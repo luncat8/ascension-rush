@@ -7,7 +7,7 @@
 
 	function findLandingPad(rocket) {
 		var pads = R.world.pads;
-		var circumference = R.constants.world.circumference;
+		var circumference = R.world.planet.circumference;
 		var nearestPad = null;
 		var nearestDistance = Infinity;
 		var distance;
@@ -21,12 +21,11 @@
 			}
 		}
 
-		return nearestDistance <= R.constants.world.landingRadius ? nearestPad : null;
+		return nearestDistance <= R.world.planet.landingRadius ? nearestPad : null;
 	}
 
 	function formatCash(value) {
-		var rounded = Math.round(Math.abs(value));
-		return (value < 0 ? '−$' : '+$') + rounded;
+		return (value < 0 ? '−$' : '+$') + Math.round(Math.abs(value));
 	}
 
 	function nextTargetId(padId) {
@@ -40,6 +39,11 @@
 		}
 		return padId;
 	}
+
+	mission.estimatedCost = function(config) {
+		R.rocket.evaluateBuild(config, buildStats);
+		return R.economy.estimateBuildCost(buildStats);
+	};
 
 	mission.launch = function(game, config) {
 		var target = R.world.findPadById(config.targetPadId);
@@ -73,7 +77,8 @@
 			fuelCost: 0,
 			structureCost: 0,
 			cashDelta: 0,
-			elapsed: 0
+			elapsed: 0,
+			usedAutopilot: R.autopilot.enabled
 		};
 
 		rocketState = game.rocket;
@@ -84,6 +89,7 @@
 		game.lastReport = null;
 		game.phase = 'flying';
 		game.physicsAccumulator = 0;
+		R.controls.reset();
 		R.economy.beginFlight(game);
 		return true;
 	};
@@ -91,12 +97,14 @@
 	mission.touchdown = function(game) {
 		var state = game.rocket;
 		var flight = game.flight;
+		var planet = R.world.planet;
 		var pad = findLandingPad(state);
-		var safe = !!pad && Math.abs(state.vy) <= R.constants.world.landingVerticalSpeed && Math.abs(state.vx) <= R.constants.world.landingHorizontalSpeed;
+		var safe = !!pad && Math.abs(state.vy) <= planet.landingVerticalSpeed && Math.abs(state.vx) <= planet.landingHorizontalSpeed;
 		var delivered = safe && pad.id === flight.targetPadId;
 		var departurePad = R.world.findPadById(flight.departedPadId);
-		var reward = delivered ? flight.payloadMass * R.economy.priceDeliveryPerKg : 0;
-		var cashDelta = R.economy.finishFlight(game, reward);
+		var reward = delivered ? flight.payloadMass * R.economy.priceDelivery() : 0;
+		var fee = delivered && flight.usedAutopilot ? reward * R.autopilot.feeFraction : 0;
+		var cashDelta = R.economy.finishFlight(game, reward, fee);
 		var landedPad = safe ? pad : departurePad;
 		var status;
 		var title;
@@ -120,6 +128,9 @@
 			title = 'CRASH · PAYLOAD LOST';
 			detail = 'The rocket missed a safe pad landing. Rebuilding at ' + departurePad.name + '. Cash flow ' + formatCash(cashDelta) + ' · Balance $' + Math.round(game.cash) + '.';
 		}
+		if (fee > 0) {
+			detail += ' Autopilot fee $' + Math.round(fee) + '.';
+		}
 
 		game.currentPadId = landedPad.id;
 		game.targetPadId = game.targetPadId === landedPad.id ? nextTargetId(landedPad.id) : game.targetPadId;
@@ -135,9 +146,8 @@
 		game.phase = 'building';
 		R.input.pointerActive = false;
 		game.physicsAccumulator = 0;
-		if (R.controls && R.controls.reset) {
-			R.controls.reset();
-		}
+		R.autopilot.reset();
+		R.controls.reset();
 		if (R.builder && R.builder.refresh) {
 			R.builder.refresh(game);
 		}

@@ -4,50 +4,70 @@
 	var R = root.R || (root.R = {});
 	var constants = R.constants || (R.constants = {});
 
-	constants.world = {
-		name: 'Verdant',
-		circumference: 1000000,
-		surfaceGravity: 9.81,
-		radius: 1000000 / (2 * Math.PI),
-		seaLevelDensity: 1.225,
-		atmosphereScaleHeight: 8500,
-		dragCoefficient: 0.04,
-		maxAltitude: 1000000,
-		logAltitudeScale: 100,
+	// Viewport layout shared by every planet.
+	constants.view = {
 		groundFraction: 0.1,
-		cameraAnchorFraction: 1 / 3,
-		landingRadius: 8000,
-		landingVerticalSpeed: 12,
-		landingHorizontalSpeed: 25
+		cameraAnchorFraction: 1 / 3
 	};
 
 	constants.rocket = {
-		tankMassPerFuelMass: 0.085,
-		engineBaseMass: 170,
-		engineThrustToMass: 125,
+		tankMassPerFuelMass: 0.075,
+		engineBaseMass: 60,
+		engineThrustToMass: 150,
 		thrustPerFuelMass: 72,
 		ispSeaLevel: 265,
 		ispVacuum: 330,
-		referenceArea: 2.2,
+		// Exhaust velocity is Isp times standard gravity, never local gravity.
+		standardGravity: 9.81,
+		referenceArea: 1.6,
+		dragCoefficient: 0.22,
 		maxAcceleration: 200,
 		fixedStep: 1 / 120,
 		maxFrameStep: 1 / 30,
+		maxSubsteps: 32,
 		throttleRate: 1.8,
-		turnRate: Math.PI,
+		turnRate: 2.4,
 		minimumLaunchTwr: 1.15,
-		maxPayloadMass: 2000,
-		minFuelMass: 300,
-		maxFuelMass: 6000,
-		defaultPayloadMass: 120,
-		defaultStageFuel: [1800, 900, 1000],
+		maxPayloadMass: 600,
+		minFuelMass: 100,
+		maxFuelMass: 1500,
+		defaultPayloadMass: 80,
+		defaultStageFuel: [420, 260, 200],
 		defaultStageStrength: [0.85, 0.9, 0.9]
 	};
 
 	constants.economy = {
-		startingCash: 30000,
-		priceFuelPerKg: 1.4,
-		priceSteelPerKg: 2.5,
-		priceDeliveryPerKg: 180
+		startingCash: 30000
+	};
+
+	constants.time = {
+		scales: [0.5, 0.75, 1, 1.5, 2, 3, 4],
+		defaultIndex: 4
+	};
+
+	// Guidance tuning for the autopilot. A planet preset may override any of
+	// these through its `flight` block.
+	constants.autopilot = {
+		liftAltitude: 60,
+		climbVelocity: 45,
+		cruiseAltitudeFraction: 0.08,
+		cruiseAltitudeMin: 120,
+		cruiseAltitudeMax: 1200,
+		glideSlope: 0.3,
+		arrivalDistance: 150,
+		arrivalAltitude: 150,
+		arrivalGain: 0.35,
+		climbMargin: 0.7,
+		descentMargin: 0.85,
+		terminalAltitude: 40,
+		touchdownVelocity: 6,
+		minimumDescent: 1.8,
+		verticalThrustShare: 0.35,
+		commitVelocity: 12,
+		velocityGain: 1.15,
+		thrustReserve: 0.92,
+		brakeMargin: 1.15,
+		speedCap: 700
 	};
 
 	constants.render = {

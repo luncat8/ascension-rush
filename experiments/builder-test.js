@@ -5,6 +5,7 @@ var R = require('../js/namespaces.js');
 
 require('../js/util.js');
 require('../js/constants.js');
+require('../js/planets.js');
 require('../js/coords.js');
 require('../js/camera.js');
 require('../js/world.js');
@@ -12,7 +13,9 @@ require('../js/rocket.js');
 require('../js/economy.js');
 require('../js/mission.js');
 require('../js/physics.js');
+require('../js/autopilot.js');
 require('../js/builder.js');
+require('../js/controls.js');
 
 function Element(value) {
 	this.value = value || '';
@@ -75,6 +78,9 @@ var elements = {
 	'builder-twr': new Element(),
 	'builder-cost': new Element(),
 	'builder-warning': new Element(),
+	'builder-planet-name': new Element(),
+	'builder-planet-button': new Element(),
+	'builder-autopilot': new Element(),
 	'launch-button': new Element()
 };
 var i;
@@ -97,10 +103,10 @@ global.document = {
 };
 
 R.world.initialize();
-var home = R.world.findPadById('homeport');
+var home = R.world.pads[0];
 var game = {
 	currentPadId: home.id,
-	targetPadId: 'eastport',
+	targetPadId: R.world.pads[1].id,
 	rocket: R.rocket.create(home),
 	phase: 'building',
 	cash: R.economy.startingCash,
@@ -120,17 +126,17 @@ assert.equal(elements['builder-warning'].textContent, '');
 assert.equal(elements['builder-target'].options.length, R.world.pads.length - 1);
 
 var target = elements['builder-target'];
-target.value = 'farport';
+target.value = R.world.pads[2].id;
 target.dispatch('change');
-assert.equal(game.targetPadId, 'farport');
+assert.equal(game.targetPadId, R.world.pads[2].id);
 
 elements['launch-button'].dispatch('click');
 assert.equal(game.phase, 'flying');
-assert.equal(game.targetPadId, 'farport');
+assert.equal(game.targetPadId, R.world.pads[2].id);
 assert.equal(elements['builder-panel'].hidden, true);
 assert.equal(elements['launch-button'].wasBlurred, true);
 
-var farport = R.world.findPadById('farport');
+var farport = R.world.pads[2];
 game.rocket.wx = farport.wx;
 game.rocket.wy = 0;
 game.rocket.vx = 0;
@@ -140,8 +146,31 @@ assert.equal(game.lastReport.status, 'delivered');
 assert.equal(elements['builder-panel'].hidden, false);
 assert.equal(elements['builder-report'].hidden, false);
 assert.equal(elements['builder-report'].dataset.status, 'delivered');
-assert.equal(game.currentPadId, 'farport');
-assert.equal(elements['builder-target'].value, 'homeport');
+assert.equal(game.currentPadId, farport.id);
+assert.equal(elements['builder-target'].value, home.id, 'the destination list excludes the pad under the rocket');
+
+// Switching worlds reloads that planet's reference build and pad list.
+R.world.initialize('cinder');
+var cinderHome = R.world.pads[0];
+game = {
+	currentPadId: cinderHome.id,
+	targetPadId: R.world.pads[1].id,
+	rocket: R.rocket.create(cinderHome),
+	phase: 'building',
+	cash: R.economy.startingCash,
+	ledger: [],
+	flight: null,
+	lastReport: null,
+	physicsAccumulator: 0
+};
+R.game = game;
+R.builder.refresh(game);
+assert.equal(elements['builder-planet-name'].textContent, 'Cinder');
+assert.equal(elements['builder-payload'].value, '60', 'payload slider adopts the planet default');
+assert.equal(elements['builder-fuel-0'].value, '1500', 'booster fuel adopts the planet default');
+assert.equal(elements['builder-fuel-2'].value, '400', 'kick stage fuel adopts the planet default');
+assert.equal(elements['builder-target'].options.length, 3);
+assert.equal(elements['launch-button'].disabled, false, 'cinder reference build clears the launch TWR gate');
 
 console.log('Builder and launch-flow tests passed.');
 delete global.document;

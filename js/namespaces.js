@@ -5,6 +5,7 @@
 
 	R.constants = R.constants || {};
 	R.util = R.util || {};
+	R.planets = R.planets || {};
 	R.coords = R.coords || {};
 	R.world = R.world || {};
 	R.camera = R.camera || {};
@@ -12,6 +13,8 @@
 	R.physics = R.physics || {};
 	R.economy = R.economy || {};
 	R.mission = R.mission || {};
+	R.autopilot = R.autopilot || {};
+	R.menu = R.menu || {};
 	R.builder = R.builder || {};
 	R.controls = R.controls || {};
 	R.input = R.input || {};

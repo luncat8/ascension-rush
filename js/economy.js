@@ -5,17 +5,27 @@
 	var economy = R.economy || (R.economy = {});
 
 	economy.startingCash = R.constants.economy.startingCash;
-	economy.priceFuelPerKg = R.constants.economy.priceFuelPerKg;
-	economy.priceSteelPerKg = R.constants.economy.priceSteelPerKg;
-	economy.priceDeliveryPerKg = R.constants.economy.priceDeliveryPerKg;
+
+	// Prices live on the active planet so each world can have its own market.
+	economy.priceFuel = function() {
+		return R.world.planet.prices.fuel;
+	};
+
+	economy.priceSteel = function() {
+		return R.world.planet.prices.steel;
+	};
+
+	economy.priceDelivery = function() {
+		return R.world.planet.prices.delivery;
+	};
 
 	economy.estimateBuildCost = function(stats) {
-		return stats.dryMass * economy.priceSteelPerKg + stats.fuelMass * economy.priceFuelPerKg;
+		return stats.dryMass * economy.priceSteel() + stats.fuelMass * economy.priceFuel();
 	};
 
 	economy.beginFlight = function(game) {
 		var flight = game.flight;
-		var structureCost = flight.dryMass * economy.priceSteelPerKg;
+		var structureCost = flight.dryMass * economy.priceSteel();
 
 		game.cash -= structureCost;
 		flight.structureCost = structureCost;
@@ -30,20 +40,18 @@
 
 	economy.consumeFuel = function(game, fuelMass) {
 		var flight = game.flight;
-		var cost;
 
 		if (!flight || fuelMass <= 0) {
 			return;
 		}
 
-		cost = fuelMass * economy.priceFuelPerKg;
-		game.cash -= cost;
+		flight.fuelCost += fuelMass * economy.priceFuel();
+		game.cash -= fuelMass * economy.priceFuel();
 		flight.fuelUsed += fuelMass;
-		flight.fuelCost += cost;
-		flight.cashDelta -= cost;
+		flight.cashDelta -= fuelMass * economy.priceFuel();
 	};
 
-	economy.finishFlight = function(game, reward) {
+	economy.finishFlight = function(game, reward, fee) {
 		var flight = game.flight;
 
 		if (flight.fuelCost > 0) {
@@ -53,6 +61,11 @@
 			game.cash += reward;
 			flight.cashDelta += reward;
 			game.ledger.push({ type: 'delivery', amount: reward, balance: game.cash });
+		}
+		if (fee > 0) {
+			game.cash -= fee;
+			flight.cashDelta -= fee;
+			game.ledger.push({ type: 'autopilot', amount: -fee, balance: game.cash });
 		}
 		return flight.cashDelta;
 	};

@@ -20,8 +20,10 @@
 	render.scratch = {
 		pad: { x: 0, y: 0 },
 		rocket: { x: 0, y: 0 },
-		crosshair: { x: 0, y: 0 }
+		crosshair: { x: 0, y: 0 },
+		landing: { x: 0, y: 0 }
 	};
+	render.timeLabel = { index: -1, text: 'x1' };
 
 	function drawPanel(context, x, y, width, height) {
 		var radius = 10;
@@ -85,7 +87,7 @@
 	function drawPads(context, game) {
 		var pads = R.world.pads;
 		var camera = R.camera;
-		var circumference = R.constants.world.circumference;
+		var circumference = R.world.planet.circumference;
 		var width = render.width;
 		var surfaceY = camera.groundY;
 		var i;
@@ -222,7 +224,7 @@
 		var panelHeight = 93;
 		var x = render.width - panelWidth - margin;
 		var y = 20;
-		var world = R.constants.world;
+		var world = R.world.planet;
 
 		if (render.width < 650) {
 			return;
@@ -266,12 +268,12 @@
 		var rocket = game.rocket;
 		var stage = R.rocket.activeStage(rocket);
 		var target = R.world.findPadById(game.targetPadId);
-		var targetDistance = target ? Math.abs(R.util.wrapDelta(target.wx - rocket.wx, R.constants.world.circumference)) : 0;
+		var targetDistance = target ? Math.abs(R.util.wrapDelta(target.wx - rocket.wx, R.world.planet.circumference)) : 0;
 		var fuelFraction = stage && stage.fuelMax > 0 ? stage.fuelMass / stage.fuelMax : 0;
 		var heading = Math.round(R.util.mod(rocket.heading, Math.PI * 2) * 180 / Math.PI);
 		var margin = Math.min(24, render.width * 0.05);
 		var panelWidth = 230;
-		var panelHeight = 221;
+		var panelHeight = 262;
 		var x = render.width - panelWidth - margin;
 		var y = 20;
 
@@ -367,17 +369,45 @@
 		context.fillText(game.flight.cashDelta < 0 ? '−$' : '+$', x + panelWidth - 58, y + 188);
 		context.fillText(Math.round(Math.abs(game.flight.cashDelta)), x + panelWidth - 16, y + 188);
 
+		context.fillStyle = '#a8bac2';
+		context.textAlign = 'left';
+		context.fillText('AUTOPILOT', x + 16, y + 209);
+		context.textAlign = 'right';
+		if (R.autopilot.enabled) {
+			context.fillStyle = '#7de0ca';
+			context.fillText(R.autopilot.label(), x + panelWidth - 16, y + 209);
+		} else {
+			context.fillStyle = '#829ba6';
+			context.fillText('OFF', x + panelWidth - 16, y + 209);
+		}
+
+		context.textAlign = 'left';
+		context.fillStyle = '#a8bac2';
+		context.fillText('TIME SCALE', x + 16, y + 230);
+		context.textAlign = 'right';
+		context.fillStyle = '#e7eff6';
+		context.fillText(timeLabel(game), x + panelWidth - 16, y + 230);
+
 		context.fillStyle = '#829ba6';
 		context.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
 		context.textAlign = 'left';
-		context.fillText('SHIFT / CTRL  THROTTLE     SPACE  STAGE', x + 16, y + 208);
+		context.fillText('A  AUTOPILOT    [ ]  TIME    SHIFT/CTRL  THROTTLE', x + 16, y + 250);
+	}
+
+	// Cached so the frame loop does not build a new string every tick.
+	function timeLabel(game) {
+		if (render.timeLabel.index !== game.timeScaleIndex) {
+			render.timeLabel.index = game.timeScaleIndex;
+			render.timeLabel.text = game.timeScale.toFixed(2).replace(/\.?0+$/, '') + 'x';
+		}
+		return render.timeLabel.text;
 	}
 
 	function drawStatusStrip(context, game) {
 		var margin = Math.min(24, render.width * 0.05);
 		var width = Math.min(350, render.width - margin * 2);
 		var y = R.camera.groundY - 46;
-		var label = game.phase === 'flying' ? 'MOUSE AIM  ·  SHIFT / CTRL THROTTLE  ·  SPACE STAGE' : 'PAD READY  ·  BUILDER OPEN  ·  CHOOSE A DESTINATION';
+		var label = game.phase === 'flying' ? 'MOUSE AIM  ·  SHIFT / CTRL THROTTLE  ·  SPACE STAGE  ·  A AUTOPILOT' : 'PAD READY  ·  BUILDER OPEN  ·  CHOOSE A DESTINATION';
 
 		drawPanel(context, margin, y, width, 30);
 		context.fillStyle = game.phase === 'flying' ? '#f4c76a' : '#7de0ca';
@@ -433,6 +463,30 @@
 		context.fillText(input.debugText, textX, textY);
 	}
 
+	function drawLandingMarker(context, game) {
+		var landing = R.autopilot.landing;
+		var point = render.scratch.landing;
+		var groundY = R.camera.groundY;
+
+		if (game.phase !== 'flying' || !R.autopilot.enabled || !landing.valid) {
+			return;
+		}
+		R.camera.project(landing.wx, 0, point);
+		if (point.x < -12 || point.x > render.width + 12) {
+			return;
+		}
+
+		context.beginPath();
+		context.moveTo(point.x, groundY - 16);
+		context.lineTo(point.x - 6, groundY - 27);
+		context.lineTo(point.x + 6, groundY - 27);
+		context.closePath();
+		context.fillStyle = 'rgba(125, 224, 202, 0.9)';
+		context.fill();
+		context.fillStyle = 'rgba(125, 224, 202, 0.34)';
+		context.fillRect(point.x - 0.5, groundY - 16, 1, 16);
+	}
+
 	render.initialize = function(context) {
 		var tile = root.document.createElement('canvas');
 		var tileContext;
@@ -485,6 +539,7 @@
 		drawAltitudeScale(context);
 		drawGround(context);
 		drawPads(context, game);
+		drawLandingMarker(context, game);
 
 		R.camera.project(rocket.wx, rocket.wy, render.scratch.rocket);
 		R.rocket.draw(context, render.scratch.rocket.x, render.scratch.rocket.y, rocket.heading, flameThrottle);

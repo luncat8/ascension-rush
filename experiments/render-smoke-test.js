@@ -72,6 +72,7 @@ global.document = {
 var R = require('../js/namespaces.js');
 require('../js/util.js');
 require('../js/constants.js');
+require('../js/planets.js');
 require('../js/coords.js');
 require('../js/camera.js');
 require('../js/world.js');
@@ -79,10 +80,12 @@ require('../js/rocket.js');
 require('../js/economy.js');
 require('../js/mission.js');
 require('../js/physics.js');
+require('../js/autopilot.js');
 require('../js/builder.js');
 require('../js/controls.js');
 require('../js/input.js');
 require('../js/render.js');
+require('../js/menu.js');
 
 R.world.initialize();
 R.camera.resize(1280, 720);
@@ -129,6 +132,8 @@ R.render.draw({
 	phase: 'flying',
 	flight: { cashDelta: -600 },
 	cash: 29400,
+	timeScaleIndex: R.constants.time.defaultIndex,
+	timeScale: R.constants.time.scales[R.constants.time.defaultIndex],
 	rocket: flightRocket
 });
 

@@ -19,6 +19,10 @@
         <p class="eyebrow">ASCENSION RUSH / FLIGHT DECK</p>
         <h1>Rocket builder</h1>
       </div>
+      <div class="builder-cash">
+        <span>WORLD</span><strong id="builder-planet-name">Verdant</strong>
+        <button id="builder-planet-button" class="ghost-button" type="button">Switch…</button>
+      </div>
       <div class="builder-cash"><span>AVAILABLE</span><strong>$<b id="builder-cash">30,000</b></strong></div>
     </header>
 
@@ -43,31 +47,31 @@
 
     <section class="stage-card" id="builder-stage-0">
       <header><strong>Stage 1 · Booster</strong><span>burns first</span></header>
-      <label for="builder-fuel-0">Fuel capacity <output id="builder-fuel-value-0">1,800 kg</output></label>
-      <input id="builder-fuel-0" type="range" min="300" max="6000" step="50" value="1800">
+      <label for="builder-fuel-0">Fuel capacity <output id="builder-fuel-value-0">420 kg</output></label>
+      <input id="builder-fuel-0" type="range" min="100" max="1500" step="10" value="420">
       <label for="builder-strength-0">Structure strength <output id="builder-strength-value-0">85%</output></label>
       <input id="builder-strength-0" type="range" min="0.5" max="1" step="0.05" value="0.85">
     </section>
 
     <section class="stage-card" id="builder-stage-1">
       <header><strong>Stage 2 · Upper stage</strong><span>burns second</span></header>
-      <label for="builder-fuel-1">Fuel capacity <output id="builder-fuel-value-1">900 kg</output></label>
-      <input id="builder-fuel-1" type="range" min="300" max="6000" step="50" value="900">
+      <label for="builder-fuel-1">Fuel capacity <output id="builder-fuel-value-1">260 kg</output></label>
+      <input id="builder-fuel-1" type="range" min="100" max="1500" step="10" value="260">
       <label for="builder-strength-1">Structure strength <output id="builder-strength-value-1">90%</output></label>
       <input id="builder-strength-1" type="range" min="0.5" max="1" step="0.05" value="0.9">
     </section>
 
     <section class="stage-card" id="builder-stage-2">
       <header><strong>Stage 3 · Kick stage</strong><span>burns last</span></header>
-      <label for="builder-fuel-2">Fuel capacity <output id="builder-fuel-value-2">1,000 kg</output></label>
-      <input id="builder-fuel-2" type="range" min="300" max="6000" step="50" value="1000">
+      <label for="builder-fuel-2">Fuel capacity <output id="builder-fuel-value-2">200 kg</output></label>
+      <input id="builder-fuel-2" type="range" min="100" max="1500" step="10" value="200">
       <label for="builder-strength-2">Structure strength <output id="builder-strength-value-2">90%</output></label>
       <input id="builder-strength-2" type="range" min="0.5" max="1" step="0.05" value="0.9">
     </section>
 
     <div class="builder-control payload-control">
-      <label for="builder-payload">Payload mass <output id="builder-payload-value">120 kg</output></label>
-      <input id="builder-payload" type="range" min="0" max="2000" step="10" value="120">
+      <label for="builder-payload">Payload mass <output id="builder-payload-value">80 kg</output></label>
+      <input id="builder-payload" type="range" min="0" max="600" step="10" value="80">
     </div>
 
     <section class="build-summary" aria-label="Rocket estimates">
@@ -79,14 +83,28 @@
       <div class="summary-cost"><span>Estimated flight cost</span><strong>$<b id="builder-cost">—</b></strong></div>
     </section>
 
+    <label class="builder-toggle"><input id="builder-autopilot" type="checkbox"> Hand the flight to the autopilot</label>
+    <p class="builder-hint">Autopilot flies the same physics you do and keeps 10% of the delivery reward.</p>
+
     <p id="builder-warning" class="builder-warning" aria-live="polite"></p>
     <button id="launch-button" class="launch-button" type="button">Launch · full throttle</button>
-    <p class="builder-help">Mouse aims · Shift/Ctrl throttle · Space stages</p>
+    <p class="builder-help">Mouse aims · Shift/Ctrl throttle · Space stages · A autopilot · [ ] time scale</p>
   </aside>
+  <div id="planet-menu" class="planet-menu" hidden>
+    <section class="planet-menu-panel" aria-label="Choose a world">
+      <p class="eyebrow">ASCENSION RUSH / DELIVERY NETWORK</p>
+      <h1>Choose a world</h1>
+      <p class="planet-menu-note">Small worlds on purpose: one pad-to-pad hop should fly in about 20–40 s of
+        game time. Use the time scale to slow down for landing (0.5x) or shorten the cruise (4x).</p>
+      <div id="planet-list" class="planet-list"></div>
+      <button id="planet-menu-close" class="ghost-button" type="button">Keep flying the current run</button>
+    </section>
+  </div>
 </main>
 <script src="js/namespaces.js"></script>
 <script src="js/util.js"></script>
 <script src="js/constants.js"></script>
+<script src="js/planets.js"></script>
 <script src="js/coords.js"></script>
 <script src="js/camera.js"></script>
 <script src="js/world.js"></script>
@@ -94,10 +112,12 @@
 <script src="js/economy.js"></script>
 <script src="js/mission.js"></script>
 <script src="js/physics.js"></script>
+<script src="js/autopilot.js"></script>
 <script src="js/builder.js"></script>
 <script src="js/controls.js"></script>
 <script src="js/input.js"></script>
 <script src="js/render.js"></script>
+<script src="js/menu.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

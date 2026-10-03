@@ -14,7 +14,7 @@
 	var i;
 
 	builder.config = {
-		targetPadId: 'eastport',
+		targetPadId: '',
 		stageCount: 3,
 		payloadMass: settings.defaultPayloadMass,
 		stages: [
@@ -25,6 +25,7 @@
 	};
 	builder.initialized = false;
 	builder.lastCurrentPadId = null;
+	builder.lastPlanetId = null;
 
 	function getElement(id) {
 		return root.document.getElementById(id);
@@ -52,8 +53,10 @@
 
 	function populateTargets(game) {
 		var pads = R.world.pads;
+		var source = R.world.findPadById(game.currentPadId);
 		var option;
 		var selectedId = builder.config.targetPadId;
+		var distance;
 		var i;
 
 		ui.target.innerHTML = '';
@@ -61,9 +64,10 @@
 			if (pads[i].id === game.currentPadId) {
 				continue;
 			}
+			distance = Math.abs(R.util.wrapDelta(pads[i].wx - source.wx, R.world.planet.circumference));
 			option = root.document.createElement('option');
 			option.value = pads[i].id;
-			option.textContent = pads[i].name;
+			option.textContent = pads[i].name + ' · ' + (Math.round(distance / 100) / 10) + ' km';
 			ui.target.appendChild(option);
 		}
 
@@ -73,6 +77,26 @@
 		ui.target.value = selectedId;
 		builder.config.targetPadId = selectedId;
 		builder.lastCurrentPadId = game.currentPadId;
+		builder.lastPlanetId = R.world.planet.id;
+	}
+
+	// A planet switch loads that world's reference build: fuel masses and
+	// payload that its gravity and air can actually lift.
+	function applyPlanetDefaults() {
+		var planet = R.world.planet;
+		var fuel = planet.defaultFuel || settings.defaultStageFuel;
+		var j;
+
+		builder.config.payloadMass = planet.defaultPayload || settings.defaultPayloadMass;
+		for (j = 0; j < 3; j += 1) {
+			builder.config.stages[j].fuelMass = fuel[j];
+		}
+		if (builder.initialized) {
+			ui.payload.value = String(builder.config.payloadMass);
+			for (j = 0; j < 3; j += 1) {
+				stageFuelInputs[j].value = String(fuel[j]);
+			}
+		}
 	}
 
 	function readInputs(game) {
@@ -100,6 +124,12 @@
 
 		ui.panel.hidden = game.phase !== 'building';
 		ui.cash.textContent = formatMoney(game.cash);
+		if (ui.planetName) {
+			ui.planetName.textContent = R.world.planet.name;
+		}
+		if (ui.autopilot) {
+			ui.autopilot.checked = R.autopilot.enabled;
+		}
 		ui.report.hidden = !game.lastReport;
 		if (game.lastReport) {
 			ui.reportTitle.textContent = game.lastReport.title;
@@ -202,6 +232,9 @@
 		ui.cost = getElement('builder-cost');
 		ui.warning = getElement('builder-warning');
 		ui.launch = getElement('launch-button');
+		ui.planetName = getElement('builder-planet-name');
+		ui.planetButton = getElement('builder-planet-button');
+		ui.autopilot = getElement('builder-autopilot');
 
 		for (i = 0; i < 3; i += 1) {
 			stageCards[i] = getElement('builder-stage-' + i);
@@ -215,6 +248,16 @@
 			stageStrengthValues[i] = getElement('builder-strength-value-' + i);
 		}
 
+		if (ui.planetButton) {
+			ui.planetButton.addEventListener('click', function() {
+				R.menu.show();
+			});
+		}
+		if (ui.autopilot) {
+			ui.autopilot.addEventListener('change', function() {
+				R.autopilot.setEnabled(ui.autopilot.checked);
+			});
+		}
 		ui.target.addEventListener('change', onInput);
 		ui.stageCount.addEventListener('change', onInput);
 		ui.payload.addEventListener('input', onInput);
@@ -228,6 +271,7 @@
 		ui.payload.value = String(builder.config.payloadMass);
 		builder.initialized = true;
 		builder.lastCurrentPadId = null;
+		builder.lastPlanetId = null;
 		builder.config.targetPadId = game.targetPadId;
 		builder.refresh(game);
 	};
@@ -236,7 +280,10 @@
 		if (!builder.initialized) {
 			return;
 		}
-		if (builder.lastCurrentPadId !== game.currentPadId) {
+		if (builder.lastPlanetId !== R.world.planet.id) {
+			applyPlanetDefaults();
+			populateTargets(game);
+		} else if (builder.lastCurrentPadId !== game.currentPadId) {
 			populateTargets(game);
 		}
 		update(game);

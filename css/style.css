@@ -322,3 +322,125 @@ input[type="range"] {
 		font-size: 19px;
 	}
 }
+
+.ghost-button {
+	margin-top: 6px;
+	padding: 4px 8px;
+	border: 1px solid rgba(160, 196, 208, 0.28);
+	border-radius: 6px;
+	background: rgba(160, 196, 208, 0.07);
+	color: #b9d4dd;
+	font: 10px ui-monospace, SFMono-Regular, Menlo, monospace;
+	cursor: pointer;
+}
+
+.ghost-button:hover {
+	border-color: rgba(125, 224, 202, 0.5);
+	color: #9be6d7;
+}
+
+.builder-toggle {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 4px 0 0;
+	color: #b9cbd2;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.builder-toggle input {
+	accent-color: #64d5c2;
+}
+
+.builder-hint {
+	margin: 5px 0 10px;
+	color: #7893a0;
+	font-size: 10px;
+	line-height: 1.45;
+}
+
+.planet-menu[hidden] {
+	display: none;
+}
+
+.planet-menu {
+	position: fixed;
+	z-index: 5;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 20px;
+	background: rgba(4, 10, 18, 0.72);
+	backdrop-filter: blur(6px);
+}
+
+.planet-menu-panel {
+	width: min(760px, 100%);
+	max-height: calc(100vh - 40px);
+	overflow: auto;
+	padding: 22px;
+	border: 1px solid rgba(180, 209, 221, 0.22);
+	border-radius: 16px;
+	background: rgba(7, 18, 30, 0.98);
+	box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+}
+
+.planet-menu-panel h1 {
+	margin: 5px 0 8px;
+	font-size: 24px;
+	letter-spacing: -0.03em;
+}
+
+.planet-menu-note {
+	margin: 0 0 16px;
+	color: #9fb6c0;
+	font-size: 12px;
+	line-height: 1.5;
+}
+
+.planet-list {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+	gap: 10px;
+	margin-bottom: 14px;
+}
+
+.planet-card {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 13px;
+	border: 1px solid rgba(150, 180, 194, 0.18);
+	border-radius: 10px;
+	background: rgba(18, 39, 53, 0.7);
+	color: #e7eff6;
+	text-align: left;
+	cursor: pointer;
+}
+
+.planet-card:hover {
+	border-color: rgba(125, 224, 202, 0.55);
+	background: rgba(22, 51, 66, 0.85);
+}
+
+.planet-card.is-current {
+	border-color: rgba(244, 199, 106, 0.6);
+}
+
+.planet-card strong {
+	font-size: 16px;
+}
+
+.planet-card span {
+	color: #b8cbd1;
+	font-size: 11px;
+	line-height: 1.45;
+}
+
+.planet-card em {
+	color: #8da6b1;
+	font: 10px ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-style: normal;
+}

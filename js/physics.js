@@ -5,22 +5,22 @@
 	var physics = R.physics || (R.physics = {});
 
 	physics.gravityAtAltitude = function(altitude) {
-		var world = R.constants.world;
-		var radius = world.radius;
-		var distance = radius + Math.max(0, altitude);
-		var ratio = radius / distance;
+		var planet = R.world.planet;
+		var distance = planet.radius + Math.max(0, altitude);
+		var ratio = planet.radius / distance;
 
-		return world.surfaceGravity * ratio * ratio;
+		return planet.surfaceGravity * ratio * ratio;
 	};
 
 	physics.densityAtAltitude = function(altitude) {
-		var world = R.constants.world;
-		return world.seaLevelDensity * Math.exp(-Math.max(0, altitude) / world.atmosphereScaleHeight);
+		var planet = R.world.planet;
+
+		return planet.seaLevelDensity * Math.exp(-Math.max(0, altitude) / planet.atmosphereScaleHeight);
 	};
 
 	physics.step = function(game, dt) {
 		var state = game.rocket;
-		var world = R.constants.world;
+		var planet = R.world.planet;
 		var settings = R.constants.rocket;
 		var stage = R.rocket.activeStage(state);
 		var oldWx = state.wx;
@@ -53,10 +53,16 @@
 		}
 
 		if (stage && stage.fuelMass > 0 && state.throttle > 0) {
-			isp = stage.ispSea + (stage.ispVac - stage.ispSea) * (1 - density / world.seaLevelDensity);
-			isp = Math.max(stage.ispSea, Math.min(stage.ispVac, isp));
+			// Vacuum engines on an airless world, sea-level interpolation only
+			// where there is an atmosphere to interpolate against.
+			if (planet.seaLevelDensity > 0) {
+				isp = stage.ispSea + (stage.ispVac - stage.ispSea) * (1 - density / planet.seaLevelDensity);
+				isp = Math.max(stage.ispSea, Math.min(stage.ispVac, isp));
+			} else {
+				isp = stage.ispVac;
+			}
 			thrust = stage.thrustMax * state.throttle;
-			massFlow = thrust / (isp * world.surfaceGravity);
+			massFlow = thrust / (isp * settings.standardGravity);
 			burn = Math.min(stage.fuelMass, massFlow * dt);
 			stage.fuelMass -= burn;
 			if (stage.fuelMass < 1e-9) {
@@ -69,7 +75,7 @@
 
 		massAfter = R.rocket.totalMass(state);
 		mass = Math.max(1, (massBefore + massAfter) * 0.5);
-		dragScale = 0.5 * density * world.dragCoefficient * settings.referenceArea * speed / mass;
+		dragScale = 0.5 * density * settings.dragCoefficient * settings.referenceArea * speed / mass;
 		accelerationX = thrust * Math.sin(state.heading) / mass - dragScale * oldVx;
 		accelerationY = thrust * Math.cos(state.heading) / mass - gravity - dragScale * oldVy;
 		acceleration = Math.sqrt(accelerationX * accelerationX + accelerationY * accelerationY);
@@ -101,21 +107,27 @@
 		return false;
 	};
 
+	// Frame time is capped so a refocus pause cannot teleport the rocket.
+	// Time scale multiplies the simulation budget, not the fixed step, so
+	// physics stays deterministic at every multiplier.
 	physics.advance = function(game, frameDt) {
-		var step = R.constants.rocket.fixedStep;
-		var dt = Math.min(Math.max(0, frameDt), R.constants.rocket.maxFrameStep);
+		var settings = R.constants.rocket;
+		var dt;
+		var steps = 0;
 
 		if (game.phase !== 'flying') {
 			game.physicsAccumulator = 0;
 			return;
 		}
 
+		dt = Math.min(Math.max(0, frameDt), settings.maxFrameStep) * (game.timeScale || 1);
 		game.physicsAccumulator += dt;
-		while (game.physicsAccumulator >= step && game.phase === 'flying') {
-			game.physicsAccumulator -= step;
-			physics.step(game, step);
+		while (game.physicsAccumulator >= settings.fixedStep && game.phase === 'flying' && steps < settings.maxSubsteps) {
+			game.physicsAccumulator -= settings.fixedStep;
+			physics.step(game, settings.fixedStep);
+			steps += 1;
 		}
-		if (game.phase !== 'flying') {
+		if (game.phase !== 'flying' || steps >= settings.maxSubsteps) {
 			game.physicsAccumulator = 0;
 		}
 	};

@@ -42,7 +42,7 @@
 
 	rocket.evaluateBuild = function(config, out) {
 		var settings = R.constants.rocket;
-		var planet = R.constants.world;
+		var planet = R.world.planet;
 		var result = out || rocket.createStats();
 		var count = R.util.clamp(Math.floor(config.stageCount), 1, stageSlots);
 		var payload = Math.max(0, config.payloadMass);
@@ -94,7 +94,7 @@
 			fuel = Math.max(0, stage.fuelMass);
 			finalMass = mass - fuel;
 			if (fuel > 0 && finalMass > 0) {
-				result.deltaV += R.constants.world.surfaceGravity * averageIsp * Math.log(mass / finalMass);
+				result.deltaV += settings.standardGravity * averageIsp * Math.log(mass / finalMass);
 			}
 			mass = finalMass - result.stageDryMass[i];
 			if (mass <= 0) {

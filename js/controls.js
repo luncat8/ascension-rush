@@ -3,7 +3,7 @@
 
 	var R = root.R || (root.R = {});
 	var controls = R.controls || (R.controls = {});
-	var game = null;
+
 	var throttleUp = false;
 	var throttleDown = false;
 	var headingScreen = { x: 0, y: 0 };
@@ -11,7 +11,26 @@
 	function isFormTarget(event) {
 		var target = event.target;
 		var tagName = target && target.tagName;
+
 		return tagName === 'INPUT' || tagName === 'SELECT' || tagName === 'TEXTAREA' || tagName === 'BUTTON';
+	}
+
+	function requestStage() {
+		if (R.game && R.game.phase === 'flying') {
+			R.rocket.separateStage(R.game.rocket);
+		}
+	}
+
+	function adjustTimeScale(step) {
+		var scales = R.constants.time.scales;
+		var index;
+
+		if (!R.game) {
+			return;
+		}
+		index = R.util.clamp(R.game.timeScaleIndex + step, 0, scales.length - 1);
+		R.game.timeScaleIndex = index;
+		R.game.timeScale = scales[index];
 	}
 
 	function onKeyDown(event) {
@@ -26,15 +45,29 @@
 			throttleDown = true;
 			return;
 		}
+		if (event.code === 'BracketLeft' || event.key === '[') {
+			adjustTimeScale(-1);
+			return;
+		}
+		if (event.code === 'BracketRight' || event.key === ']') {
+			adjustTimeScale(1);
+			return;
+		}
+		if (event.code === 'KeyA') {
+			if (R.game && R.game.phase === 'flying') {
+				R.autopilot.toggle();
+			}
+			return;
+		}
 		if (event.code !== 'Space') {
 			return;
 		}
 
 		event.preventDefault();
-		if (event.repeat || !game || game.phase !== 'flying') {
+		if (event.repeat) {
 			return;
 		}
-		R.rocket.separateStage(game.rocket);
+		requestStage();
 	}
 
 	function onKeyUp(event) {
@@ -46,8 +79,7 @@
 		}
 	}
 
-	controls.initialize = function(currentGame) {
-		game = currentGame;
+	controls.initialize = function() {
 		root.addEventListener('keydown', onKeyDown);
 		root.addEventListener('keyup', onKeyUp);
 		root.addEventListener('blur', controls.reset);
@@ -58,21 +90,53 @@
 		throttleDown = false;
 	};
 
+	controls.setTimeScaleIndex = function(index) {
+		var scales = R.constants.time.scales;
+
+		if (!R.game) {
+			return;
+		}
+		R.game.timeScaleIndex = R.util.clamp(index, 0, scales.length - 1);
+		R.game.timeScale = scales[R.game.timeScaleIndex];
+	};
+
+	// Shared actuators: player input and autopilot commands both pass through
+	// the same turn-rate and throttle-rate limits.
+	controls.applyHeading = function(state, desiredHeading, dt) {
+		var maxTurn = R.constants.rocket.turnRate * dt;
+		var delta = R.util.wrapDelta(desiredHeading - state.heading, Math.PI * 2);
+
+		state.heading = R.util.mod(state.heading + R.util.clamp(delta, -maxTurn, maxTurn), Math.PI * 2);
+	};
+
+	controls.applyThrottle = function(state, desiredThrottle, dt) {
+		var rate = R.constants.rocket.throttleRate * dt;
+
+		state.throttle = R.util.clamp(state.throttle + R.util.clamp(desiredThrottle - state.throttle, -rate, rate), 0, 1);
+	};
+
 	controls.update = function(currentGame, dt) {
 		var state = currentGame.rocket;
 		var input = R.input;
 		var dx;
 		var dy;
-		var desiredHeading;
-		var headingDelta;
-		var maxTurn;
 
 		if (currentGame.phase !== 'flying') {
 			controls.reset();
 			return;
 		}
 
-		state.throttle = R.util.clamp(state.throttle + (Number(throttleUp) - Number(throttleDown)) * R.constants.rocket.throttleRate * dt, 0, 1);
+		if (R.autopilot.enabled) {
+			R.autopilot.update(currentGame);
+			controls.applyHeading(state, R.autopilot.command.heading, dt);
+			controls.applyThrottle(state, R.autopilot.command.throttle, dt);
+			if (R.autopilot.command.stage) {
+				R.rocket.separateStage(state);
+			}
+			return;
+		}
+
+		controls.applyThrottle(state, state.throttle + (Number(throttleUp) - Number(throttleDown)) * R.constants.rocket.throttleRate * dt, dt);
 		if (!input.pointerActive) {
 			return;
 		}
@@ -83,11 +147,7 @@
 		if (dx * dx + dy * dy < 64) {
 			return;
 		}
-
-		desiredHeading = Math.atan2(dx, dy);
-		headingDelta = R.util.wrapDelta(desiredHeading - state.heading, Math.PI * 2);
-		maxTurn = R.constants.rocket.turnRate * dt;
-		state.heading = R.util.mod(state.heading + R.util.clamp(headingDelta, -maxTurn, maxTurn), Math.PI * 2);
+		controls.applyHeading(state, Math.atan2(dx, dy), dt);
 	};
 
 	if (typeof module !== 'undefined' && module.exports) {

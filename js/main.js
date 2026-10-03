@@ -3,11 +3,39 @@
 
 	var R = root.R || (root.R = {});
 	var main = {};
+	var game = null;
+
+	function createRun() {
+		var timeIndex = R.constants.time.defaultIndex;
+
+		return {
+			currentPadId: R.world.currentPadId,
+			targetPadId: R.world.targetPadId,
+			rocket: R.rocket.create(R.world.findPadById(R.world.currentPadId)),
+			phase: 'building',
+			cash: R.economy.startingCash,
+			ledger: [],
+			flight: null,
+			lastReport: null,
+			simTime: 0,
+			physicsAccumulator: 0,
+			timeScaleIndex: timeIndex,
+			timeScale: R.constants.time.scales[timeIndex]
+		};
+	}
+
+	function update(dt) {
+		var simDt = Math.min(Math.max(0, dt), R.constants.rocket.maxFrameStep) * game.timeScale;
+
+		game.simTime += simDt;
+		R.controls.update(game, simDt);
+		R.physics.advance(game, dt);
+		R.autopilot.updateLandingPrediction(game);
+	}
 
 	function start() {
 		var canvas = root.document.getElementById('c');
 		var context;
-		var game;
 		var previousTimestamp = 0;
 
 		if (!canvas) {
@@ -20,24 +48,14 @@
 		}
 
 		R.world.initialize();
-		game = {
-			currentPadId: R.world.currentPadId,
-			targetPadId: R.world.targetPadId,
-			rocket: R.rocket.create(R.world.findPadById(R.world.currentPadId)),
-			phase: 'building',
-			cash: R.economy.startingCash,
-			ledger: [],
-			flight: null,
-			lastReport: null,
-			simTime: 0,
-			physicsAccumulator: 0
-		};
+		game = createRun();
 		R.game = game;
 
 		R.render.initialize(context);
 		R.input.initialize(canvas, R.camera);
-		R.controls.initialize(game);
+		R.controls.initialize();
 		R.builder.initialize(game);
+		R.menu.initialize();
 
 		function resize() {
 			var width = Math.max(1, root.innerWidth);
@@ -51,12 +69,6 @@
 			R.camera.follow(game.rocket.wx);
 			R.input.resize(R.camera);
 			R.render.draw(game);
-		}
-
-		function update(dt) {
-			game.simTime += dt;
-			R.controls.update(game, dt);
-			R.physics.advance(game, dt);
 		}
 
 		function frame(timestamp) {
@@ -76,6 +88,20 @@
 		resize();
 		root.requestAnimationFrame(frame);
 	}
+
+	// Start a fresh run, optionally on another world. The builder panel and
+	// key handlers live for the whole session; only game state is replaced.
+	main.restart = function(planetId) {
+		R.world.initialize(planetId);
+		game = createRun();
+		R.game = game;
+		R.autopilot.setEnabled(false);
+		R.autopilot.reset();
+		R.controls.setTimeScaleIndex(R.constants.time.defaultIndex);
+		R.builder.refresh(game);
+		R.camera.follow(game.rocket.wx);
+		R.render.draw(game);
+	};
 
 	main.start = start;
 
