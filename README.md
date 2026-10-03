@@ -33,11 +33,13 @@ failures are not implemented yet.
 
 ## Plans (subject-numbered, not version sequence)
 Active:
-- [`0.3.x-plan.md`](./0.3.x-plan.md) — Aerodynamics, Q / acceleration-aware autopilot, drag-aware impact prediction & flight diagnostics (0.3.1–0.3.4 implemented; 0.3.x is complete).
+- [`0.3.5-plan.md`](./0.3.5-plan.md) — Autopilot operations deck: pad-to-pad dispatch, return flights, fleet availability, flight logs, and reusable automatic routes.
 - [`0.4-plan.md`](./0.4-plan.md) — Economy balance, parts catalog with service/repair, market prices & contract board.
 - [`0.5-plan.md`](./0.5-plan.md) — Damage/failures mid-flight and landing, competitor company AI.
 
-Implemented, kept in `archive/` next to their worklogs:
+Implemented, kept in `archive/` next to their worklogs (the completed 0.3.x
+umbrella plan remains at the repository root):
+- [`0.3.x-plan.md`](./0.3.x-plan.md) — Aerodynamics, Q / acceleration-aware autopilot, drag-aware impact prediction, flight diagnostics, and staging authority (0.3.1–0.3.4).
 - [`archive/0.1.0-plan.md`](./archive/0.1.0-plan.md) — World, canvas scaffold, log-Y wrap-X planet, launch pads, triangle rocket.
 - [`archive/0.2.0-plan.md`](./archive/0.2.0-plan.md) — Rocket physics, stage builder, manual flight controls, time scale, first-pass economy & landing.
 - [`archive/0.3.0-plan.md`](./archive/0.3.0-plan.md) — Autopilot (pad-to-pad + landing) and planet presets (gravity / atmo / size / reference build).
