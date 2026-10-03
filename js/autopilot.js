@@ -131,6 +131,7 @@
 		var vxDesired;
 		var vyDesired;
 		var brakeFeedForward;
+		var descentFeedForward;
 		var verticalAuthority;
 		var vectorX;
 		var vectorY;
@@ -194,8 +195,18 @@
 		stoppingAccel = Math.max(0.5, 0.7 * verticalAuthority);
 		climbRate = Math.min(tuning.climbVelocity, tuning.climbMargin * Math.sqrt(2 * gravity * Math.max(0, altitudeTarget - rocket.wy)) + 1);
 		descentRate = tuning.descentMargin * Math.sqrt(2 * stoppingAccel * Math.max(0, rocket.wy)) + 1;
+		// The descent profile is a moving target: a proportional tracker lags
+		// it by roughly accel/gain m/s, and that lag is exactly the sink rate
+		// the ground cannot absorb. Feed the profile's own deceleration
+		// (descentMargin² * stoppingAccel) forward while the profile is live.
+		descentFeedForward = 0;
+		if (rocket.vy < 0 && descentRate > 0) {
+			descentFeedForward = tuning.descentMargin * tuning.descentMargin * stoppingAccel *
+				R.util.clamp(-rocket.vy / descentRate, 0, 1);
+		}
 		if (rocket.wy < tuning.terminalAltitude) {
 			descentRate = Math.min(descentRate, tuning.touchdownVelocity);
+			descentFeedForward = 0;
 		}
 		vyDesired = R.util.clamp(tuning.velocityGain * (altitudeTarget - rocket.wy), -descentRate, climbRate);
 		// Final: never climb back, and start descending as soon as the horizontal
@@ -233,7 +244,7 @@
 		// channel, which is what actually decides whether the rocket reaches
 		// the pad instead of overflying it.
 		vectorY = gravity + R.util.clamp(
-			tuning.velocityGain * (vyDesired - rocket.vy),
+			tuning.velocityGain * (vyDesired - rocket.vy) + descentFeedForward,
 			-verticalAuthority,
 			verticalAuthority
 		);
