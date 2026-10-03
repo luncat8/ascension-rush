@@ -1,0 +1,30 @@
+* {
+	box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+	width: 100%;
+	height: 100%;
+	margin: 0;
+	overflow: hidden;
+	background: #071322;
+}
+
+body {
+	color: #e7eff6;
+	font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+#app {
+	position: relative;
+}
+
+#c {
+	display: block;
+	width: 100vw;
+	height: 100vh;
+	touch-action: none;
+	cursor: crosshair;
+}
