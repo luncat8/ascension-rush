@@ -16,6 +16,7 @@ still prototype balance; parts, wear and failures are not implemented yet.
 
 ## Plans (subject-numbered, not version sequence)
 Active:
+- [`0.3.x-plan.md`](./0.3.x-plan.md) — Aerodynamics, Q / acceleration-aware autopilot, drag-aware impact prediction & flight diagnostics.
 - [`0.4-plan.md`](./0.4-plan.md) — Economy balance, parts catalog with service/repair, market prices & contract board.
 - [`0.5-plan.md`](./0.5-plan.md) — Damage/failures mid-flight and landing, competitor company AI.
 
