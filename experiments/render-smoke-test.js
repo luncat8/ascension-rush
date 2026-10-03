@@ -55,8 +55,8 @@ global.requestAnimationFrame = function(callback) {
 	frameCallback = callback;
 };
 global.document = {
-	getElementById: function() {
-		return canvas;
+	getElementById: function(id) {
+		return id === 'c' ? canvas : null;
 	},
 	createElement: function() {
 		return {
@@ -76,6 +76,11 @@ require('../js/coords.js');
 require('../js/camera.js');
 require('../js/world.js');
 require('../js/rocket.js');
+require('../js/economy.js');
+require('../js/mission.js');
+require('../js/physics.js');
+require('../js/builder.js');
+require('../js/controls.js');
 require('../js/input.js');
 require('../js/render.js');
 
@@ -100,6 +105,31 @@ R.render.draw({
 	currentPadId: R.world.currentPadId,
 	targetPadId: R.world.targetPadId,
 	rocket: R.rocket.create(R.world.findPadById(R.world.currentPadId))
+});
+
+var flightRocket = R.rocket.create(R.world.findPadById(R.world.currentPadId));
+R.rocket.applyBuild(flightRocket, {
+	targetPadId: R.world.targetPadId,
+	stageCount: 2,
+	payloadMass: 100,
+	stages: [
+		{ fuelMass: 1000, strength: 0.9 },
+		{ fuelMass: 500, strength: 0.9 },
+		{ fuelMass: 300, strength: 0.9 }
+	]
+});
+flightRocket.wy = 12000;
+flightRocket.vx = 450;
+flightRocket.vy = 600;
+flightRocket.throttle = 0.75;
+R.camera.follow(flightRocket.wx);
+R.render.draw({
+	currentPadId: R.world.currentPadId,
+	targetPadId: R.world.targetPadId,
+	phase: 'flying',
+	flight: { cashDelta: -600 },
+	cash: 29400,
+	rocket: flightRocket
 });
 
 var main = require('../js/main.js');

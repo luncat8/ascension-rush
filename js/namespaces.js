@@ -9,6 +9,11 @@
 	R.world = R.world || {};
 	R.camera = R.camera || {};
 	R.rocket = R.rocket || {};
+	R.physics = R.physics || {};
+	R.economy = R.economy || {};
+	R.mission = R.mission || {};
+	R.builder = R.builder || {};
+	R.controls = R.controls || {};
 	R.input = R.input || {};
 	R.render = R.render || {};
 	R.game = R.game || null;

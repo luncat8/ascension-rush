@@ -24,12 +24,20 @@
 			currentPadId: R.world.currentPadId,
 			targetPadId: R.world.targetPadId,
 			rocket: R.rocket.create(R.world.findPadById(R.world.currentPadId)),
-			simTime: 0
+			phase: 'building',
+			cash: R.economy.startingCash,
+			ledger: [],
+			flight: null,
+			lastReport: null,
+			simTime: 0,
+			physicsAccumulator: 0
 		};
 		R.game = game;
 
 		R.render.initialize(context);
 		R.input.initialize(canvas, R.camera);
+		R.controls.initialize(game);
+		R.builder.initialize(game);
 
 		function resize() {
 			var width = Math.max(1, root.innerWidth);
@@ -47,13 +55,15 @@
 
 		function update(dt) {
 			game.simTime += dt;
+			R.controls.update(game, dt);
+			R.physics.advance(game, dt);
 		}
 
 		function frame(timestamp) {
 			var dt = 0;
 
 			if (previousTimestamp !== 0) {
-				dt = Math.min((timestamp - previousTimestamp) / 1000, 1 / 30);
+				dt = Math.min((timestamp - previousTimestamp) / 1000, R.constants.rocket.maxFrameStep);
 			}
 			previousTimestamp = timestamp;
 			update(dt);

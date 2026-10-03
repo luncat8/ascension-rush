@@ -143,7 +143,6 @@
 	function drawAltitudeScale(context) {
 		var marks = altitudeMarks;
 		var i;
-		var mark;
 		var y;
 
 		context.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
@@ -167,9 +166,11 @@
 	function drawMissionPanel(context, game) {
 		var source = R.world.findPadById(game.currentPadId);
 		var target = R.world.findPadById(game.targetPadId);
+		var rocket = game.rocket;
 		var margin = Math.min(24, render.width * 0.05);
 		var panelWidth = Math.min(354, render.width - margin * 2);
 		var panelHeight = 126;
+		var horizontalSpeed = Math.round(Math.abs(rocket.vx));
 		var x = margin;
 		var y = 20;
 
@@ -180,7 +181,7 @@
 		context.fillText('ASCENSION RUSH', x + 18, y + 24);
 		context.fillStyle = R.constants.render.mutedText;
 		context.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
-		context.fillText('PAYLOAD DELIVERY  /  NETWORK 01', x + 18, y + 42);
+		context.fillText(game.phase === 'flying' ? 'PAYLOAD DELIVERY  /  FLIGHT 01' : 'PAYLOAD DELIVERY  /  NETWORK 01', x + 18, y + 42);
 
 		context.strokeStyle = 'rgba(190, 215, 224, 0.16)';
 		context.beginPath();
@@ -206,13 +207,13 @@
 		context.fillText('ALTITUDE', x + 18, y + 105);
 		context.fillStyle = R.constants.render.text;
 		context.font = '600 11px ui-monospace, SFMono-Regular, Menlo, monospace';
-		context.fillText('0 m', x + 83, y + 105);
+		context.fillText(Math.round(rocket.wy), x + 83, y + 105);
 		context.fillStyle = R.constants.render.mutedText;
 		context.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
-		context.fillText('VELOCITY', x + 145, y + 105);
+		context.fillText('H-SPEED', x + 153, y + 105);
 		context.fillStyle = R.constants.render.text;
 		context.font = '600 11px ui-monospace, SFMono-Regular, Menlo, monospace';
-		context.fillText('0 m/s', x + 213, y + 105);
+		context.fillText(horizontalSpeed, x + 214, y + 105);
 	}
 
 	function drawWorldPanel(context) {
@@ -240,32 +241,156 @@
 		context.fillText('CIRCUMFERENCE', x + 16, y + 68);
 		context.textAlign = 'right';
 		context.fillStyle = '#d3e0e1';
-		context.fillText('1,000 km', x + panelWidth - 16, y + 68);
+		context.fillText(Math.round(world.circumference / 1000), x + panelWidth - 36, y + 68);
+		context.fillText('km', x + panelWidth - 16, y + 68);
 		context.textAlign = 'left';
 		context.fillStyle = '#93aebc';
 		context.fillText('SURFACE GRAVITY', x + 16, y + 83);
 		context.textAlign = 'right';
 		context.fillStyle = '#d3e0e1';
-		context.fillText('9.81 m/s²', x + panelWidth - 16, y + 83);
+		context.fillText(world.surfaceGravity, x + panelWidth - 55, y + 83);
+		context.fillText('m/s²', x + panelWidth - 16, y + 83);
 	}
 
-	function drawStatusStrip(context) {
+	function drawBar(context, x, y, width, fraction, color) {
+		context.fillStyle = 'rgba(173, 197, 207, 0.14)';
+		context.fillRect(x, y, width, 6);
+		if (fraction <= 0) {
+			return;
+		}
+		context.fillStyle = color;
+		context.fillRect(x, y, width * Math.min(1, fraction), 6);
+	}
+
+	function drawFlightTelemetry(context, game) {
+		var rocket = game.rocket;
+		var stage = R.rocket.activeStage(rocket);
+		var target = R.world.findPadById(game.targetPadId);
+		var targetDistance = target ? Math.abs(R.util.wrapDelta(target.wx - rocket.wx, R.constants.world.circumference)) : 0;
+		var fuelFraction = stage && stage.fuelMax > 0 ? stage.fuelMass / stage.fuelMax : 0;
+		var heading = Math.round(R.util.mod(rocket.heading, Math.PI * 2) * 180 / Math.PI);
+		var margin = Math.min(24, render.width * 0.05);
+		var panelWidth = 230;
+		var panelHeight = 221;
+		var x = render.width - panelWidth - margin;
+		var y = 20;
+
+		if (render.width < 650) {
+			x = margin;
+			y = Math.max(152, R.camera.groundY - panelHeight - 20);
+		}
+
+		drawPanel(context, x, y, panelWidth, panelHeight);
+		context.textAlign = 'left';
+		context.fillStyle = R.constants.render.mutedText;
+		context.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
+		context.fillText('FLIGHT TELEMETRY', x + 16, y + 22);
+		context.fillStyle = '#e7eff6';
+		context.font = '600 12px system-ui, sans-serif';
+		context.fillText(target ? target.name : 'NO DESTINATION', x + 16, y + 43);
+		context.textAlign = 'right';
+		context.fillStyle = '#91e3d3';
+		context.font = '600 11px ui-monospace, SFMono-Regular, Menlo, monospace';
+		if (targetDistance < 20000) {
+			context.fillText(Math.round(targetDistance), x + panelWidth - 37, y + 43);
+			context.fillText('m', x + panelWidth - 16, y + 43);
+		} else {
+			context.fillText(Math.round(targetDistance / 1000), x + panelWidth - 37, y + 43);
+			context.fillText('km', x + panelWidth - 16, y + 43);
+		}
+
+		context.textAlign = 'left';
+		context.fillStyle = '#a8bac2';
+		context.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
+		context.fillText('STAGE', x + 16, y + 65);
+		context.textAlign = 'right';
+		context.fillStyle = '#e7eff6';
+		if (stage) {
+			context.fillText(rocket.currentStage + 1, x + panelWidth - 54, y + 65);
+			context.fillText('/', x + panelWidth - 34, y + 65);
+			context.fillText(rocket.stageCount, x + panelWidth - 16, y + 65);
+		} else {
+			context.fillText('NO STAGES LEFT', x + panelWidth - 16, y + 65);
+		}
+
+		context.textAlign = 'left';
+		context.fillStyle = '#a8bac2';
+		context.fillText('FUEL', x + 16, y + 86);
+		context.textAlign = 'right';
+		context.fillStyle = '#e7eff6';
+		if (stage) {
+			context.fillText(Math.round(stage.fuelMass), x + panelWidth - 38, y + 86);
+			context.fillText('kg', x + panelWidth - 16, y + 86);
+		} else {
+			context.fillText('—', x + panelWidth - 16, y + 86);
+		}
+		drawBar(context, x + 16, y + 93, panelWidth - 32, fuelFraction, '#65d5c1');
+
+		context.textAlign = 'left';
+		context.fillStyle = '#a8bac2';
+		context.fillText('THROTTLE', x + 16, y + 115);
+		context.textAlign = 'right';
+		context.fillStyle = '#e7eff6';
+		context.fillText(Math.round(rocket.throttle * 100), x + panelWidth - 37, y + 115);
+		context.fillText('%', x + panelWidth - 16, y + 115);
+		drawBar(context, x + 16, y + 122, panelWidth - 32, rocket.throttle, '#f4c76a');
+
+		context.textAlign = 'left';
+		context.fillStyle = '#a8bac2';
+		context.fillText('VX', x + 16, y + 145);
+		context.fillStyle = '#e7eff6';
+		context.fillText(Math.round(rocket.vx), x + 43, y + 145);
+		context.fillStyle = '#a8bac2';
+		context.fillText('VY', x + 91, y + 145);
+		context.fillStyle = '#e7eff6';
+		context.fillText(Math.round(rocket.vy), x + 118, y + 145);
+		context.fillStyle = '#a8bac2';
+		context.fillText('HDG', x + 158, y + 145);
+		context.fillStyle = '#e7eff6';
+		context.fillText(heading, x + 192, y + 145);
+		context.fillText('°', x + 208, y + 145);
+
+		context.fillStyle = '#a8bac2';
+		context.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
+		context.textAlign = 'left';
+		context.fillText('BALANCE', x + 16, y + 168);
+		context.fillStyle = '#e7eff6';
+		context.textAlign = 'right';
+		context.fillText('$', x + panelWidth - 58, y + 168);
+		context.fillText(Math.round(game.cash), x + panelWidth - 16, y + 168);
+
+		context.textAlign = 'left';
+		context.fillStyle = '#a8bac2';
+		context.fillText('FLIGHT Δ', x + 16, y + 188);
+		context.textAlign = 'right';
+		context.fillStyle = game.flight.cashDelta >= 0 ? '#91e3d3' : '#f1a89d';
+		context.fillText(game.flight.cashDelta < 0 ? '−$' : '+$', x + panelWidth - 58, y + 188);
+		context.fillText(Math.round(Math.abs(game.flight.cashDelta)), x + panelWidth - 16, y + 188);
+
+		context.fillStyle = '#829ba6';
+		context.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
+		context.textAlign = 'left';
+		context.fillText('SHIFT / CTRL  THROTTLE     SPACE  STAGE', x + 16, y + 208);
+	}
+
+	function drawStatusStrip(context, game) {
 		var margin = Math.min(24, render.width * 0.05);
 		var width = Math.min(350, render.width - margin * 2);
 		var y = R.camera.groundY - 46;
+		var label = game.phase === 'flying' ? 'MOUSE AIM  ·  SHIFT / CTRL THROTTLE  ·  SPACE STAGE' : 'PAD READY  ·  BUILDER OPEN  ·  CHOOSE A DESTINATION';
 
 		drawPanel(context, margin, y, width, 30);
-		context.fillStyle = '#7de0ca';
+		context.fillStyle = game.phase === 'flying' ? '#f4c76a' : '#7de0ca';
 		context.beginPath();
 		context.arc(margin + 16, y + 15, 3, 0, Math.PI * 2);
 		context.fill();
 		context.textAlign = 'left';
 		context.fillStyle = '#c8ddd9';
-		context.font = '600 10px ui-monospace, SFMono-Regular, Menlo, monospace';
-		context.fillText('ON PAD  ·  FLIGHT SYSTEMS STANDBY', margin + 29, y + 19);
+		context.font = '600 9px ui-monospace, SFMono-Regular, Menlo, monospace';
+		context.fillText(label, margin + 27, y + 19);
 	}
 
-	function drawCrosshair(context) {
+	function drawCrosshair(context, game) {
 		var input = R.input;
 		var point = render.scratch.crosshair;
 		var alignRight;
@@ -276,7 +401,12 @@
 			return;
 		}
 
-		R.camera.project(input.worldPoint.x, input.worldPoint.y, point);
+		if (game.phase === 'flying') {
+			point.x = input.pointerX;
+			point.y = input.pointerY;
+		} else {
+			R.camera.project(input.worldPoint.x, input.worldPoint.y, point);
+		}
 		context.strokeStyle = 'rgba(229, 246, 247, 0.88)';
 		context.lineWidth = 1;
 		context.beginPath();
@@ -291,6 +421,9 @@
 		context.lineTo(point.x, point.y + 11);
 		context.stroke();
 
+		if (game.phase === 'flying') {
+			return;
+		}
 		alignRight = input.pointerX > render.width * 0.68;
 		textX = input.pointerX + (alignRight ? -14 : 14);
 		textY = Math.max(18, input.pointerY - 15);
@@ -342,6 +475,8 @@
 	render.draw = function(game) {
 		var context = render.context;
 		var rocket = game.rocket;
+		var stage = R.rocket.activeStage(rocket);
+		var flameThrottle = stage && stage.fuelMass > 0 ? rocket.throttle : 0;
 
 		context.clearRect(0, 0, render.width, render.height);
 		context.fillStyle = render.skyGradient;
@@ -352,11 +487,15 @@
 		drawPads(context, game);
 
 		R.camera.project(rocket.wx, rocket.wy, render.scratch.rocket);
-		R.rocket.draw(context, render.scratch.rocket.x, render.scratch.rocket.y, rocket.heading);
+		R.rocket.draw(context, render.scratch.rocket.x, render.scratch.rocket.y, rocket.heading, flameThrottle);
 		drawMissionPanel(context, game);
-		drawWorldPanel(context);
-		drawStatusStrip(context);
-		drawCrosshair(context);
+		if (game.phase === 'flying') {
+			drawFlightTelemetry(context, game);
+		} else {
+			drawWorldPanel(context);
+			drawStatusStrip(context, game);
+		}
+		drawCrosshair(context, game);
 	};
 
 	if (typeof module !== 'undefined' && module.exports) {

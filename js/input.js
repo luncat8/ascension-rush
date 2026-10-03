@@ -43,25 +43,8 @@
 			input.pointerActive = false;
 		}
 
-		function onKeyDown(event) {
-			if (event.repeat) {
-				return;
-			}
-
-			if (event.code === 'Space') {
-				event.preventDefault();
-				console.info('Input routed: Space (stage).');
-				return;
-			}
-
-			if (event.key === 'Control' || event.key === 'Shift') {
-				console.info('Input routed: ' + event.key + '.');
-			}
-		}
-
-		canvas.addEventListener('mousemove', onPointerMove);
-		canvas.addEventListener('mouseleave', onPointerLeave);
-		root.addEventListener('keydown', onKeyDown);
+		canvas.addEventListener('pointermove', onPointerMove);
+		canvas.addEventListener('pointerleave', onPointerLeave);
 	};
 
 	if (typeof module !== 'undefined' && module.exports) {

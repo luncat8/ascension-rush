@@ -1,13 +1,16 @@
 # Ascension Rush: Payload Delivery
 
-A small 2D rocket-delivery game: wrap-around planets, launch pads, staged
-rockets, pad-to-pad flight, fuel/hull/payload economics, autopilot, planet
-presets, part wear & failures, and a rival company.
+A small 2D rocket-delivery game: wrap-around planets, staged rockets, manual
+flight controls, pad-to-pad delivery, fuel/hull/payload economics, and a
+logarithmic altitude view. Autopilot, planet presets, persistent parts, damage,
+and a rival company are planned follow-ups.
 
 ## Status
-The 0.1 canvas/world scaffold is implemented: a static planetary map,
-launch pads, rocket marker, log-altitude scale, mouse coordinate probe, and
-keyboard routing. Rocket physics and the builder are the next playable slice.
+The 0.1 world/render scaffold and 0.2 playable flight slice are implemented.
+Configure a one-to-three-stage rocket, choose a pad, launch, steer with the
+mouse, manage throttle/staging, and attempt a safe delivery. The current
+physics and economy are prototype balance values; autopilot and detailed part
+wear/failure are not implemented yet.
 
 ## Plans (subject-numbered, not version sequence)
 - [`0.1-plan.md`](./0.1-plan.md) — World, canvas scaffold, log-Y wrap-X planet, launch pads, triangle rocket.
@@ -23,6 +26,11 @@ See [`AGENTS.md`](./AGENTS.md) for code-style and workflow conventions.
 
 ## Run
 Open `index.html` in a modern browser (no build step; classic `<script>`
-tags, `file://`-friendly). Coordinate and canvas/app-startup smoke tests run
-with `node experiments/coords-test.js` and
-`node experiments/render-smoke-test.js`.
+tags, `file://`-friendly). Node smoke/regression tests:
+
+```sh
+node experiments/coords-test.js
+node experiments/flight-test.js
+node experiments/builder-test.js
+node experiments/render-smoke-test.js
+```

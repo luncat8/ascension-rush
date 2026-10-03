@@ -13,6 +13,76 @@
   <canvas id="c" aria-label="Ascension Rush planetary delivery map">
     Ascension Rush needs a browser with HTML canvas support.
   </canvas>
+  <aside id="builder-panel" class="builder-panel" aria-label="Rocket builder" hidden>
+    <header class="builder-header">
+      <div>
+        <p class="eyebrow">ASCENSION RUSH / FLIGHT DECK</p>
+        <h1>Rocket builder</h1>
+      </div>
+      <div class="builder-cash"><span>AVAILABLE</span><strong>$<b id="builder-cash">30,000</b></strong></div>
+    </header>
+
+    <section id="builder-report" class="builder-report" aria-live="polite" hidden>
+      <strong id="builder-report-title"></strong>
+      <p id="builder-report-detail"></p>
+    </section>
+
+    <div class="builder-control">
+      <label for="builder-target">Destination pad</label>
+      <select id="builder-target"></select>
+    </div>
+
+    <div class="builder-control builder-row">
+      <label for="builder-stage-count">Stages</label>
+      <select id="builder-stage-count">
+        <option value="1">1 stage</option>
+        <option value="2">2 stages</option>
+        <option value="3" selected>3 stages</option>
+      </select>
+    </div>
+
+    <section class="stage-card" id="builder-stage-0">
+      <header><strong>Stage 1 · Booster</strong><span>burns first</span></header>
+      <label for="builder-fuel-0">Fuel capacity <output id="builder-fuel-value-0">1,800 kg</output></label>
+      <input id="builder-fuel-0" type="range" min="300" max="6000" step="50" value="1800">
+      <label for="builder-strength-0">Structure strength <output id="builder-strength-value-0">85%</output></label>
+      <input id="builder-strength-0" type="range" min="0.5" max="1" step="0.05" value="0.85">
+    </section>
+
+    <section class="stage-card" id="builder-stage-1">
+      <header><strong>Stage 2 · Upper stage</strong><span>burns second</span></header>
+      <label for="builder-fuel-1">Fuel capacity <output id="builder-fuel-value-1">900 kg</output></label>
+      <input id="builder-fuel-1" type="range" min="300" max="6000" step="50" value="900">
+      <label for="builder-strength-1">Structure strength <output id="builder-strength-value-1">90%</output></label>
+      <input id="builder-strength-1" type="range" min="0.5" max="1" step="0.05" value="0.9">
+    </section>
+
+    <section class="stage-card" id="builder-stage-2">
+      <header><strong>Stage 3 · Kick stage</strong><span>burns last</span></header>
+      <label for="builder-fuel-2">Fuel capacity <output id="builder-fuel-value-2">1,000 kg</output></label>
+      <input id="builder-fuel-2" type="range" min="300" max="6000" step="50" value="1000">
+      <label for="builder-strength-2">Structure strength <output id="builder-strength-value-2">90%</output></label>
+      <input id="builder-strength-2" type="range" min="0.5" max="1" step="0.05" value="0.9">
+    </section>
+
+    <div class="builder-control payload-control">
+      <label for="builder-payload">Payload mass <output id="builder-payload-value">120 kg</output></label>
+      <input id="builder-payload" type="range" min="0" max="2000" step="10" value="120">
+    </div>
+
+    <section class="build-summary" aria-label="Rocket estimates">
+      <div><span>Takeoff mass</span><strong><b id="builder-mass">—</b> kg</strong></div>
+      <div><span>Steel / structure</span><strong><b id="builder-steel">—</b> kg</strong></div>
+      <div><span>Fuel load</span><strong><b id="builder-fuel">—</b> kg</strong></div>
+      <div><span>Estimated dV</span><strong><b id="builder-dv">—</b> m/s</strong></div>
+      <div><span>Launch TWR</span><strong><b id="builder-twr">—</b></strong></div>
+      <div class="summary-cost"><span>Estimated flight cost</span><strong>$<b id="builder-cost">—</b></strong></div>
+    </section>
+
+    <p id="builder-warning" class="builder-warning" aria-live="polite"></p>
+    <button id="launch-button" class="launch-button" type="button">Launch · full throttle</button>
+    <p class="builder-help">Mouse aims · Shift/Ctrl throttle · Space stages</p>
+  </aside>
 </main>
 <script src="js/namespaces.js"></script>
 <script src="js/util.js"></script>
@@ -21,6 +91,11 @@
 <script src="js/camera.js"></script>
 <script src="js/world.js"></script>
 <script src="js/rocket.js"></script>
+<script src="js/economy.js"></script>
+<script src="js/mission.js"></script>
+<script src="js/physics.js"></script>
+<script src="js/builder.js"></script>
+<script src="js/controls.js"></script>
 <script src="js/input.js"></script>
 <script src="js/render.js"></script>
 <script src="js/main.js"></script>

@@ -15,7 +15,39 @@
 		maxAltitude: 1000000,
 		logAltitudeScale: 100,
 		groundFraction: 0.1,
-		cameraAnchorFraction: 1 / 3
+		cameraAnchorFraction: 1 / 3,
+		landingRadius: 8000,
+		landingVerticalSpeed: 12,
+		landingHorizontalSpeed: 25
+	};
+
+	constants.rocket = {
+		tankMassPerFuelMass: 0.085,
+		engineBaseMass: 170,
+		engineThrustToMass: 125,
+		thrustPerFuelMass: 72,
+		ispSeaLevel: 265,
+		ispVacuum: 330,
+		referenceArea: 2.2,
+		maxAcceleration: 200,
+		fixedStep: 1 / 120,
+		maxFrameStep: 1 / 30,
+		throttleRate: 1.8,
+		turnRate: Math.PI,
+		minimumLaunchTwr: 1.15,
+		maxPayloadMass: 2000,
+		minFuelMass: 300,
+		maxFuelMass: 6000,
+		defaultPayloadMass: 120,
+		defaultStageFuel: [1800, 900, 1000],
+		defaultStageStrength: [0.85, 0.9, 0.9]
+	};
+
+	constants.economy = {
+		startingCash: 30000,
+		priceFuelPerKg: 1.4,
+		priceSteelPerKg: 2.5,
+		priceDeliveryPerKg: 180
 	};
 
 	constants.render = {
