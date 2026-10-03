@@ -28,6 +28,22 @@
 		return (value < 0 ? '−$' : '+$') + Math.round(Math.abs(value));
 	}
 
+	// Where the touchdown sits against the selected pad, signed along the
+	// wrap map (+x is east): a missed delivery is only diagnosable if the
+	// report says by how much and to which side.
+	function formatPadError(error, pad, planet) {
+		var distance = Math.abs(error);
+		var scale = distance < 1000 ? Math.round(distance) + ' m' : (distance / 1000).toFixed(1) + ' km';
+
+		if (!pad) {
+			return 'no target pad';
+		}
+		if (distance <= planet.landingRadius) {
+			return Math.round(distance) + ' m from ' + pad.name + ' centre';
+		}
+		return scale + (error > 0 ? ' east of ' : ' west of ') + pad.name;
+	}
+
 	function nextTargetId(padId) {
 		var pads = R.world.pads;
 		var i;
@@ -115,6 +131,10 @@
 		var flight = game.flight;
 		var planet = R.world.planet;
 		var pad = findLandingPad(state);
+		var targetPad = R.world.findPadById(flight.targetPadId);
+		// Measured, not predicted: the physics step interpolates the ground
+		// crossing, so these are the speeds the rocket actually arrived with.
+		var targetError = targetPad ? R.util.wrapDelta(state.wx - targetPad.wx, planet.circumference) : 0;
 		var safe = !!pad && Math.abs(state.vy) <= planet.landingVerticalSpeed && Math.abs(state.vx) <= planet.landingHorizontalSpeed;
 		var delivered = safe && pad.id === flight.targetPadId;
 		var departurePad = R.world.findPadById(flight.departedPadId);
@@ -147,6 +167,8 @@
 		if (fee > 0) {
 			detail += ' Autopilot fee $' + Math.round(fee) + ' (' + R.autopilot.profileById(flight.autopilotProfile).label + ' profile).';
 		}
+		detail += ' Touchdown ' + Math.abs(state.vy).toFixed(1) + ' m/s down and ' + Math.abs(state.vx).toFixed(1) +
+			' m/s across, ' + formatPadError(targetError, targetPad, planet) + '.';
 		detail += ' Peak Q ' + (flight.peakDynamicPressure / 1000).toFixed(1) + ' kPa at ' +
 			Math.round(flight.peakDynamicPressureAltitude) + ' m (AoA ' +
 			(R.world.planet.seaLevelDensity > 0 ? (flight.peakDynamicPressureAngleOfAttack * 180 / Math.PI).toFixed(1) + '°' : 'n/a') +
@@ -164,6 +186,9 @@
 			cashDelta: cashDelta,
 			elapsed: flight.elapsed,
 			landingPadId: safe ? pad.id : null,
+			touchdownVerticalSpeed: state.vy,
+			touchdownHorizontalSpeed: state.vx,
+			targetError: targetError,
 			peakDynamicPressure: flight.peakDynamicPressure,
 			peakDynamicPressureAltitude: flight.peakDynamicPressureAltitude,
 			peakDynamicPressureAngleOfAttack: flight.peakDynamicPressureAngleOfAttack,

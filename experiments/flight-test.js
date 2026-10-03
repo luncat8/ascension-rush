@@ -14,6 +14,7 @@ require('../js/economy.js');
 require('../js/mission.js');
 require('../js/aerodynamics.js');
 require('../js/physics.js');
+require('../js/trajectory.js');
 require('../js/autopilot.js');
 require('../js/controls.js');
 require('../js/input.js');
@@ -265,6 +266,11 @@ assert.equal(report.peakThrustAcceleration, 12.3);
 assert.equal(report.peakAppliedThrustAcceleration, 11.1);
 assert.match(report.detail, /peak thrust acceleration 11.1 m\/s²/, 'the debrief reports the thrust the rocket actually felt');
 assert.match(report.detail, /Peak Q 12.3 kPa at 678 m/);
+assert.equal(report.touchdownVerticalSpeed, -5, 'the debrief quotes the measured sink rate, not a prediction');
+assert.equal(report.touchdownHorizontalSpeed, 10, 'and the measured horizontal speed');
+assert.equal(report.targetError, 100, 'and the touchdown error against the target pad');
+assert.match(report.detail, /Touchdown 5\.0 m\/s down and 10\.0 m\/s across, 100 m from Eastport centre\./,
+	'the debrief reports where and how hard it arrived');
 assert.equal(deliveredGame.currentPadId, target.id);
 assert.ok(deliveredGame.cash > startingBalance, 'target delivery pays a reward');
 assert.equal(deliveredGame.phase, 'building');
@@ -292,16 +298,20 @@ elsewhereGame.rocket.vx = 0;
 elsewhereGame.rocket.vy = 0;
 report = R.mission.touchdown(elsewhereGame);
 assert.equal(report.status, 'landed');
+assert.equal(report.targetError, farPad.wx - target.wx, 'a safe landing elsewhere quotes its error from the target');
+assert.match(report.detail, /5\.0 km east of Eastport/, 'the error is signed along the wrap map');
 assert.equal(elsewhereGame.currentPadId, farPad.id);
 assert.equal(elsewhereGame.cash, R.economy.startingCash - stats.dryMass * R.economy.priceSteel());
 
 var crashGame = launch(defaultConfig);
-crashGame.rocket.wx = 12500;
+crashGame.rocket.wx = target.wx - 1200;
 crashGame.rocket.wy = 0;
 crashGame.rocket.vx = 0;
 crashGame.rocket.vy = -40;
 report = R.mission.touchdown(crashGame);
 assert.equal(report.status, 'crashed');
+assert.match(report.detail, /Touchdown 40\.0 m\/s down and 0\.0 m\/s across, 1\.2 km west of Eastport\./,
+	'a crash is reported with the arrival speeds and the side of the pad it fell short on');
 assert.equal(crashGame.currentPadId, home.id);
 assert.equal(crashGame.cash, R.economy.startingCash - stats.dryMass * R.economy.priceSteel());
 

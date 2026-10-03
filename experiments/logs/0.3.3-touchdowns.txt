@@ -1,0 +1,95 @@
+# Touchdown baseline for 0.5 damage tuning: node experiments/envelope.js <world> 0 <profile>
+# Reference build, every directed route, fixed step, one control update per step.
+# 'touchdown V/H' is the measured arrival sink and horizontal rate; 'pad error' is signed against the target (+ = east).
+
+$ node experiments/envelope.js verdant 0 balanced
+(planet reference build: payload 80 kg, stages 420/260/200 kg)
+=== Verdant · planet reference · balanced profile · C 20 km · g 9.81 m/s² · 1.225 kg/m³ · 120 fps x1 ===
+directed route               km    result    time  peak alt   peak v  dry mass     peak Q    Q alt   AoA@Qpk      AoAmax/Q  peak T/m  applied   limit s Q/A/α  touchdown V/H  pad error  fuel left
+Homeport → Eastport         5.0 delivered   44.9s      406m   250m/s     666kg    23.3kPa     400m     36.0°     90.0/16.4      24.0     21.3     3.7/0.0/0.0      -2.8/-0.6         1m    512.6kg
+Homeport → Farport         10.0 delivered   63.2s      803m   330m/s     666kg    24.5kPa     802m     31.9°     89.6/18.1      25.1     22.0    11.9/3.9/0.0       -3.7/0.1         0m    420.5kg
+Homeport → Westport         5.0 delivered   44.9s      406m   250m/s     666kg    23.3kPa     400m     36.0°     90.0/16.4      24.0     21.3     3.7/0.0/0.0       -2.8/0.6        -1m    512.6kg
+Eastport → Homeport         5.0 delivered   44.9s      406m   250m/s     666kg    23.3kPa     400m     36.0°     90.0/16.4      24.0     21.3     3.7/0.0/0.0       -2.8/0.6        -1m    512.6kg
+Eastport → Farport          5.0 delivered   44.9s      406m   250m/s     666kg    23.3kPa     400m     36.0°     90.0/16.4      24.0     21.3     3.7/0.0/0.0      -2.8/-0.6         1m    512.6kg
+Eastport → Westport        10.0 delivered   63.2s      803m   330m/s     666kg    24.5kPa     802m     31.9°     89.6/18.1      25.1     22.0    11.9/3.9/0.0       -3.7/0.1         0m    420.5kg
+Farport → Homeport         10.0 delivered   63.2s      803m   330m/s     666kg    24.5kPa     802m     31.9°     89.6/18.1      25.1     22.0    11.9/3.9/0.0       -3.7/0.1         0m    420.5kg
+Farport → Eastport          5.0 delivered   44.9s      406m   250m/s     666kg    23.3kPa     400m     36.0°     90.0/16.4      24.0     21.3     3.7/0.0/0.0       -2.8/0.6        -1m    512.6kg
+Farport → Westport          5.0 delivered   44.9s      406m   250m/s     666kg    23.3kPa     400m     36.0°     90.0/16.4      24.0     21.3     3.7/0.0/0.0      -2.8/-0.6         1m    512.6kg
+Westport → Homeport         5.0 delivered   44.9s      406m   250m/s     666kg    23.3kPa     400m     36.0°     90.0/16.4      24.0     21.3     3.7/0.0/0.0      -2.8/-0.6         1m    512.6kg
+Westport → Eastport        10.0 delivered   63.2s      803m   330m/s     666kg    24.5kPa     802m     31.9°     89.6/18.1      25.1     22.0    11.9/3.9/0.0       -3.7/0.1         0m    420.5kg
+Westport → Farport          5.0 delivered   44.9s      406m   250m/s     666kg    23.3kPa     400m     36.0°     90.0/16.4      24.0     21.3     3.7/0.0/0.0       -2.8/0.6        -1m    512.6kg
+routes delivered: 12/12 · envelope maxima: Q 24.5 kPa at AoA 31.9° · max AoA 90.0° at Q 16.4 kPa · thrust acceleration 22.0 applied / 25.1 available m/s² · worst re-climb 0 m · most axis flips 1 · worst touchdown 3.7 m/s down, 1 m off the pad
+
+$ node experiments/envelope.js verdant 0 gentle   (summary)
+routes delivered: 12/12 · envelope maxima: Q 17.7 kPa at AoA 29.7° · max AoA 90.0° at Q 13.9 kPa · thrust acceleration 17.6 applied / 25.1 available m/s² · worst re-climb 0 m · most axis flips 1 · worst touchdown 3.5 m/s down, 1 m off the pad
+$ node experiments/envelope.js verdant 0 off       (summary)
+routes delivered: 12/12 · envelope maxima: Q 32.2 kPa at AoA 27.6° · max AoA 90.0° at Q 16.4 kPa · thrust acceleration 23.0 applied / 25.1 available m/s² · worst re-climb 0 m · most axis flips 1 · worst touchdown 3.7 m/s down, 1 m off the pad
+
+$ node experiments/envelope.js tinmoon 0 balanced
+(planet reference build: payload 80 kg, stages 200/140/100 kg)
+=== Tinmoon · planet reference · balanced profile · C 16 km · g 1.62 m/s² · 0 kg/m³ · 120 fps x1 ===
+directed route               km    result    time  peak alt   peak v  dry mass     peak Q    Q alt   AoA@Qpk      AoAmax/Q  peak T/m  applied   limit s Q/A/α  touchdown V/H  pad error  fuel left
+Anchor → Dustfield          2.6 delivered   45.9s      238m   180m/s     423kg     0.0kPa       0m       n/a           n/a      17.3     15.7     0.0/0.0/0.0      -3.7/-0.0         0m    330.1kg
+Anchor → Rim Relay          8.0 delivered   84.5s      678m   331m/s     423kg     0.0kPa       0m       n/a           n/a      19.1     16.0     0.0/3.4/0.0      -3.8/-0.0         0m    251.0kg
+Anchor → Tinstack           5.1 delivered   65.4s      446m   261m/s     423kg     0.0kPa       0m       n/a           n/a      18.2     16.0     0.0/3.4/0.0      -3.8/-0.0         0m    286.7kg
+Dustfield → Anchor          2.6 delivered   46.0s      238m   180m/s     423kg     0.0kPa       0m       n/a           n/a      17.3     15.7     0.0/0.0/0.0       -3.7/0.0         0m    330.1kg
+Dustfield → Rim Relay       5.4 delivered   67.4s      471m   269m/s     423kg     0.0kPa       0m       n/a           n/a      18.3     16.0     0.0/3.4/0.0       -3.8/0.0         0m    282.2kg
+Dustfield → Tinstack        7.7 delivered   82.4s      652m   323m/s     423kg     0.0kPa       0m       n/a           n/a      19.0     16.0     0.0/3.5/0.0      -3.8/-0.0         0m    254.5kg
+Rim Relay → Anchor          8.0 delivered   84.5s      678m   331m/s     423kg     0.0kPa       0m       n/a           n/a      19.1     16.0     0.0/3.4/0.0      -3.8/-0.0         0m    251.0kg
+Rim Relay → Dustfield       5.4 delivered   67.7s      471m   269m/s     423kg     0.0kPa       0m       n/a           n/a      18.3     16.0     0.0/3.4/0.0      -3.8/-0.0         0m    282.2kg
+Rim Relay → Tinstack        2.9 delivered   48.5s      264m   192m/s     423kg     0.0kPa       0m       n/a           n/a      17.4     15.8     0.0/0.0/0.0      -3.7/-0.0         0m    323.6kg
+Tinstack → Anchor           5.1 delivered   65.2s      446m   261m/s     423kg     0.0kPa       0m       n/a           n/a      18.2     16.0     0.0/3.4/0.0       -3.8/0.0         0m    286.7kg
+Tinstack → Dustfield        7.7 delivered   82.1s      652m   323m/s     423kg     0.0kPa       0m       n/a           n/a      19.0     16.0     0.0/3.5/0.0       -3.8/0.0         0m    254.5kg
+Tinstack → Rim Relay        2.9 delivered   48.7s      264m   192m/s     423kg     0.0kPa       0m       n/a           n/a      17.4     15.8     0.0/0.0/0.0       -3.7/0.0         0m    323.7kg
+routes delivered: 12/12 · envelope maxima: Q 0.0 kPa at AoA n/a · max AoA n/a · thrust acceleration 16.0 applied / 19.1 available m/s² · worst re-climb 14 m · most axis flips 1 · worst touchdown 3.8 m/s down, 0 m off the pad
+
+$ node experiments/envelope.js tinmoon 0 gentle   (summary)
+routes delivered: 12/12 · envelope maxima: Q 0.0 kPa at AoA n/a · max AoA n/a · thrust acceleration 12.8 applied / 18.8 available m/s² · worst re-climb 6 m · most axis flips 1 · worst touchdown 3.7 m/s down, 0 m off the pad
+$ node experiments/envelope.js tinmoon 0 off       (summary)
+routes delivered: 12/12 · envelope maxima: Q 0.0 kPa at AoA n/a · max AoA n/a · thrust acceleration 17.2 applied / 19.1 available m/s² · worst re-climb 14 m · most axis flips 1 · worst touchdown 3.8 m/s down, 0 m off the pad
+
+$ node experiments/envelope.js cinder 0 balanced
+(planet reference build: payload 60 kg, stages 1500/900/400 kg)
+=== Cinder · planet reference · balanced profile · C 24 km · g 16.5 m/s² · 1.9 kg/m³ · 120 fps x1 ===
+directed route               km    result    time  peak alt   peak v  dry mass     peak Q    Q alt   AoA@Qpk      AoAmax/Q  peak T/m  applied   limit s Q/A/α  touchdown V/H  pad error  fuel left
+Bastion → Forge             6.0 delivered   48.9s      496m   321m/s    1725kg    57.5kPa     480m     47.1°     89.9/50.6      35.0     30.4     2.6/0.0/0.0      -2.0/-0.8         1m   1303.0kg
+Bastion → Slagworks        12.0 delivered   67.9s      967m   435m/s    1725kg    61.9kPa     960m     40.4°     90.0/54.2      35.0     32.2    10.0/0.0/0.0       -3.3/0.3         0m   1032.2kg
+Bastion → Anvil             6.0 delivered   48.9s      496m   321m/s    1725kg    57.5kPa     480m     47.1°     89.9/50.6      35.0     30.4     2.6/0.0/0.0       -2.0/0.8        -1m   1303.0kg
+Forge → Bastion             6.0 delivered   48.9s      496m   321m/s    1725kg    57.5kPa     480m     47.1°     89.9/50.6      35.0     30.4     2.6/0.0/0.0       -2.0/0.8        -1m   1303.0kg
+Forge → Slagworks           6.0 delivered   48.9s      496m   321m/s    1725kg    57.5kPa     480m     47.1°     89.9/50.6      35.0     30.4     2.6/0.0/0.0      -2.0/-0.8         1m   1303.0kg
+Forge → Anvil              12.0 delivered   67.9s      967m   435m/s    1725kg    61.9kPa     960m     40.4°     90.0/54.2      35.0     32.2    10.0/0.0/0.0       -3.3/0.3         0m   1032.2kg
+Slagworks → Bastion        12.0 delivered   67.9s      967m   435m/s    1725kg    61.9kPa     960m     40.4°     90.0/54.2      35.0     32.2    10.0/0.0/0.0       -3.3/0.3         0m   1032.2kg
+Slagworks → Forge           6.0 delivered   48.9s      496m   321m/s    1725kg    57.5kPa     480m     47.1°     89.9/50.6      35.0     30.4     2.6/0.0/0.0       -2.0/0.8        -1m   1303.0kg
+Slagworks → Anvil           6.0 delivered   48.9s      496m   321m/s    1725kg    57.5kPa     480m     47.1°     89.9/50.6      35.0     30.4     2.6/0.0/0.0      -2.0/-0.8         1m   1303.0kg
+Anvil → Bastion             6.0 delivered   48.9s      496m   321m/s    1725kg    57.5kPa     480m     47.1°     89.9/50.6      35.0     30.4     2.6/0.0/0.0      -2.0/-0.8         1m   1303.0kg
+Anvil → Forge              12.0 delivered   67.9s      967m   435m/s    1725kg    61.9kPa     960m     40.4°     90.0/54.2      35.0     32.2    10.0/0.0/0.0       -3.3/0.3         0m   1032.2kg
+Anvil → Slagworks           6.0 delivered   48.9s      496m   321m/s    1725kg    57.5kPa     480m     47.1°     89.9/50.6      35.0     30.4     2.6/0.0/0.0       -2.0/0.8        -1m   1303.0kg
+routes delivered: 12/12 · envelope maxima: Q 61.9 kPa at AoA 40.4° · max AoA 90.0° at Q 54.2 kPa · thrust acceleration 32.2 applied / 35.0 available m/s² · worst re-climb 0 m · most axis flips 1 · worst touchdown 3.3 m/s down, 1 m off the pad
+
+$ node experiments/envelope.js cinder 0 gentle   (summary)
+routes delivered: 12/12 · envelope maxima: Q 44.4 kPa at AoA 47.0° · max AoA 90.0° at Q 39.9 kPa · thrust acceleration 28.1 applied / 35.0 available m/s² · worst re-climb 0 m · most axis flips 1 · worst touchdown 2.7 m/s down, 1 m off the pad
+$ node experiments/envelope.js cinder 0 off       (summary)
+routes delivered: 12/12 · envelope maxima: Q 79.6 kPa at AoA 35.8° · max AoA 90.0° at Q 60.4 kPa · thrust acceleration 32.1 applied / 35.0 available m/s² · worst re-climb 0 m · most axis flips 1 · worst touchdown 3.3 m/s down, 1 m off the pad
+
+$ node experiments/envelope.js gossamer 0 balanced
+(planet reference build: payload 80 kg, stages 380/240/180 kg)
+=== Gossamer · planet reference · balanced profile · C 26 km · g 5.4 m/s² · 3.4 kg/m³ · 120 fps x1 ===
+directed route               km    result    time  peak alt   peak v  dry mass     peak Q    Q alt   AoA@Qpk      AoAmax/Q  peak T/m  applied   limit s Q/A/α  touchdown V/H  pad error  fuel left
+Canopy → Drift              5.2 delivered   53.8s      418m   187m/s     621kg    49.2kPa     418m      8.3°     90.0/23.5      23.6     20.4    13.6/0.0/0.0      -3.8/-0.0         0m    456.4kg
+Canopy → Halcyon           11.7 delivered   97.8s      937m   211m/s     621kg    49.4kPa     937m      6.0°      90.0/2.2      24.4     20.2    31.5/3.3/0.0      -3.8/-0.0         0m    299.9kg
+Canopy → Zephyr             6.5 delivered   61.3s      522m   192m/s     621kg    49.3kPa     522m      7.1°     89.5/20.5      24.4     21.0    19.8/0.0/0.0       -3.8/0.0         0m    413.4kg
+Drift → Canopy              5.2 delivered   52.9s      418m   187m/s     621kg    49.2kPa     418m      8.3°     89.8/23.2      23.6     20.3    13.6/0.0/0.0       -3.8/0.0         0m    457.7kg
+Drift → Halcyon             6.5 delivered   62.1s      522m   192m/s     621kg    49.3kPa     522m      7.1°     89.9/20.9      24.4     20.4    19.8/0.0/0.0      -3.8/-0.0         0m    415.2kg
+Drift → Zephyr             11.7 delivered   93.9s      937m   211m/s     621kg    49.4kPa     937m      6.0°      89.9/2.8      24.4     20.2    31.5/3.3/0.0      -3.8/-0.0         0m    301.2kg
+Halcyon → Canopy           11.7 delivered   93.9s      937m   211m/s     621kg    49.4kPa     937m      6.0°      89.9/2.8      24.4     20.2    31.5/3.3/0.0      -3.8/-0.0         0m    301.2kg
+Halcyon → Drift             6.5 delivered   61.3s      522m   192m/s     621kg    49.3kPa     522m      7.1°     89.5/20.5      24.4     21.0    19.8/0.0/0.0       -3.8/0.0         0m    413.4kg
+Halcyon → Zephyr            7.8 delivered   71.0s      626m   196m/s     621kg    49.3kPa     626m      6.7°     89.9/18.3      24.4     20.5    25.7/0.0/0.0      -3.7/-0.0         0m    384.9kg
+Zephyr → Canopy             6.5 delivered   62.1s      522m   192m/s     621kg    49.3kPa     522m      7.1°     89.9/20.9      24.4     20.4    19.8/0.0/0.0      -3.8/-0.0         0m    415.2kg
+Zephyr → Drift             11.7 delivered   97.8s      937m   211m/s     621kg    49.4kPa     937m      6.0°      90.0/2.2      24.4     20.2    31.5/3.3/0.0      -3.8/-0.0         0m    299.9kg
+Zephyr → Halcyon            7.8 delivered   70.5s      626m   196m/s     621kg    49.3kPa     626m      6.7°     89.4/19.2      24.4     21.5    25.7/0.0/0.0       -3.7/0.0         0m    382.7kg
+routes delivered: 12/12 · envelope maxima: Q 49.4 kPa at AoA 6.0° · max AoA 90.0° at Q 2.2 kPa · thrust acceleration 21.5 applied / 24.4 available m/s² · worst re-climb 0 m · most axis flips 3 · worst touchdown 3.8 m/s down, 0 m off the pad
+
+$ node experiments/envelope.js gossamer 0 gentle   (summary)
+routes delivered: 12/12 · envelope maxima: Q 36.0 kPa at AoA 8.4° · max AoA 90.0° at Q 15.4 kPa · thrust acceleration 17.6 applied / 24.4 available m/s² · worst re-climb 0 m · most axis flips 1 · worst touchdown 3.7 m/s down, 0 m off the pad
+$ node experiments/envelope.js gossamer 0 off       (summary)
+routes delivered: 12/12 · envelope maxima: Q 66.2 kPa at AoA 9.2° · max AoA 90.0° at Q 1.7 kPa · thrust acceleration 22.4 applied / 24.4 available m/s² · worst re-climb 0 m · most axis flips 3 · worst touchdown 3.8 m/s down, 0 m off the pad

@@ -86,6 +86,7 @@ require('../js/economy.js');
 require('../js/mission.js');
 require('../js/aerodynamics.js');
 require('../js/physics.js');
+require('../js/trajectory.js');
 require('../js/autopilot.js');
 require('../js/builder.js');
 require('../js/controls.js');
@@ -146,6 +147,63 @@ R.render.draw({
 // The limiter row is shown in manual flight too, as OFF; with the autopilot on it names the active limits.
 assert.ok(drawnText.indexOf('LIMITER') >= 0, 'flight HUD draws the limiter row');
 assert.ok(drawnText.indexOf('Q + ACCEL LIMIT') < 0, 'no limiter is named while flying by hand');
+assert.ok(drawnText.indexOf('COAST IMPACT') >= 0, 'flight HUD forecasts the coast impact while flying by hand');
+assert.ok(drawnText.indexOf('COAST TOUCHDOWN') >= 0, 'and the speeds that coast would arrive with');
+assert.ok(drawnText.indexOf('OUT OF HORIZON') >= 0, 'with no forecast yet the row says so instead of showing a stale point');
+
+// The coast forecast is a property of the state, not of the autopilot, so the
+// marker and its numbers belong to a hand-flown rocket too.
+var coastGame = {
+	currentPadId: R.world.currentPadId,
+	targetPadId: R.world.targetPadId,
+	phase: 'flying',
+	flight: { cashDelta: -600, currentDynamicPressure: 24000, currentAngleOfAttack: 0.4, peakDynamicPressure: 28000 },
+	cash: 29400,
+	timeScaleIndex: R.constants.time.defaultIndex,
+	timeScale: R.constants.time.scales[R.constants.time.defaultIndex],
+	rocket: flightRocket
+};
+var coastError = Math.abs(R.trajectory.update(coastGame).targetError);
+
+assert.ok(R.trajectory.impact.valid, 'the cruising state has a coast impact');
+R.camera.follow(flightRocket.wx);
+drawnText.length = 0;
+R.render.draw(coastGame);
+assert.equal(drawnText.indexOf('OUT OF HORIZON'), -1, 'an in-range forecast replaces the horizon notice');
+assert.ok(drawnText.indexOf('COAST') >= 0, 'the coast marker is labelled on the ground');
+assert.ok(drawnText.indexOf(Math.abs(R.trajectory.impact.vy).toFixed(1)) >= 0, 'the HUD quotes the predicted sink rate');
+assert.ok(drawnText.indexOf(Math.abs(R.trajectory.impact.vx).toFixed(1)) >= 0, 'and the predicted horizontal speed');
+assert.ok(drawnText.indexOf(coastError >= 1000 ? (coastError / 1000).toFixed(1) : String(Math.round(coastError))) >= 0,
+	'and how far the coast impact is from the selected pad');
+
+R.trajectory.impact.valid = false;
+drawnText.length = 0;
+R.render.draw(coastGame);
+assert.ok(drawnText.indexOf('OUT OF HORIZON') >= 0, 'an invalid forecast is announced');
+assert.equal(drawnText.indexOf('COAST'), -1, 'and no marker is drawn for it');
+R.trajectory.update(coastGame);
+
+// The map shows one whole circumference, so the marker comes from the
+// viewport's periodic copy of the impact longitude: a coast that wraps the world
+// stays on screen, and at the seam it is drawn on both edges like the pads are.
+var viewportLeft = flightRocket.wx - R.world.planet.circumference / 3;
+
+function coastLabels() {
+	return drawnText.filter(function(text) {
+		return text === 'COAST';
+	}).length;
+}
+
+R.trajectory.impact.wx = viewportLeft + R.world.planet.circumference + 3000;
+drawnText.length = 0;
+R.render.draw(coastGame);
+assert.equal(coastLabels(), 1, 'a coast a whole world east is the same ground, drawn once inside the viewport');
+
+R.trajectory.impact.wx = viewportLeft + 5;
+drawnText.length = 0;
+R.render.draw(coastGame);
+assert.equal(coastLabels(), 2, 'a coast at the viewport seam is drawn on both edges');
+R.trajectory.update(coastGame);
 
 var autopilotFlight = {
 	currentPadId: R.world.pads[0].id,

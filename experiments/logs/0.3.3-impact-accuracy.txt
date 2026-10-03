@@ -1,0 +1,31 @@
+# Coast-impact accuracy: node experiments/impact-accuracy.js [samplesPerRoute] [seed] [stepHz]
+# 'flown routes' samples the states the marker is really shown for (reference build, both profiles, every directed route).
+# 'edge grid' is a synthetic sweep: altitudes 20 m to 9 km, speeds 0-420 m/s, four headings, three vertical fractions.
+# The reference is the same integrator at 24x the prediction step. 'no ground' counts coasts beyond the 120 s horizon.
+# Shipped step = the live fixed step (120). The 30 Hz run is the rejected alternative, kept for the comparison.
+
+$ node experiments/impact-accuracy.js 12 7
+=== Coast-impact accuracy: prediction step 1/120 s, horizon 120 s, reference step 1/2880 s, tolerance max(25 m, 1% of range) ===
+world     states                  scored  no ground  worst m  worst %  over tol  longest  µs/call
+verdant   flown routes                89          0      1.7     0.25         0    21.0s      110
+verdant   edge grid                  182         58      2.2     0.25         0   119.9s      463
+tinmoon   flown routes               113          0      2.3     0.37         0    51.8s      169
+tinmoon   edge grid                  164         76      1.7     0.12         0   119.4s      374
+cinder    flown routes                95          0      2.1     0.45         0    18.2s       86
+cinder    edge grid                  224         16     37.8     0.42         0   113.7s      353
+gossamer  flown routes               127          0      1.6     0.10         0    31.2s      187
+gossamer  edge grid                  182         58     12.4     0.31         0   113.3s      501
+scored 1176 states · worst range error 37.8 m (0.45% of range) · over tolerance 0 · slowest prediction 501.4 µs
+
+$ node experiments/impact-accuracy.js 12 7 30
+=== Coast-impact accuracy: prediction step 1/30 s, horizon 120 s, reference step 1/720 s, tolerance max(25 m, 1% of range) ===
+world     states                  scored  no ground  worst m  worst %  over tol  longest  µs/call
+verdant   flown routes                89          0      7.0     1.00         0    21.0s       30
+verdant   edge grid                  182         58      9.0     1.01         0   119.9s      116
+tinmoon   flown routes               113          0      9.0     1.45         0    51.8s       40
+tinmoon   edge grid                  164         76      6.6     0.47         0   119.4s      100
+cinder    flown routes                95          0      8.5     1.84         0    18.2s       23
+cinder    edge grid                  224         16    150.6     1.69         4   113.7s       95
+gossamer  flown routes               127          0      6.5     0.41         0    31.2s       47
+gossamer  edge grid                  182         58     49.6     1.26         4   113.3s      133
+scored 1176 states · worst range error 150.6 m (1.84% of range) · over tolerance 8 · slowest prediction 133.2 µs

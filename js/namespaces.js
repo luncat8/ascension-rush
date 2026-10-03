@@ -10,7 +10,9 @@
 	R.world = R.world || {};
 	R.camera = R.camera || {};
 	R.rocket = R.rocket || {};
+	R.aerodynamics = R.aerodynamics || {};
 	R.physics = R.physics || {};
+	R.trajectory = R.trajectory || {};
 	R.economy = R.economy || {};
 	R.mission = R.mission || {};
 	R.autopilot = R.autopilot || {};

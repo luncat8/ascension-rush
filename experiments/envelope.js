@@ -115,7 +115,7 @@ if (config.fromPlanet) {
 }
 console.log('=== ' + planet.name + ' · ' + config.label + ' · ' + (limitsOff ? 'limits off' : profileId + ' profile') + ' · C ' + Math.round(planet.circumference / 100) / 10 +
 	' km · g ' + planet.surfaceGravity + ' m/s² · ' + planet.seaLevelDensity + ' kg/m³ · ' + Math.round(1 / frameDt) + ' fps x' + timeScale + ' ===');
-console.log(padRight('directed route', 25) + padLeft('km', 6) + padLeft('result', 10) + padLeft('time', 8) + padLeft('peak alt', 10) + padLeft('peak v', 9) + padLeft('dry mass', 10) + padLeft('peak Q', 11) + padLeft('Q alt', 9) + padLeft('AoA@Qpk', 10) + padLeft('AoAmax/Q', 14) + padLeft('peak T/m', 10) + padLeft('applied', 9) + padLeft('limit s Q/A/α', 16) + padLeft('fuel left', 11));
+console.log(padRight('directed route', 25) + padLeft('km', 6) + padLeft('result', 10) + padLeft('time', 8) + padLeft('peak alt', 10) + padLeft('peak v', 9) + padLeft('dry mass', 10) + padLeft('peak Q', 11) + padLeft('Q alt', 9) + padLeft('AoA@Qpk', 10) + padLeft('AoAmax/Q', 14) + padLeft('peak T/m', 10) + padLeft('applied', 9) + padLeft('limit s Q/A/α', 16) + padLeft('touchdown V/H', 15) + padLeft('pad error', 11) + padLeft('fuel left', 11));
 
 R.world.pads.forEach(function(sourcePad) {
 	R.world.pads.forEach(function(targetPad) {
@@ -151,6 +151,8 @@ R.world.pads.forEach(function(sourcePad) {
 			padLeft(flight.peakThrustAcceleration.toFixed(1), 10) +
 			padLeft(flight.peakAppliedThrustAcceleration.toFixed(1), 9) +
 			padLeft(result.limiterSeconds.Q.toFixed(1) + '/' + result.limiterSeconds.ACCEL.toFixed(1) + '/' + result.limiterSeconds.AOA.toFixed(1), 16) +
+			padLeft(result.report ? result.report.touchdownVerticalSpeed.toFixed(1) + '/' + result.report.touchdownHorizontalSpeed.toFixed(1) : 'n/a', 15) +
+			padLeft(result.report ? Math.round(result.report.targetError) + 'm' : 'n/a', 11) +
 			padLeft(result.fuelLeft.toFixed(1) + 'kg', 11)
 		);
 	});
@@ -166,6 +168,8 @@ if (rows.length) {
 	var peakAppliedAcceleration = 0;
 	var worstReclimb = 0;
 	var mostFlips = 0;
+	var worstSink = 0;
+	var worstPadError = 0;
 	var i;
 
 	for (i = 0; i < rows.length; i += 1) {
@@ -182,11 +186,16 @@ if (rows.length) {
 		peakAppliedAcceleration = Math.max(peakAppliedAcceleration, rows[i].flight.peakAppliedThrustAcceleration);
 		worstReclimb = Math.max(worstReclimb, rows[i].reclimb);
 		mostFlips = Math.max(mostFlips, rows[i].sideFlips);
+		if (rows[i].report) {
+			worstSink = Math.max(worstSink, Math.abs(rows[i].report.touchdownVerticalSpeed));
+			worstPadError = Math.max(worstPadError, Math.abs(rows[i].report.targetError));
+		}
 	}
 	console.log('routes delivered: ' + delivered + '/' + rows.length +
 		' · envelope maxima: Q ' + (peakQ / 1000).toFixed(1) + ' kPa at AoA ' +
 		(planet.seaLevelDensity > 0 ? (peakQAoA * 180 / Math.PI).toFixed(1) + '°' : 'n/a') + ' · max AoA ' +
 		(planet.seaLevelDensity > 0 ? (peakAoA * 180 / Math.PI).toFixed(1) + '° at Q ' + (peakAoAQ / 1000).toFixed(1) + ' kPa' : 'n/a') +
 		' · thrust acceleration ' + peakAppliedAcceleration.toFixed(1) + ' applied / ' + peakThrustAcceleration.toFixed(1) + ' available m/s²' +
-		' · worst re-climb ' + Math.round(worstReclimb) + ' m · most axis flips ' + mostFlips);
+		' · worst re-climb ' + Math.round(worstReclimb) + ' m · most axis flips ' + mostFlips +
+		' · worst touchdown ' + worstSink.toFixed(1) + ' m/s down, ' + Math.round(worstPadError) + ' m off the pad');
 }

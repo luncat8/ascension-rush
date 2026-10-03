@@ -18,6 +18,7 @@ require('../js/economy.js');
 require('../js/mission.js');
 require('../js/aerodynamics.js');
 require('../js/physics.js');
+require('../js/trajectory.js');
 require('../js/autopilot.js');
 require('../js/controls.js');
 require('../js/input.js');

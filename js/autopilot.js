@@ -12,7 +12,6 @@
 	autopilot.phase = 'PAD';
 	autopilot.profileId = R.constants.autopilotProfiles[0].id;
 	autopilot.command = { heading: 0, throttle: 0, stage: false };
-	autopilot.landing = { wx: 0, valid: false };
 	// Bit flags for the envelope limits that shaped the latest command.
 	autopilot.limitFlags = { Q: 1, ACCEL: 2, AOA: 4 };
 	autopilot.limiter = 0;
@@ -202,7 +201,6 @@
 		autopilot.command.heading = 0;
 		autopilot.command.throttle = 0;
 		autopilot.command.stage = false;
-		autopilot.landing.valid = false;
 	};
 
 	autopilot.setEnabled = function(enabled) {
@@ -411,28 +409,6 @@
 			autopilot.limiter |= autopilot.limitFlags.ACCEL;
 		}
 		commandThrust(rocket, tuning, thrustAccel, budget, gravity, vectorX, vectorY);
-	};
-
-	// Vacuum ballistic projection of the impact point, for the ground marker.
-	autopilot.updateLandingPrediction = function(game) {
-		var rocket = game.rocket;
-		var gravity;
-		var discriminant;
-		var seconds;
-
-		if (game.phase !== 'flying' || rocket.wy <= 0) {
-			autopilot.landing.valid = false;
-			return;
-		}
-		gravity = R.physics.gravityAtAltitude(rocket.wy);
-		discriminant = rocket.vy * rocket.vy + 2 * gravity * rocket.wy;
-		if (discriminant < 0 || gravity <= 0) {
-			autopilot.landing.valid = false;
-			return;
-		}
-		seconds = (rocket.vy + Math.sqrt(discriminant)) / gravity;
-		autopilot.landing.wx = rocket.wx + rocket.vx * seconds;
-		autopilot.landing.valid = true;
 	};
 
 	if (typeof module !== 'undefined' && module.exports) {

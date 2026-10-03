@@ -21,9 +21,13 @@
 		pad: { x: 0, y: 0 },
 		rocket: { x: 0, y: 0 },
 		crosshair: { x: 0, y: 0 },
-		landing: { x: 0, y: 0 }
+		coast: { x: 0, y: 0 }
 	};
 	render.timeLabel = { index: -1, text: 'x1' };
+	// Coast marker: crash, safe landing elsewhere, delivery on the target pad.
+	var coastColors = ['#f28b82', '#f4c76a', '#64d5c2'];
+	// Distance unit and side of the pad, so the HUD never builds a string.
+	var coastUnits = [' m W', ' m E', ' km W', ' km E'];
 
 	function drawPanel(context, x, y, width, height) {
 		var radius = 10;
@@ -271,15 +275,20 @@
 		var targetDistance = target ? Math.abs(R.util.wrapDelta(target.wx - rocket.wx, R.world.planet.circumference)) : 0;
 		var fuelFraction = stage && stage.fuelMax > 0 ? stage.fuelMass / stage.fuelMax : 0;
 		var heading = Math.round(R.util.mod(rocket.heading, Math.PI * 2) * 180 / Math.PI);
+		var impact = R.trajectory.impact;
+		var coastError;
 		var margin = Math.min(24, render.width * 0.05);
 		var panelWidth = 230;
-		var panelHeight = 345;
+		var panelHeight = 387;
 		var x = render.width - panelWidth - margin;
 		var y = 20;
 
 		if (render.width < 650) {
+			// Narrow viewport: the panel moves to the left, as low as it can go
+			// without covering the ground strip, and never off the bottom.
 			x = margin;
-			y = Math.max(152, R.camera.groundY - panelHeight - 20);
+			y = R.util.clamp(Math.max(152, R.camera.groundY - panelHeight - 20), 12,
+				Math.max(12, render.height - panelHeight - 12));
 		}
 
 		drawPanel(context, x, y, panelWidth, panelHeight);
@@ -424,17 +433,54 @@
 			context.fillText(R.autopilot.profileById(game.flight.autopilotProfile).label, x + 74, y + 296);
 		}
 
+		// The coast forecast: where an engine-off trajectory from this state
+		// reaches the ground, how far that is from the selected pad, and how
+		// hard it arrives. It is a projection, not a promise: the autopilot
+		// keeps burning and lands where its own guidance takes it.
 		context.textAlign = 'left';
 		context.fillStyle = '#a8bac2';
-		context.fillText('TIME SCALE', x + 16, y + 317);
+		context.fillText('COAST IMPACT', x + 16, y + 317);
+		context.textAlign = 'right';
+		if (!impact.valid) {
+			context.fillStyle = '#829ba6';
+			context.fillText('OUT OF HORIZON', x + panelWidth - 16, y + 317);
+		} else if (impact.onTargetPad) {
+			context.fillStyle = '#7de0ca';
+			context.fillText('ON TARGET PAD', x + panelWidth - 16, y + 317);
+		} else {
+			coastError = Math.abs(impact.targetError);
+			context.fillStyle = impact.safeTouchdown ? '#f4c76a' : '#f1a89d';
+			context.fillText(coastError >= 1000 ? (coastError / 1000).toFixed(1) : String(Math.round(coastError)), x + panelWidth - 50, y + 317);
+			context.textAlign = 'left';
+			context.fillText(coastUnits[(impact.targetError >= 0 ? 1 : 0) + (coastError >= 1000 ? 2 : 0)], x + panelWidth - 48, y + 317);
+		}
+
+		context.textAlign = 'left';
+		context.fillStyle = '#a8bac2';
+		context.fillText('COAST TOUCHDOWN', x + 16, y + 337);
+		context.textAlign = 'right';
+		if (!impact.valid) {
+			context.fillStyle = '#829ba6';
+			context.fillText('—', x + panelWidth - 16, y + 337);
+		} else {
+			context.fillStyle = impact.safeTouchdown ? '#7de0ca' : '#f1a89d';
+			context.fillText('V', x + panelWidth - 116, y + 337);
+			context.fillText(Math.abs(impact.vy).toFixed(1), x + panelWidth - 66, y + 337);
+			context.fillText('H', x + panelWidth - 56, y + 337);
+			context.fillText(Math.abs(impact.vx).toFixed(1), x + panelWidth - 16, y + 337);
+		}
+
+		context.textAlign = 'left';
+		context.fillStyle = '#a8bac2';
+		context.fillText('TIME SCALE', x + 16, y + 358);
 		context.textAlign = 'right';
 		context.fillStyle = '#e7eff6';
-		context.fillText(timeLabel(game), x + panelWidth - 16, y + 317);
+		context.fillText(timeLabel(game), x + panelWidth - 16, y + 358);
 
 		context.fillStyle = '#829ba6';
 		context.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
 		context.textAlign = 'left';
-		context.fillText('A  AUTOPILOT    [ ]  TIME    SHIFT/CTRL  THROTTLE', x + 16, y + 337);
+		context.fillText('A  AUTOPILOT    [ ]  TIME    SHIFT/CTRL  THROTTLE', x + 16, y + 378);
 	}
 
 	// Cached so the frame loop does not build a new string every tick.
@@ -506,28 +552,49 @@
 		context.fillText(input.debugText, textX, textY);
 	}
 
-	function drawLandingMarker(context, game) {
-		var landing = R.autopilot.landing;
-		var point = render.scratch.landing;
-		var groundY = R.camera.groundY;
-
-		if (game.phase !== 'flying' || !R.autopilot.enabled || !landing.valid) {
-			return;
-		}
-		R.camera.project(landing.wx, 0, point);
-		if (point.x < -12 || point.x > render.width + 12) {
-			return;
-		}
-
+	// The label sits above the pad-name band so a coast that lands on a pad
+	// still reads as two labels, not as one overprint.
+	function drawCoastMarkerAt(context, sx, groundY, color) {
+		context.globalAlpha = 0.3;
+		context.fillStyle = color;
+		context.fillRect(sx - 0.5, groundY - 16, 1, 16);
+		context.globalAlpha = 0.92;
 		context.beginPath();
-		context.moveTo(point.x, groundY - 16);
-		context.lineTo(point.x - 6, groundY - 27);
-		context.lineTo(point.x + 6, groundY - 27);
+		context.moveTo(sx, groundY - 16);
+		context.lineTo(sx - 6, groundY - 27);
+		context.lineTo(sx + 6, groundY - 27);
 		context.closePath();
-		context.fillStyle = 'rgba(125, 224, 202, 0.9)';
 		context.fill();
-		context.fillStyle = 'rgba(125, 224, 202, 0.34)';
-		context.fillRect(point.x - 0.5, groundY - 16, 1, 16);
+		context.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
+		context.textAlign = 'center';
+		context.fillText('COAST', sx, groundY - 44);
+		context.globalAlpha = 1;
+	}
+
+	// Where the rocket reaches the ground if the engine is cut now. The colour
+	// separates a coast that would deliver from one that would merely land and
+	// one that would break the world's touchdown limits.
+	function drawCoastMarker(context, game) {
+		var impact = R.trajectory.impact;
+		var point = render.scratch.coast;
+		var groundY = R.camera.groundY;
+		var color;
+
+		if (game.phase !== 'flying' || !impact.valid) {
+			return;
+		}
+		// The periodic copy always projects inside the viewport, so a coast that
+		// wraps the world keeps its marker; near an edge it is drawn twice, like
+		// the pads are.
+		R.camera.project(R.trajectory.markerX(impact), 0, point);
+		color = impact.safeTouchdown ? (impact.onTargetPad ? coastColors[2] : coastColors[1]) : coastColors[0];
+		drawCoastMarkerAt(context, point.x, groundY, color);
+		if (point.x < 20) {
+			drawCoastMarkerAt(context, point.x + render.width, groundY, color);
+		}
+		if (point.x > render.width - 20) {
+			drawCoastMarkerAt(context, point.x - render.width, groundY, color);
+		}
 	}
 
 	render.initialize = function(context) {
@@ -582,7 +649,7 @@
 		drawAltitudeScale(context);
 		drawGround(context);
 		drawPads(context, game);
-		drawLandingMarker(context, game);
+		drawCoastMarker(context, game);
 
 		R.camera.project(rocket.wx, rocket.wy, render.scratch.rocket);
 		R.rocket.draw(context, render.scratch.rocket.x, render.scratch.rocket.y, rocket.heading, flameThrottle);

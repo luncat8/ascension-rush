@@ -30,7 +30,9 @@
 		game.simTime += simDt;
 		R.controls.update(game, simDt);
 		R.physics.advance(game, dt);
-		R.autopilot.updateLandingPrediction(game);
+		// The coast-impact marker is a forecast for whoever is flying: it says
+		// where the engine-off trajectory from this state reaches the ground.
+		R.trajectory.update(game);
 	}
 
 	function start() {
