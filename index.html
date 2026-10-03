@@ -13,87 +13,266 @@
   <canvas id="c" aria-label="Ascension Rush planetary delivery map">
     Ascension Rush needs a browser with HTML canvas support.
   </canvas>
-  <aside id="builder-panel" class="builder-panel" aria-label="Rocket builder" hidden>
-    <header class="builder-header">
+
+  <div id="flight-strip" class="flight-strip" hidden>
+    <span id="flight-strip-text"></span>
+    <button id="flight-strip-deck" class="ghost-button" type="button">Open deck</button>
+  </div>
+
+  <aside id="deck" class="deck" aria-label="Operations deck">
+    <header class="deck-header">
       <div>
-        <p class="eyebrow">ASCENSION RUSH / FLIGHT DECK</p>
-        <h1>Rocket builder</h1>
+        <p class="eyebrow">ASCENSION RUSH / OPERATIONS</p>
+        <h1>Operations deck</h1>
       </div>
-      <div class="builder-cash">
-        <span>WORLD</span><strong id="builder-planet-name">Verdant</strong>
-        <button id="builder-planet-button" class="ghost-button" type="button">Switch…</button>
+      <div class="deck-stats">
+        <div>
+          <span>WORLD</span><strong id="deck-world">Verdant</strong>
+          <button id="deck-planet-button" class="ghost-button" type="button">Switch…</button>
+        </div>
+        <div><span>AVAILABLE</span><strong id="deck-cash">$30,000</strong></div>
+        <div><span>FLEET</span><strong id="deck-fleet">1 of 1 ready</strong></div>
       </div>
-      <div class="builder-cash"><span>AVAILABLE</span><strong>$<b id="builder-cash">30,000</b></strong></div>
     </header>
 
-    <section id="builder-report" class="builder-report" aria-live="polite" hidden>
-      <strong id="builder-report-title"></strong>
-      <p id="builder-report-detail"></p>
+    <nav class="deck-tabs" role="tablist" aria-label="Operations views">
+      <button id="tab-dispatch" class="deck-tab" role="tab" type="button"
+        aria-controls="view-dispatch" aria-selected="true">Dispatch</button>
+      <button id="tab-routes" class="deck-tab" role="tab" type="button"
+        aria-controls="view-routes" aria-selected="false" tabindex="-1">Routes</button>
+      <button id="tab-log" class="deck-tab" role="tab" type="button"
+        aria-controls="view-log" aria-selected="false" tabindex="-1">Flight log</button>
+    </nav>
+
+    <section id="view-dispatch" class="deck-view" role="tabpanel" aria-labelledby="tab-dispatch" tabindex="0">
+      <section id="dispatch-report" class="builder-report" aria-live="polite" hidden>
+        <strong id="dispatch-report-title"></strong>
+        <p id="dispatch-report-detail"></p>
+      </section>
+
+      <section id="dispatch-offer" class="offer-card" aria-live="polite" hidden>
+        <p id="dispatch-offer-text"></p>
+        <div class="offer-actions">
+          <button id="dispatch-offer-send" class="ghost-button" type="button">Send now</button>
+          <button id="dispatch-offer-cancel" class="ghost-button" type="button">Not now</button>
+        </div>
+      </section>
+
+      <section id="dispatch-return" class="offer-card" aria-live="polite" hidden>
+        <p id="dispatch-return-text"></p>
+        <p class="offer-cost" id="dispatch-return-cost"></p>
+        <button id="dispatch-return-send" class="ghost-button" type="button">Send return leg</button>
+      </section>
+
+      <div class="pad-row">
+        <div class="builder-control">
+          <label for="dispatch-from">From</label>
+          <select id="dispatch-from"></select>
+        </div>
+        <button id="dispatch-swap" class="swap-button" type="button" aria-label="Swap start and destination">⇄</button>
+        <div class="builder-control">
+          <label for="dispatch-to">To</label>
+          <select id="dispatch-to"></select>
+        </div>
+      </div>
+
+      <fieldset class="segmented">
+        <legend>Trip</legend>
+        <label><input id="dispatch-mode-oneway" type="radio" name="dispatch-mode" checked> One way</label>
+        <label><input id="dispatch-mode-return" type="radio" name="dispatch-mode"> Return</label>
+      </fieldset>
+
+      <fieldset class="segmented" id="dispatch-policy" hidden>
+        <legend>Return fuel</legend>
+        <label><input id="dispatch-policy-refuel" type="radio" name="dispatch-policy" checked> Refuel there</label>
+        <label><input id="dispatch-policy-none" type="radio" name="dispatch-policy"> Use remaining</label>
+      </fieldset>
+
+      <div class="builder-control payload-control">
+        <label for="dispatch-outbound">Outbound payload <output id="dispatch-outbound-value">80 kg</output></label>
+        <input id="dispatch-outbound" type="range" min="0" max="600" step="10" value="80">
+      </div>
+      <div class="builder-control payload-control" id="dispatch-return-row" hidden>
+        <label for="dispatch-return-payload">Return payload <output id="dispatch-return-payload-value">80 kg</output></label>
+        <input id="dispatch-return-payload" type="range" min="0" max="600" step="10" value="80">
+      </div>
+
+      <div class="builder-control">
+        <label for="dispatch-type">Rocket type</label>
+        <select id="dispatch-type"></select>
+      </div>
+      <div class="builder-control">
+        <label for="dispatch-rocket">Rocket at this pad</label>
+        <select id="dispatch-rocket"></select>
+      </div>
+      <button id="dispatch-build" class="ghost-button wide" type="button">
+        <span id="dispatch-build-label">Build rocket here</span>
+      </button>
+
+      <div class="builder-control builder-row autopilot-profile">
+        <label for="dispatch-profile">Autopilot profile</label>
+        <select id="dispatch-profile"></select>
+      </div>
+      <p class="builder-hint" id="dispatch-profile-hint"></p>
+
+      <section class="build-summary" id="dispatch-summary" aria-label="Dispatch summary"></section>
+      <p id="dispatch-blocked" class="builder-warning" aria-live="polite" hidden></p>
+      <button id="dispatch-send" class="launch-button" type="button">Send on autopilot</button>
+      <div class="deck-actions">
+        <button id="dispatch-save-route" class="ghost-button" type="button">Save as route…</button>
+        <button id="dispatch-workshop" class="ghost-button" type="button">Rocket workshop…</button>
+      </div>
+      <p class="builder-help">Mouse aims · Shift/Ctrl throttle · Space stages · A autopilot · [ ] time scale</p>
     </section>
 
-    <div class="builder-control">
-      <label for="builder-target">Destination pad</label>
-      <select id="builder-target"></select>
-    </div>
-
-    <div class="builder-control builder-row">
-      <label for="builder-stage-count">Stages</label>
-      <select id="builder-stage-count">
-        <option value="1">1 stage</option>
-        <option value="2">2 stages</option>
-        <option value="3" selected>3 stages</option>
-      </select>
-    </div>
-
-    <section class="stage-card" id="builder-stage-0">
-      <header><strong>Stage 1 · Booster</strong><span>burns first</span></header>
-      <label for="builder-fuel-0">Fuel capacity <output id="builder-fuel-value-0">420 kg</output></label>
-      <input id="builder-fuel-0" type="range" min="100" max="1500" step="10" value="420">
-      <label for="builder-strength-0">Structure strength <output id="builder-strength-value-0">85%</output></label>
-      <input id="builder-strength-0" type="range" min="0.5" max="1" step="0.05" value="0.85">
+    <section id="view-routes" class="deck-view" role="tabpanel" aria-labelledby="tab-routes" tabindex="0" hidden>
+      <p id="routes-empty" class="empty-state">No routes yet. Send a flight from Dispatch, then save it as a
+        route: an enabled route waits for a compatible rocket and payload, then asks before it flies.</p>
+      <div id="routes-list" class="card-list"></div>
     </section>
 
-    <section class="stage-card" id="builder-stage-1">
-      <header><strong>Stage 2 · Upper stage</strong><span>burns second</span></header>
-      <label for="builder-fuel-1">Fuel capacity <output id="builder-fuel-value-1">260 kg</output></label>
-      <input id="builder-fuel-1" type="range" min="100" max="1500" step="10" value="260">
-      <label for="builder-strength-1">Structure strength <output id="builder-strength-value-1">90%</output></label>
-      <input id="builder-strength-1" type="range" min="0.5" max="1" step="0.05" value="0.9">
+    <section id="view-log" class="deck-view" role="tabpanel" aria-labelledby="tab-log" tabindex="0" hidden>
+      <p id="log-empty" class="empty-state">No flights yet. Every finished leg is recorded here, including
+        crashes and wrong-pad landings, with its measured touchdown and itemized cash.</p>
+      <div id="log-list" class="card-list"></div>
     </section>
-
-    <section class="stage-card" id="builder-stage-2">
-      <header><strong>Stage 3 · Kick stage</strong><span>burns last</span></header>
-      <label for="builder-fuel-2">Fuel capacity <output id="builder-fuel-value-2">200 kg</output></label>
-      <input id="builder-fuel-2" type="range" min="100" max="1500" step="10" value="200">
-      <label for="builder-strength-2">Structure strength <output id="builder-strength-value-2">90%</output></label>
-      <input id="builder-strength-2" type="range" min="0.5" max="1" step="0.05" value="0.9">
-    </section>
-
-    <div class="builder-control payload-control">
-      <label for="builder-payload">Payload mass <output id="builder-payload-value">80 kg</output></label>
-      <input id="builder-payload" type="range" min="0" max="600" step="10" value="80">
-    </div>
-
-    <section class="build-summary" aria-label="Rocket estimates">
-      <div><span>Takeoff mass</span><strong><b id="builder-mass">—</b> kg</strong></div>
-      <div><span>Steel / structure</span><strong><b id="builder-steel">—</b> kg</strong></div>
-      <div><span>Fuel load</span><strong><b id="builder-fuel">—</b> kg</strong></div>
-      <div><span>Estimated dV</span><strong><b id="builder-dv">—</b> m/s</strong></div>
-      <div><span>Launch TWR</span><strong><b id="builder-twr">—</b></strong></div>
-      <div class="summary-cost"><span>Estimated flight cost</span><strong>$<b id="builder-cost">—</b></strong></div>
-    </section>
-
-    <label class="builder-toggle"><input id="builder-autopilot" type="checkbox"> Hand the flight to the autopilot</label>
-    <div class="builder-control builder-row autopilot-profile">
-      <label for="builder-autopilot-profile">Autopilot profile</label>
-      <select id="builder-autopilot-profile"></select>
-    </div>
-    <p class="builder-hint">Autopilot flies the same physics you do and keeps 10% of the delivery reward. <span id="builder-autopilot-profile-hint"></span></p>
-
-    <p id="builder-warning" class="builder-warning" aria-live="polite"></p>
-    <button id="launch-button" class="launch-button" type="button">Launch · full throttle</button>
-    <p class="builder-help">Mouse aims · Shift/Ctrl throttle · Space stages · A autopilot · [ ] time scale</p>
   </aside>
+
+  <div id="workshop" class="dialog" hidden>
+    <section class="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="workshop-title">
+      <header class="dialog-header">
+        <h2 id="workshop-title">Rocket workshop</h2>
+        <button id="workshop-close" class="ghost-button" type="button">Close</button>
+      </header>
+      <p class="builder-hint">A rocket type is an immutable build template. Routes point at a type; fleet
+        rockets are instances of one.</p>
+
+      <div class="builder-control">
+        <label for="workshop-name">Type name</label>
+        <input id="workshop-name" type="text" value="">
+      </div>
+
+      <div class="builder-control builder-row">
+        <label for="workshop-stage-count">Stages</label>
+        <select id="workshop-stage-count">
+          <option value="1">1 stage</option>
+          <option value="2">2 stages</option>
+          <option value="3" selected>3 stages</option>
+        </select>
+      </div>
+
+      <section class="stage-card" id="builder-stage-0">
+        <header><strong>Stage 1 · Booster</strong><span>burns first</span></header>
+        <label for="builder-fuel-0">Fuel capacity <output id="builder-fuel-value-0">420 kg</output></label>
+        <input id="builder-fuel-0" type="range" min="100" max="1500" step="10" value="420">
+        <label for="builder-strength-0">Structure strength <output id="builder-strength-value-0">85%</output></label>
+        <input id="builder-strength-0" type="range" min="0.5" max="1" step="0.05" value="0.85">
+      </section>
+
+      <section class="stage-card" id="builder-stage-1">
+        <header><strong>Stage 2 · Upper stage</strong><span>burns second</span></header>
+        <label for="builder-fuel-1">Fuel capacity <output id="builder-fuel-value-1">260 kg</output></label>
+        <input id="builder-fuel-1" type="range" min="100" max="1500" step="10" value="260">
+        <label for="builder-strength-1">Structure strength <output id="builder-strength-value-1">90%</output></label>
+        <input id="builder-strength-1" type="range" min="0.5" max="1" step="0.05" value="0.9">
+      </section>
+
+      <section class="stage-card" id="builder-stage-2">
+        <header><strong>Stage 3 · Kick stage</strong><span>burns last</span></header>
+        <label for="builder-fuel-2">Fuel capacity <output id="builder-fuel-value-2">200 kg</output></label>
+        <input id="builder-fuel-2" type="range" min="100" max="1500" step="10" value="200">
+        <label for="builder-strength-2">Structure strength <output id="builder-strength-value-2">90%</output></label>
+        <input id="builder-strength-2" type="range" min="0.5" max="1" step="0.05" value="0.9">
+      </section>
+
+      <div class="builder-control payload-control">
+        <label for="workshop-payload">Design payload <output id="workshop-payload-value">80 kg</output></label>
+        <input id="workshop-payload" type="range" min="0" max="600" step="10" value="80">
+      </div>
+
+      <section class="build-summary" aria-label="Rocket type estimates">
+        <div><span>Takeoff mass</span><strong><b id="workshop-mass">—</b> kg</strong></div>
+        <div><span>Steel / structure</span><strong><b id="workshop-steel">—</b> kg</strong></div>
+        <div><span>Fuel load</span><strong><b id="workshop-fuel">—</b> kg</strong></div>
+        <div><span>Estimated dV</span><strong><b id="workshop-dv">—</b> m/s</strong></div>
+        <div><span>Launch TWR</span><strong><b id="workshop-twr">—</b></strong></div>
+        <div><span>Payload capacity</span><strong><b id="workshop-capacity">—</b> kg</strong></div>
+        <div class="summary-cost"><span>Price of a new rocket</span><strong>$<b id="workshop-cost">—</b></strong></div>
+      </section>
+
+      <p id="workshop-fleet" class="builder-hint"></p>
+      <p id="workshop-warning" class="builder-warning" aria-live="polite"></p>
+      <button id="workshop-save" class="launch-button" type="button">
+        <span id="workshop-save-label">Save as new rocket type</span>
+      </button>
+      <button id="workshop-build" class="ghost-button wide" type="button">
+        Build a rocket at <span id="workshop-build-pad"></span>
+      </button>
+    </section>
+  </div>
+
+  <div id="route-type-dialog" class="dialog" hidden>
+    <section class="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="route-type-title">
+      <header class="dialog-header">
+        <h2 id="route-type-title">Change rocket type</h2>
+        <button id="route-type-cancel" class="ghost-button" type="button">Cancel</button>
+      </header>
+      <div id="route-type-list" class="type-list"></div>
+      <p id="route-type-warning" class="builder-warning" aria-live="polite"></p>
+    </section>
+  </div>
+
+  <div id="route-review-dialog" class="dialog" hidden>
+    <section class="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="route-review-title">
+      <header class="dialog-header">
+        <h2 id="route-review-title">Review new route</h2>
+        <button id="route-review-cancel" class="ghost-button" type="button">Cancel</button>
+      </header>
+      <p class="builder-hint" id="route-review-route"></p>
+
+      <div class="builder-control">
+        <label for="route-name">Route name</label>
+        <input id="route-name" type="text" value="">
+      </div>
+      <div class="builder-control builder-row">
+        <label for="route-mode">Trip</label>
+        <select id="route-mode">
+          <option value="oneway">One way</option>
+          <option value="return">Return</option>
+        </select>
+      </div>
+      <div class="builder-control payload-control">
+        <label for="route-outbound">Outbound payload <output id="route-outbound-value">80 kg</output></label>
+        <input id="route-outbound" type="range" min="0" max="600" step="10" value="80">
+      </div>
+      <div class="builder-control payload-control" id="route-return-row">
+        <label for="route-return">Return payload <output id="route-return-value">80 kg</output></label>
+        <input id="route-return" type="range" min="0" max="600" step="10" value="80">
+      </div>
+      <div class="builder-control builder-row" id="route-policy-row">
+        <label for="route-policy">Return fuel</label>
+        <select id="route-policy">
+          <option value="refuel">Refuel at destination</option>
+          <option value="none">Use remaining fuel</option>
+        </select>
+      </div>
+      <div class="builder-control builder-row">
+        <label for="route-type">Rocket type</label>
+        <select id="route-type"></select>
+      </div>
+      <div class="builder-control builder-row">
+        <label for="route-profile">Autopilot profile</label>
+        <select id="route-profile"></select>
+      </div>
+
+      <label class="builder-toggle"><input id="route-enabled" type="checkbox"> Enabled — the scheduler may offer this route</label>
+      <label class="builder-toggle"><input id="route-auto-launch" type="checkbox"> Auto-launch when ready, after one delivered leg</label>
+
+      <p id="route-warning" class="builder-warning" aria-live="polite"></p>
+      <button id="route-review-save" class="launch-button" type="button">Save route</button>
+    </section>
+  </div>
+
   <div id="planet-menu" class="planet-menu" hidden>
     <section class="planet-menu-panel" aria-label="Choose a world">
       <p class="eyebrow">ASCENSION RUSH / DELIVERY NETWORK</p>
@@ -104,6 +283,8 @@
       <button id="planet-menu-close" class="ghost-button" type="button">Keep flying the current run</button>
     </section>
   </div>
+
+  <p id="deck-announcer" class="visually-hidden" role="status" aria-live="polite"></p>
 </main>
 <script src="js/namespaces.js"></script>
 <script src="js/util.js"></script>
@@ -114,12 +295,15 @@
 <script src="js/world.js"></script>
 <script src="js/rocket.js"></script>
 <script src="js/economy.js"></script>
+<script src="js/flight-log.js"></script>
 <script src="js/mission.js"></script>
 <script src="js/aerodynamics.js"></script>
 <script src="js/physics.js"></script>
 <script src="js/trajectory.js"></script>
 <script src="js/autopilot.js"></script>
+<script src="js/operations.js"></script>
 <script src="js/builder.js"></script>
+<script src="js/deck.js"></script>
 <script src="js/controls.js"></script>
 <script src="js/input.js"></script>
 <script src="js/render.js"></script>

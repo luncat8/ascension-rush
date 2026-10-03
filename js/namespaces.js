@@ -15,9 +15,12 @@
 	R.trajectory = R.trajectory || {};
 	R.economy = R.economy || {};
 	R.mission = R.mission || {};
+	R.flightLog = R.flightLog || {};
+	R.operations = R.operations || {};
 	R.autopilot = R.autopilot || {};
 	R.menu = R.menu || {};
 	R.builder = R.builder || {};
+	R.deck = R.deck || {};
 	R.controls = R.controls || {};
 	R.input = R.input || {};
 	R.render = R.render || {};

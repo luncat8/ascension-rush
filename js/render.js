@@ -24,6 +24,16 @@
 		coast: { x: 0, y: 0 }
 	};
 	render.timeLabel = { index: -1, text: 'x1' };
+	// The pad pair the map highlights: the leg in flight, a mission waiting for
+	// its return, or the dispatch form's selection. Filled in place per frame.
+	render.focus = {
+		fromPadId: '',
+		toPadId: '',
+		showReturn: false,
+		leg: 0,
+		legCount: 0,
+		active: false
+	};
 	// Coast marker: crash, safe landing elsewhere, delivery on the target pad.
 	var coastColors = ['#f28b82', '#f4c76a', '#64d5c2'];
 	// Distance unit and side of the pad, so the HUD never builds a string.
@@ -48,6 +58,91 @@
 		context.lineWidth = 1;
 		context.strokeStyle = 'rgba(191, 214, 227, 0.18)';
 		context.stroke();
+	}
+
+	// Which pad pair the map is talking about right now. A mission outranks the
+	// dispatch selection so the deck keeps showing the flight it is working on.
+	function legFocus(game) {
+		var focus = render.focus;
+		var mission = game.mission;
+		var selection = game.selection;
+
+		if (mission && mission.legFrom) {
+			focus.fromPadId = mission.legFrom;
+			focus.toPadId = mission.legTo;
+			focus.showReturn = mission.mode === 'return';
+			focus.leg = mission.currentLeg || 1;
+			focus.legCount = mission.mode === 'return' ? 2 : 1;
+			focus.active = true;
+			return focus;
+		}
+		focus.fromPadId = selection ? selection.sourcePadId : game.currentPadId;
+		focus.toPadId = selection ? selection.targetPadId : game.targetPadId;
+		focus.showReturn = !!selection && selection.mode === 'return';
+		focus.leg = 0;
+		focus.legCount = focus.showReturn ? 2 : 1;
+		focus.active = false;
+		return focus;
+	}
+
+	function padScreenX(pad) {
+		R.camera.project(R.coords.nearestPeriodicX(pad.wx, R.camera.leftWx, R.world.planet.circumference), 0, render.scratch.pad);
+		return render.scratch.pad.x;
+	}
+
+	function drawArrowHead(context, sx, y, direction, color) {
+		context.beginPath();
+		context.moveTo(sx, y);
+		context.lineTo(sx - direction * 9, y - 4);
+		context.lineTo(sx - direction * 9, y + 4);
+		context.closePath();
+		context.fillStyle = color;
+		context.fill();
+	}
+
+	// The shortest wrapped direction between the two pads, drawn on the surface
+	// strip. A return mission adds the leg back above it, so the player can see
+	// the whole trip rather than one arrow at a time.
+	function drawLegArc(context, game) {
+		var focus = legFocus(game);
+		var from = R.world.findPadById(focus.fromPadId);
+		var to = R.world.findPadById(focus.toPadId);
+		var groundY = R.camera.groundY;
+		var width = render.width;
+		var x1;
+		var x2;
+
+		if (!from || !to || from.id === to.id) {
+			return;
+		}
+		x1 = padScreenX(from);
+		x2 = padScreenX(to);
+		if (x2 - x1 > width * 0.5) {
+			x2 -= width;
+		} else if (x1 - x2 > width * 0.5) {
+			x2 += width;
+		}
+
+		context.lineWidth = 3;
+		context.strokeStyle = focus.active ? 'rgba(100, 213, 194, 0.75)' : 'rgba(100, 213, 194, 0.42)';
+		context.beginPath();
+		context.moveTo(x1, groundY - 3);
+		context.lineTo(x2, groundY - 3);
+		context.stroke();
+		drawArrowHead(context, x2, groundY - 3, x2 >= x1 ? 1 : -1, 'rgba(140, 232, 216, 0.9)');
+
+		if (!focus.showReturn) {
+			return;
+		}
+		context.setLineDash([6, 6]);
+		context.lineWidth = 2;
+		context.strokeStyle = 'rgba(244, 199, 106, 0.55)';
+		context.beginPath();
+		context.moveTo(x2, groundY - 12);
+		context.lineTo(x1, groundY - 12);
+		context.stroke();
+		context.setLineDash([]);
+		drawArrowHead(context, x1, groundY - 12, x2 >= x1 ? -1 : 1, 'rgba(244, 199, 106, 0.8)');
 	}
 
 	function drawPadMarker(context, pad, sx, surfaceY, isCurrent, isTarget, showLabel) {
@@ -100,14 +195,15 @@
 		var sx;
 		var isCurrent;
 		var isTarget;
+		var focus = legFocus(game);
 
 		for (i = 0; i < pads.length; i += 1) {
 			pad = pads[i];
 			padWorldX = R.coords.nearestPeriodicX(pad.wx, camera.leftWx, circumference);
 			camera.project(padWorldX, 0, render.scratch.pad);
 			sx = render.scratch.pad.x;
-			isCurrent = pad.id === game.currentPadId;
-			isTarget = pad.id === game.targetPadId;
+			isCurrent = pad.id === focus.fromPadId;
+			isTarget = pad.id === focus.toPadId;
 
 			drawPadMarker(context, pad, sx, surfaceY, isCurrent, isTarget, sx > 40 && sx < width - 40);
 			if (sx < 14) {
@@ -169,13 +265,61 @@
 		}
 	}
 
+	var missionLabels = [
+		'PAYLOAD DELIVERY  /  OPERATIONS DECK',
+		'PAYLOAD DELIVERY  /  FLIGHT',
+		'PAYLOAD DELIVERY  /  LEG 1 OF 2',
+		'PAYLOAD DELIVERY  /  LEG 2 OF 2',
+		'PAYLOAD DELIVERY  /  RETURN LEG WAITING'
+	];
+
+	// Route identity and fuel policy for the flight HUD. Rebuilt only when the
+	// mission changes, so the frame loop stays allocation-free.
+	render.missionTag = { key: '', text: '' };
+
+	function missionTag(game) {
+		var mission = game.mission;
+		var route;
+		var key;
+
+		if (!mission) {
+			return 'MANUAL DISPATCH FROM THE DECK';
+		}
+		route = mission.routeId ? R.operations.findRoute(mission.routeId) : null;
+		key = mission.id + ':' + mission.status;
+		if (render.missionTag.key === key) {
+			return render.missionTag.text;
+		}
+		render.missionTag.key = key;
+		render.missionTag.text = (route ? 'ROUTE ' + route.name.toUpperCase() : 'DISPATCH') +
+			(mission.mode === 'return' ?
+				(mission.fuelPolicy === 'refuel' ? '  ·  REFUELS AT DESTINATION' : '  ·  FLIES HOME ON REMAINING FUEL') :
+				'  ·  ONE WAY');
+		return render.missionTag.text;
+	}
+
+	// Indexed, so the panel never builds a string per frame.
+	function missionLine(game) {
+		var mission = game.mission;
+		var focus = render.focus;
+
+		if (!mission) {
+			return missionLabels[0];
+		}
+		if (game.phase !== 'flying') {
+			return missionLabels[4];
+		}
+		return missionLabels[focus.legCount === 2 ? focus.leg : 1];
+	}
+
 	function drawMissionPanel(context, game) {
-		var source = R.world.findPadById(game.currentPadId);
-		var target = R.world.findPadById(game.targetPadId);
+		var focus = legFocus(game);
+		var source = R.world.findPadById(focus.fromPadId);
+		var target = R.world.findPadById(focus.toPadId);
 		var rocket = game.rocket;
 		var margin = Math.min(24, render.width * 0.05);
 		var panelWidth = Math.min(354, render.width - margin * 2);
-		var panelHeight = 126;
+		var panelHeight = 143;
 		var horizontalSpeed = Math.round(Math.abs(rocket.vx));
 		var x = margin;
 		var y = 20;
@@ -187,7 +331,7 @@
 		context.fillText('ASCENSION RUSH', x + 18, y + 24);
 		context.fillStyle = R.constants.render.mutedText;
 		context.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
-		context.fillText(game.phase === 'flying' ? 'PAYLOAD DELIVERY  /  FLIGHT 01' : 'PAYLOAD DELIVERY  /  NETWORK 01', x + 18, y + 42);
+		context.fillText(missionLine(game), x + 18, y + 42);
 
 		context.strokeStyle = 'rgba(190, 215, 224, 0.16)';
 		context.beginPath();
@@ -220,6 +364,10 @@
 		context.fillStyle = R.constants.render.text;
 		context.font = '600 11px ui-monospace, SFMono-Regular, Menlo, monospace';
 		context.fillText(horizontalSpeed, x + 214, y + 105);
+
+		context.fillStyle = game.mission ? '#f4c76a' : R.constants.render.mutedText;
+		context.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
+		context.fillText(missionTag(game), x + 18, y + 128);
 	}
 
 	function drawWorldPanel(context) {
@@ -502,7 +650,7 @@
 		var margin = Math.min(24, render.width * 0.05);
 		var width = Math.min(350, render.width - margin * 2);
 		var y = R.camera.groundY - 46;
-		var label = game.phase === 'flying' ? 'MOUSE AIM  ·  SHIFT / CTRL THROTTLE  ·  SPACE STAGE  ·  A AUTOPILOT' : 'PAD READY  ·  BUILDER OPEN  ·  CHOOSE A DESTINATION';
+		var label = game.phase === 'flying' ? 'MOUSE AIM  ·  SHIFT / CTRL THROTTLE  ·  SPACE STAGE  ·  A AUTOPILOT' : 'OPERATIONS DECK  ·  DISPATCH  ·  ROUTES  ·  FLIGHT LOG';
 
 		drawPanel(context, margin, y, width, 30);
 		context.fillStyle = game.phase === 'flying' ? '#f4c76a' : '#7de0ca';
@@ -654,6 +802,7 @@
 		drawStars(context);
 		drawAltitudeScale(context);
 		drawGround(context);
+		drawLegArc(context, game);
 		drawPads(context, game);
 		drawCoastMarker(context, game);
 

@@ -5,23 +5,37 @@
 	var main = {};
 	var game = null;
 
+	// A run is one world's operations save. Nothing crosses a planet change:
+	// fleet, routes and pad ids are all rebuilt with the world.
 	function createRun() {
 		var timeIndex = R.constants.time.defaultIndex;
-
-		return {
-			currentPadId: R.world.currentPadId,
+		var home = R.world.currentPadId;
+		var run = {
+			currentPadId: home,
 			targetPadId: R.world.targetPadId,
-			rocket: R.rocket.create(R.world.findPadById(R.world.currentPadId)),
-			phase: 'building',
+			rocket: R.rocket.create(R.world.findPadById(home)),
+			phase: 'deck',
 			cash: R.economy.startingCash,
 			ledger: [],
 			flight: null,
+			mission: null,
 			lastReport: null,
+			// What the map highlights. Mutated in place by the deck.
+			selection: {
+				sourcePadId: home,
+				targetPadId: R.world.targetPadId,
+				mode: 'oneway',
+				visible: true
+			},
 			simTime: 0,
 			physicsAccumulator: 0,
 			timeScaleIndex: timeIndex,
 			timeScale: R.constants.time.scales[timeIndex]
 		};
+
+		R.game = run;
+		R.operations.initialize();
+		return run;
 	}
 
 	function update(dt) {
@@ -33,6 +47,9 @@
 		// The coast-impact marker is a forecast for whoever is flying: it says
 		// where the engine-off trajectory from this state reaches the ground.
 		R.trajectory.update(game);
+		// Route scheduling and its cancellable countdown run on the deck's own
+		// clock, in real seconds, never inside the physics budget.
+		R.operations.run(game, Math.min(Math.max(0, dt), R.constants.rocket.maxFrameStep));
 	}
 
 	function start() {
@@ -51,12 +68,12 @@
 
 		R.world.initialize();
 		game = createRun();
-		R.game = game;
 
 		R.render.initialize(context);
 		R.input.initialize(canvas, R.camera);
 		R.controls.initialize();
 		R.builder.initialize(game);
+		R.deck.initialize(game);
 		R.menu.initialize();
 
 		function resize() {
@@ -83,6 +100,7 @@
 			update(dt);
 			R.camera.follow(game.rocket.wx);
 			R.render.draw(game);
+			R.deck.sync(game);
 			root.requestAnimationFrame(frame);
 		}
 
@@ -91,16 +109,16 @@
 		root.requestAnimationFrame(frame);
 	}
 
-	// Start a fresh run, optionally on another world. The builder panel and
-	// key handlers live for the whole session; only game state is replaced.
+	// Start a fresh run, optionally on another world. The deck and key handlers
+	// live for the whole session; only game and operations state are replaced.
 	main.restart = function(planetId) {
 		R.world.initialize(planetId);
 		game = createRun();
-		R.game = game;
 		R.autopilot.setEnabled(false);
 		R.autopilot.reset();
 		R.controls.setTimeScaleIndex(R.constants.time.defaultIndex);
 		R.builder.refresh(game);
+		R.deck.reset(game);
 		R.camera.follow(game.rocket.wx);
 		R.render.draw(game);
 	};

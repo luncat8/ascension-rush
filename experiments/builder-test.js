@@ -1,7 +1,15 @@
 'use strict';
 
 var assert = require('node:assert/strict');
+var fs = require('node:fs');
+var path = require('node:path');
+var dom = require('./dom.js');
 var R = require('../js/namespaces.js');
+
+var fixture = dom.createDocument(fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8'));
+
+global.document = fixture;
+global.addEventListener = function() {};
 
 require('../js/util.js');
 require('../js/constants.js');
@@ -11,184 +19,208 @@ require('../js/camera.js');
 require('../js/world.js');
 require('../js/rocket.js');
 require('../js/economy.js');
+require('../js/flight-log.js');
 require('../js/mission.js');
 require('../js/aerodynamics.js');
 require('../js/physics.js');
 require('../js/trajectory.js');
 require('../js/autopilot.js');
+require('../js/operations.js');
 require('../js/builder.js');
+require('../js/deck.js');
 require('../js/controls.js');
 
-function Element(value) {
-	this.value = value || '';
-	this.hidden = false;
-	this.disabled = false;
-	this.textContent = '';
-	this.dataset = {};
-	this.options = [];
-	this.listeners = {};
-	this.children = [];
+function byId(id) {
+	var element = fixture.getElementById(id);
+
+	assert.ok(element, 'the shipped markup has #' + id);
+	return element;
 }
 
-Element.prototype.addEventListener = function(type, listener) {
-	this.listeners[type] = listener;
-};
-
-Element.prototype.appendChild = function(child) {
-	this.children.push(child);
-	this.options.push(child);
-};
-
-Element.prototype.removeAttribute = function(name) {
-	delete this.dataset[name.replace('data-', '').replace(/-([a-z])/g, function(match, letter) {
-		return letter.toUpperCase();
-	})];
-};
-
-Element.prototype.blur = function() {
-	this.wasBlurred = true;
-};
-
-Object.defineProperty(Element.prototype, 'innerHTML', {
-	set: function(value) {
-		if (value === '') {
-			this.children.length = 0;
-			this.options.length = 0;
-			this.value = '';
-		}
-	}
-});
-
-Element.prototype.dispatch = function(type) {
-	this.listeners[type]();
-};
-
-var elements = {
-	'builder-panel': new Element(),
-	'builder-report': new Element(),
-	'builder-target': new Element(),
-	'builder-stage-count': new Element('3'),
-	'builder-payload': new Element('120'),
-	'builder-payload-value': new Element(),
-	'builder-cash': new Element(),
-	'builder-report-title': new Element(),
-	'builder-report-detail': new Element(),
-	'builder-mass': new Element(),
-	'builder-steel': new Element(),
-	'builder-fuel': new Element(),
-	'builder-dv': new Element(),
-	'builder-twr': new Element(),
-	'builder-cost': new Element(),
-	'builder-warning': new Element(),
-	'builder-planet-name': new Element(),
-	'builder-planet-button': new Element(),
-	'builder-autopilot': new Element(),
-	'builder-autopilot-profile': new Element(),
-	'builder-autopilot-profile-hint': new Element(),
-	'launch-button': new Element()
-};
-var i;
-
-for (i = 0; i < 3; i += 1) {
-	elements['builder-stage-' + i] = new Element();
-	elements['builder-fuel-' + i] = new Element(String(R.constants.rocket.defaultStageFuel[i]));
-	elements['builder-strength-' + i] = new Element(String(R.constants.rocket.defaultStageStrength[i]));
-	elements['builder-fuel-value-' + i] = new Element();
-	elements['builder-strength-value-' + i] = new Element();
+function number(element) {
+	return Number(element.textContent.replace(/,/g, ''));
 }
 
-global.document = {
-	getElementById: function(id) {
-		return elements[id] || null;
-	},
-	createElement: function() {
-		return new Element();
-	}
-};
+function createRun() {
+	var home = R.world.pads[0];
+	var run = {
+		currentPadId: home.id,
+		targetPadId: R.world.pads[1].id,
+		rocket: R.rocket.create(home),
+		phase: 'deck',
+		cash: R.economy.startingCash,
+		ledger: [],
+		flight: null,
+		mission: null,
+		lastReport: null,
+		selection: { sourcePadId: home.id, targetPadId: R.world.pads[1].id, mode: 'oneway', visible: true },
+		simTime: 0,
+		physicsAccumulator: 0,
+		timeScaleIndex: R.constants.time.defaultIndex,
+		timeScale: 1
+	};
 
-R.world.initialize();
-var home = R.world.pads[0];
-var game = {
-	currentPadId: home.id,
-	targetPadId: R.world.pads[1].id,
-	rocket: R.rocket.create(home),
-	phase: 'building',
-	cash: R.economy.startingCash,
-	ledger: [],
-	flight: null,
-	lastReport: null,
-	physicsAccumulator: 0
-};
-R.game = game;
+	R.game = run;
+	R.operations.initialize();
+	return run;
+}
+
+R.world.initialize('verdant');
+R.camera.resize(1280, 720);
+var game = createRun();
 R.builder.initialize(game);
+R.deck.initialize(game);
+R.deck.sync(game);
 
-assert.equal(R.builder.initialized, true);
-assert.equal(elements['builder-panel'].hidden, false);
-assert.equal(elements['builder-stage-2'].hidden, false);
-assert.equal(elements['launch-button'].disabled, false);
-assert.equal(elements['builder-warning'].textContent, '');
-assert.equal(elements['builder-target'].options.length, R.world.pads.length - 1);
+var referenceType = R.operations.state.types[0];
 
-var target = elements['builder-target'];
-target.value = R.world.pads[2].id;
-target.dispatch('change');
-assert.equal(game.targetPadId, R.world.pads[2].id);
+assert.equal(R.builder.initialized, true, 'the workshop initialises against the shipped markup');
+assert.equal(byId('workshop').hidden, true, 'and stays closed until it is opened');
+assert.equal(R.operations.state.fleet.length, 1, 'a run starts with one rocket of the reference type');
 
-// The profile choice lists every profile, defaults to the first, and rides along with the launch.
-var profileSelect = elements['builder-autopilot-profile'];
-var profileHint = elements['builder-autopilot-profile-hint'];
-assert.deepEqual(profileSelect.options.map(function(option) { return option.value; }), R.constants.autopilotProfiles.map(function(profile) { return profile.id; }));
-assert.equal(profileSelect.value, 'balanced', 'the first profile is the default');
-assert.equal(profileHint.textContent, R.autopilot.profileById('balanced').description);
-profileSelect.value = 'gentle';
-profileSelect.dispatch('change');
-assert.equal(R.autopilot.profileId, 'gentle', 'the select chooses the autopilot profile');
-assert.equal(profileHint.textContent, R.autopilot.profileById('gentle').description, 'the hint describes the chosen profile');
+// ------------------------------------------------------------ workshop dialog
 
-elements['launch-button'].dispatch('click');
+var sendBefore = fixture.activeElement;
+
+R.builder.open(game, { typeId: referenceType.id, padId: R.world.pads[0].id });
+assert.equal(byId('workshop').hidden, false, 'the workshop opens as a dialog');
+assert.equal(R.deck.dialog, 'workshop');
+assert.equal(R.operations.blocked, true, 'an open dialog pauses automation');
+assert.notEqual(fixture.activeElement, sendBefore, 'focus moves into the dialog');
+assert.equal(byId('workshop-title').textContent, 'Edit rocket type', 'an existing type is edited, not copied');
+assert.equal(byId('workshop-name').value, referenceType.name);
+assert.ok(number(byId('workshop-capacity')) > 0, 'the type quotes its payload capacity');
+assert.match(byId('workshop-twr').textContent, /: 1$/, 'and its launch TWR on this world');
+
+// A stage edit moves the numbers the player prices against.
+var massBefore = number(byId('workshop-mass'));
+var costBefore = number(byId('workshop-cost'));
+byId('builder-fuel-0').value = '900';
+byId('builder-fuel-0').dispatch('input');
+assert.ok(number(byId('workshop-mass')) > massBefore, 'booster fuel raises the takeoff mass');
+assert.ok(number(byId('workshop-cost')) > costBefore, 'and the price of a new rocket');
+byId('builder-fuel-0').value = String(R.world.planet.defaultFuel[0]);
+byId('builder-fuel-0').dispatch('input');
+
+// The design payload can never exceed what the type can lift.
+byId('workshop-payload').value = '99999';
+byId('workshop-payload').dispatch('input');
+var capacity = Math.floor(R.operations.typeStats(R.builder.draft).payloadLimit);
+assert.equal(R.builder.draft.nominalPayload, capacity, 'the design payload is clamped to the type capacity');
+
+byId('workshop-name').value = 'Test hauler';
+byId('workshop-save').dispatch('click');
+assert.equal(R.operations.state.types.length, 1, 'saving an edited type changes it in place');
+assert.equal(referenceType.name, 'Test hauler', 'and renames it');
+
+byId('workshop-name').value = 'Second type';
+R.builder.draft.id = null;
+R.builder.open(game, { padId: R.world.pads[0].id });
+byId('workshop-name').value = 'Second type';
+byId('workshop-stage-count').value = '2';
+byId('workshop-stage-count').dispatch('change');
+assert.equal(byId('builder-stage-2').hidden, true, 'a two-stage type hides the third stage card');
+byId('workshop-save').dispatch('click');
+assert.equal(R.operations.state.types.length, 2, 'a new name saves a new rocket type');
+var secondType = R.operations.state.types[1];
+assert.equal(secondType.stageCount, 2);
+assert.equal(secondType.stages.length, 2, 'the snapshot keeps only the stages the type has');
+
+// Buying an instance is explicit and priced.
+var cashBefore = game.cash;
+var ledgerBefore = game.ledger.length;
+byId('workshop-build').dispatch('click');
+assert.equal(R.operations.state.fleet.length, 2, 'the workshop builds a fleet instance');
+assert.equal(R.operations.state.fleet[1].typeId, secondType.id);
+assert.equal(R.operations.state.fleet[1].padId, R.world.pads[0].id, 'at the pad it was opened for');
+assert.ok(game.cash < cashBefore, 'and charges for it');
+assert.equal(game.ledger.length, ledgerBefore + 2, 'structure and fuel are separate ledger entries');
+assert.equal(game.ledger[ledgerBefore].type, 'structure');
+assert.equal(game.ledger[ledgerBefore + 1].type, 'fuel');
+assert.equal(byId('workshop-fleet').textContent, '1 built · 1 available', 'the workshop reports the fleet it made');
+
+// A type the balance cannot afford says so instead of building.
+game.cash = 0;
+R.builder.update();
+assert.equal(byId('workshop-build').disabled, true, 'a build the balance cannot cover is disabled');
+byId('workshop-close').dispatch('click');
+assert.equal(byId('workshop').hidden, true, 'the dialog closes');
+assert.equal(R.operations.blocked, false, 'and automation resumes');
+assert.equal(R.deck.dialog, null);
+
+fixture.dispatch('keydown', { key: 'Escape', preventDefault: function() {} });
+assert.equal(R.deck.dialog, null, 'Escape with no dialog open changes nothing');
+
+// ------------------------------------------------------- type compatibility
+
+game.cash = R.economy.startingCash;
+var route = R.operations.createRoute({
+	name: 'Heavy run',
+	source: R.world.pads[0].id,
+	destination: R.world.pads[1].id,
+	mode: 'return',
+	fuelPolicy: 'refuel',
+	outboundPayload: 500,
+	returnPayload: 400,
+	typeId: referenceType.id,
+	profileId: 'balanced',
+	enabled: true
+});
+// One small tank: its capacity is a few hundred kilos, so it cannot take the
+// route's cargo either way.
+var smallType = R.operations.addType({
+	name: 'Tiny hopper',
+	stageCount: 1,
+	stages: [{ fuelMass: R.constants.rocket.minFuelMass, strength: 0.9 }],
+	nominalPayload: 20,
+	defaultProfileId: 'balanced'
+});
+assert.ok(smallType.payloadLimit < route.outboundPayload, 'the small type really cannot carry the route payload');
+
+assert.equal(R.operations.changeRouteType(route.id, smallType.id).reason,
+	R.operations.reasons.PAYLOAD_OVER, 'a type that cannot carry the route payload is refused');
+assert.equal(route.typeId, referenceType.id, 'and the route keeps the type it had');
+assert.equal(R.operations.changeRouteType(route.id, referenceType.id).ok, true, 'a type that carries both directions applies');
+
+// A type change never reaches a mission that is already in the air.
+var dispatched = R.operations.dispatch({
+	source: route.source,
+	destination: route.destination,
+	mode: 'return',
+	fuelPolicy: 'refuel',
+	outboundPayload: 500,
+	returnPayload: 400,
+	typeId: referenceType.id,
+	rocketId: null,
+	profileId: 'balanced',
+	routeId: route.id
+});
+assert.equal(dispatched.ok, true, 'the reference type lifts the route payload');
 assert.equal(game.phase, 'flying');
-assert.equal(game.targetPadId, R.world.pads[2].id);
-assert.equal(elements['builder-panel'].hidden, true);
-assert.equal(elements['launch-button'].wasBlurred, true);
-assert.equal(game.flight.autopilotProfile, 'gentle', 'the launch snapshots the chosen profile');
+assert.equal(R.operations.changeRouteType(route.id, smallType.id).reason, R.operations.reasons.BUSY,
+	'a route with a leg in the air keeps its type');
 
-var farport = R.world.pads[2];
-game.rocket.wx = farport.wx;
-game.rocket.wy = 0;
-game.rocket.vx = 0;
-game.rocket.vy = 0;
-R.mission.touchdown(game);
-assert.equal(game.lastReport.status, 'delivered');
-assert.equal(elements['builder-panel'].hidden, false);
-assert.equal(elements['builder-report'].hidden, false);
-assert.equal(elements['builder-report'].dataset.status, 'delivered');
-assert.equal(game.currentPadId, farport.id);
-assert.equal(elements['builder-target'].value, home.id, 'the destination list excludes the pad under the rocket');
-assert.equal(profileSelect.value, 'gentle', 'the profile choice outlives the flight');
-R.autopilot.setProfile('balanced');
+// Deleting a type leaves the log's own snapshot able to rebuild it.
+var typeIdBefore = R.operations.state.types.length;
+var restored = R.operations.restoreTypeFromSnapshot(dispatched.mission.type);
+assert.equal(R.operations.state.types.length, typeIdBefore + 1, 'a snapshot restores a type');
+assert.equal(restored.stageCount, dispatched.mission.type.stageCount);
+assert.equal(restored.stages[0].fuelMass, dispatched.mission.type.stages[0].fuelMass, 'stage for stage');
+assert.match(restored.name, /restored/, 'and says it is a restoration');
 
-// Switching worlds reloads that planet's reference build and pad list.
+// ------------------------------------------------------------- planet switch
+
 R.world.initialize('cinder');
-var cinderHome = R.world.pads[0];
-game = {
-	currentPadId: cinderHome.id,
-	targetPadId: R.world.pads[1].id,
-	rocket: R.rocket.create(cinderHome),
-	phase: 'building',
-	cash: R.economy.startingCash,
-	ledger: [],
-	flight: null,
-	lastReport: null,
-	physicsAccumulator: 0
-};
-R.game = game;
+game = createRun();
 R.builder.refresh(game);
-assert.equal(elements['builder-planet-name'].textContent, 'Cinder');
-assert.equal(elements['builder-payload'].value, '60', 'payload slider adopts the planet default');
-assert.equal(elements['builder-fuel-0'].value, '1500', 'booster fuel adopts the planet default');
-assert.equal(elements['builder-fuel-2'].value, '400', 'kick stage fuel adopts the planet default');
-assert.equal(elements['builder-target'].options.length, 3);
-assert.equal(elements['launch-button'].disabled, false, 'cinder reference build clears the launch TWR gate');
+R.builder.open(game, { padId: R.world.pads[0].id });
+assert.equal(byId('builder-fuel-0').value, '1500', 'a world switch loads that world reference booster');
+assert.equal(byId('builder-fuel-2').value, '400', 'and its kick stage');
+assert.equal(byId('workshop-payload').value, '60', 'and its design payload');
+assert.equal(R.operations.state.types.length, 1, 'a new world starts a separate operations save');
+assert.equal(R.operations.state.fleet.length, 1, 'with one rocket of its own reference type');
+assert.equal(R.operations.state.types[0].name, 'Cinder reference');
+byId('workshop-close').dispatch('click');
 
-console.log('Builder and launch-flow tests passed.');
+console.log('Builder and rocket-type tests passed.');
 delete global.document;

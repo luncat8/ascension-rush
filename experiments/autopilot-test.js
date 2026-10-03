@@ -179,13 +179,22 @@ var ignition = withLimits({ maxThrustAcceleration: 30 }, function() {
 });
 
 assert.ok(ignition > 25 && ignition <= 30 + 1e-9, 'an autopilot launch lights the engine at the acceleration it was allowed, not at full throttle');
+// A rocket put back on the pad is ready at full throttle; only the autopilot
+// lowers it to the acceleration it is allowed. Manual flight still owns the
+// throttle from there.
 assert.equal(withLimits({ maxThrustAcceleration: 30 }, function() {
-	var game = harness.createGame(R.world.pads[0], R.world.pads[2].id);
+	var rocket = R.rocket.create(R.world.pads[0]);
+	var stageState = R.rocket.createStageState();
+	var type = { stageCount: hotBuild.stageCount, stages: hotBuild.stages };
+	var i;
 
-	R.autopilot.setEnabled(false);
-	R.mission.launch(game, hotBuild);
-	return game.rocket.throttle;
-}), 1, 'a player launch still lights the engine at full throttle');
+	for (i = 0; i < hotBuild.stageCount; i += 1) {
+		stageState[i].alive = true;
+		stageState[i].fuelMass = hotBuild.stages[i].fuelMass;
+	}
+	R.rocket.applyFleetState(rocket, type, stageState, hotBuild.payloadMass, R.world.pads[0]);
+	return rocket.throttle;
+}), 1, 'a rocket put back on the pad is ready at full throttle');
 
 var cappedFlight = withLimits({ maxThrustAcceleration: 30 }, function() {
 	return harness.fly(launchReference(0, 2, 'balanced', hotBuild), step);

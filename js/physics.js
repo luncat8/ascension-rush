@@ -82,7 +82,7 @@
 			}
 			thrustFraction = massFlow > 0 ? burn / (massFlow * dt) : 0;
 			thrust *= thrustFraction;
-			R.economy.consumeFuel(game, burn);
+			R.economy.burnFuel(game, burn);
 		}
 
 		massAfter = R.rocket.totalMass(state);

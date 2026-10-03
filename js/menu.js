@@ -56,11 +56,16 @@
 		}
 		build();
 		ui.panel.hidden = false;
+		// A world picker is a modal too: automation must not launch behind it.
+		R.operations.blocked = true;
 	};
 
 	menu.hide = function() {
 		if (ui.panel) {
 			ui.panel.hidden = true;
+		}
+		if (!R.deck.dialog) {
+			R.operations.blocked = false;
 		}
 	};
 

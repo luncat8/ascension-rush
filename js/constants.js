@@ -39,6 +39,13 @@
 		startingCash: 30000
 	};
 
+	// Operations deck: bounded in-session history and the visible window an
+	// auto-launch can be cancelled in.
+	constants.operations = {
+		flightLogLimit: 200,
+		autoLaunchSeconds: 5
+	};
+
 	constants.time = {
 		scales: [0.5, 0.75, 1, 1.5, 2, 3, 4],
 		defaultIndex: 4

@@ -205,7 +205,7 @@ assert.ok(Math.abs(R.util.wrapDelta(markerX - westImpact.wx, R.world.planet.circ
 	'without moving the ground it names');
 R.world.initialize('verdant');
 
-wrapGame.phase = 'building';
+wrapGame.phase = 'deck';
 assert.equal(trajectory.update(wrapGame).valid, false, 'no forecast is published while not flying');
 wrapGame.phase = 'flying';
 wrapGame.rocket.wy = 0;

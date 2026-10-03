@@ -3,7 +3,6 @@
 
 	var R = root.R || (root.R = {});
 	var mission = R.mission || (R.mission = {});
-	var buildStats = R.rocket.createStats();
 
 	function findLandingPad(rocket) {
 		var pads = R.world.pads;
@@ -44,54 +43,46 @@
 		return scale + (error > 0 ? ' east of ' : ' west of ') + pad.name;
 	}
 
-	function nextTargetId(padId) {
-		var pads = R.world.pads;
-		var i;
+	function padName(padId) {
+		var pad = R.world.findPadById(padId);
 
-		for (i = 0; i < pads.length; i += 1) {
-			if (pads[i].id !== padId) {
-				return pads[i].id;
-			}
-		}
-		return padId;
+		return pad ? pad.name : '—';
 	}
 
-	mission.estimatedCost = function(config) {
-		R.rocket.evaluateBuild(config, buildStats);
-		return R.economy.estimateBuildCost(buildStats);
-	};
+	function fuelAboard(state) {
+		var total = 0;
+		var i;
 
-	mission.launch = function(game, config) {
-		var target = R.world.findPadById(config.targetPadId);
-		var source = R.world.findPadById(game.currentPadId);
-		var estimatedCost;
-		var rocketState;
-
-		if (game.phase !== 'building' || !source || !target || target.id === source.id) {
-			return false;
+		for (i = 0; i < state.stageCount; i += 1) {
+			total += state.stages[i].alive ? state.stages[i].fuelMass : 0;
 		}
+		return total;
+	}
 
-		R.rocket.evaluateBuild(config, buildStats);
-		if (buildStats.twr < R.constants.rocket.minimumLaunchTwr) {
-			return false;
-		}
+	// One leg of a mission order. The rocket instance, its stage/fuel state and
+	// the pad are already prepared by operations.js; this opens the flight record
+	// and hands the controls to the autopilot profile the order locked in.
+	mission.beginLeg = function(game, order, leg, charges) {
+		var state = game.rocket;
 
-		estimatedCost = R.economy.estimateBuildCost(buildStats);
-		if (game.cash < estimatedCost) {
-			return false;
-		}
-
-		game.targetPadId = target.id;
+		game.currentPadId = leg.fromPadId;
+		game.targetPadId = leg.toPadId;
 		game.flight = {
-			departedPadId: source.id,
-			targetPadId: target.id,
-			payloadMass: config.payloadMass,
-			dryMass: buildStats.dryMass,
-			launchMass: buildStats.totalMass,
-			fuelMass: buildStats.fuelMass,
+			missionId: order.id,
+			routeId: order.routeId,
+			leg: leg.index,
+			legCount: leg.count,
+			departedPadId: leg.fromPadId,
+			targetPadId: leg.toPadId,
+			payloadMass: leg.payloadMass,
+			refuel: leg.refuel,
+			launchMass: R.rocket.totalMass(state),
+			dryMass: charges.structureMass,
+			fuelAboard: fuelAboard(state),
 			fuelUsed: 0,
 			fuelCost: 0,
 			structureCost: 0,
+			turnaroundCost: 0,
 			cashDelta: 0,
 			elapsed: 0,
 			currentDynamicPressure: 0,
@@ -103,89 +94,62 @@
 			peakAngleOfAttackDynamicPressure: 0,
 			peakThrustAcceleration: 0,
 			peakAppliedThrustAcceleration: 0,
-			usedAutopilot: R.autopilot.enabled,
-			autopilotProfile: R.autopilot.profileId
+			usedAutopilot: true,
+			autopilotProfile: order.profileId
 		};
-
-		rocketState = game.rocket;
-		R.rocket.applyBuild(rocketState, config);
-		rocketState.padId = source.id;
-		rocketState.onGround = false;
-		rocketState.launched = true;
 		game.lastReport = null;
 		game.phase = 'flying';
 		game.physicsAccumulator = 0;
 		R.controls.reset();
-		R.economy.beginFlight(game);
-		if (R.autopilot.enabled) {
-			// An autopilot launch lights the engine at the throttle the guidance
-			// wants, so an acceleration cap holds from the first step.
-			R.autopilot.update(game);
-			rocketState.throttle = R.autopilot.command.throttle;
-		}
-		return true;
+		R.economy.beginFlight(game, charges);
+		R.autopilot.setProfile(order.profileId);
+		R.autopilot.setEnabled(true);
+		R.autopilot.reset();
+		// An autopilot launch lights the engine at the throttle the guidance
+		// wants, so an acceleration cap holds from the first step.
+		R.autopilot.update(game);
+		state.throttle = R.autopilot.command.throttle;
+		return game.flight;
 	};
 
+	// Structured first, prose second: the flight log stores these numbers and the
+	// debrief is generated from the same record, so the two cannot diverge.
 	mission.touchdown = function(game) {
 		var state = game.rocket;
 		var flight = game.flight;
+		var order = game.mission;
 		var planet = R.world.planet;
 		var pad = findLandingPad(state);
 		var targetPad = R.world.findPadById(flight.targetPadId);
+		var departurePad = R.world.findPadById(flight.departedPadId);
 		// Measured, not predicted: the physics step interpolates the ground
 		// crossing, so these are the speeds the rocket actually arrived with.
 		var targetError = targetPad ? R.util.wrapDelta(state.wx - targetPad.wx, planet.circumference) : 0;
 		var safe = !!pad && Math.abs(state.vy) <= planet.landingVerticalSpeed && Math.abs(state.vx) <= planet.landingHorizontalSpeed;
 		var delivered = safe && pad.id === flight.targetPadId;
-		var departurePad = R.world.findPadById(flight.departedPadId);
 		var reward = delivered ? flight.payloadMass * R.economy.priceDelivery() : 0;
 		var fee = delivered && flight.usedAutopilot ? reward * R.autopilot.feeFraction : 0;
 		var cashDelta = R.economy.finishFlight(game, reward, fee);
 		var landedPad = safe ? pad : departurePad;
-		var status;
-		var title;
-		var detail;
-
-		state.wy = 0;
-		state.onGround = true;
-		state.landed = safe;
-		state.crashed = !safe;
-
-		if (delivered) {
-			status = 'delivered';
-			title = 'PAYLOAD DELIVERED';
-			detail = 'Soft landing at ' + pad.name + '. Flight cash flow ' + formatCash(cashDelta) + ' · Balance $' + Math.round(game.cash) + '.';
-		} else if (safe) {
-			status = 'landed';
-			title = 'SAFE LANDING · NO DELIVERY';
-			detail = 'Landed at ' + pad.name + '. Return to the builder to plan another leg. Cash flow ' + formatCash(cashDelta) + ' · Balance $' + Math.round(game.cash) + '.';
-		} else {
-			status = 'crashed';
-			title = 'CRASH · PAYLOAD LOST';
-			detail = 'The rocket missed a safe pad landing. Rebuilding at ' + departurePad.name + '. Cash flow ' + formatCash(cashDelta) + ' · Balance $' + Math.round(game.cash) + '.';
-		}
-		if (fee > 0) {
-			detail += ' Autopilot fee $' + Math.round(fee) + ' (' + R.autopilot.profileById(flight.autopilotProfile).label + ' profile).';
-		}
-		detail += ' Touchdown ' + Math.abs(state.vy).toFixed(1) + ' m/s down and ' + Math.abs(state.vx).toFixed(1) +
-			' m/s across, ' + formatPadError(targetError, targetPad, planet) + '.';
-		detail += ' Peak Q ' + (flight.peakDynamicPressure / 1000).toFixed(1) + ' kPa at ' +
-			Math.round(flight.peakDynamicPressureAltitude) + ' m (AoA ' +
-			(R.world.planet.seaLevelDensity > 0 ? (flight.peakDynamicPressureAngleOfAttack * 180 / Math.PI).toFixed(1) + '°' : 'n/a') +
-			') · peak AoA ' +
-			(R.world.planet.seaLevelDensity > 0 ? (flight.peakAngleOfAttack * 180 / Math.PI).toFixed(1) + '° at ' +
-			(flight.peakAngleOfAttackDynamicPressure / 1000).toFixed(1) + ' kPa' : 'n/a') +
-			' · peak thrust acceleration ' + flight.peakAppliedThrustAcceleration.toFixed(1) + ' m/s².';
-
-		game.currentPadId = landedPad.id;
-		game.targetPadId = game.targetPadId === landedPad.id ? nextTargetId(landedPad.id) : game.targetPadId;
-		game.lastReport = {
-			status: status,
-			title: title,
-			detail: detail,
-			cashDelta: cashDelta,
-			elapsed: flight.elapsed,
+		var result = {
+			status: delivered ? 'delivered' : (safe ? 'landed' : 'crashed'),
+			leg: flight.leg,
+			legCount: flight.legCount,
+			missionId: order.id,
+			departedPadId: flight.departedPadId,
+			targetPadId: flight.targetPadId,
 			landingPadId: safe ? pad.id : null,
+			payloadMass: flight.payloadMass,
+			elapsed: flight.elapsed,
+			fuelStart: flight.fuelAboard,
+			fuelUsed: flight.fuelUsed,
+			fuelRemaining: 0,
+			fuelCost: flight.fuelCost,
+			structureCost: flight.structureCost,
+			turnaroundCost: flight.turnaroundCost,
+			revenue: reward,
+			autopilotFee: fee,
+			cashDelta: cashDelta,
 			touchdownVerticalSpeed: state.vy,
 			touchdownHorizontalSpeed: state.vx,
 			targetError: targetError,
@@ -195,19 +159,131 @@
 			peakAngleOfAttack: flight.peakAngleOfAttack,
 			peakAngleOfAttackDynamicPressure: flight.peakAngleOfAttackDynamicPressure,
 			peakThrustAcceleration: flight.peakThrustAcceleration,
-			peakAppliedThrustAcceleration: flight.peakAppliedThrustAcceleration
+			peakAppliedThrustAcceleration: flight.peakAppliedThrustAcceleration,
+			stageState: R.rocket.captureStageState(state, R.rocket.createStageState()),
+			completedAt: R.operations.now()
 		};
-		game.rocket = R.rocket.create(landedPad);
+		var i;
+
+		for (i = 0; i < state.stageCount; i += 1) {
+			result.fuelRemaining += state.stages[i].alive ? state.stages[i].fuelMass : 0;
+		}
+
+		state.wy = 0;
+		state.onGround = true;
+		state.landed = safe;
+		state.crashed = !safe;
+		state.padId = landedPad.id;
+		game.currentPadId = landedPad.id;
+		game.lastReport = mission.debrief(game, result, order);
 		game.flight = null;
-		game.phase = 'building';
+		game.phase = 'deck';
 		R.input.pointerActive = false;
 		game.physicsAccumulator = 0;
 		R.autopilot.reset();
+		R.autopilot.setEnabled(false);
 		R.controls.reset();
-		if (R.builder && R.builder.refresh) {
-			R.builder.refresh(game);
-		}
+		// Fleet, route, log and the pending return leg are operations decisions;
+		// the flight only reports what happened. The debrief returned here is
+		// generated from the same result that was logged, so the two agree.
+		R.operations.applyLegResult(game, result);
 		return game.lastReport;
+	};
+
+	// The return leg of a no-refuel mission that cannot light the stack it landed
+	// with. Nothing is charged and nothing is added to the rocket.
+	mission.returnBlocked = function(order, leg) {
+		return {
+			status: 'return-blocked',
+			leg: leg.index,
+			legCount: leg.count,
+			missionId: order.id,
+			departedPadId: leg.fromPadId,
+			targetPadId: leg.toPadId,
+			landingPadId: leg.fromPadId,
+			payloadMass: leg.payloadMass,
+			elapsed: 0,
+			fuelStart: 0,
+			fuelUsed: 0,
+			fuelRemaining: 0,
+			fuelCost: 0,
+			structureCost: 0,
+			turnaroundCost: 0,
+			revenue: 0,
+			autopilotFee: 0,
+			cashDelta: 0,
+			touchdownVerticalSpeed: 0,
+			touchdownHorizontalSpeed: 0,
+			targetError: 0,
+			peakDynamicPressure: 0,
+			peakDynamicPressureAltitude: 0,
+			peakDynamicPressureAngleOfAttack: 0,
+			peakAngleOfAttack: 0,
+			peakAngleOfAttackDynamicPressure: 0,
+			peakThrustAcceleration: 0,
+			peakAppliedThrustAcceleration: 0,
+			stageState: R.rocket.createStageState(),
+			completedAt: R.operations.now()
+		};
+	};
+
+	mission.reportReturnBlocked = function(game, result) {
+		game.lastReport = mission.debrief(game, result, game.mission || { type: { name: '—' }, profileId: '' });
+	};
+
+	var statusCopy = {
+		delivered: { title: 'PAYLOAD DELIVERED', lead: 'Soft landing at ' },
+		landed: { title: 'SAFE LANDING · NO DELIVERY', lead: 'Landed at ' },
+		crashed: { title: 'CRASH · PAYLOAD LOST', lead: 'The rocket missed a safe pad landing and is written off near ' },
+		'return-blocked': { title: 'RETURN BLOCKED', lead: 'The surviving stack cannot lift the return payload from ' }
+	};
+
+	mission.debrief = function(game, result, order) {
+		var planet = R.world.planet;
+		var copy = statusCopy[result.status];
+		var profile = result.autopilotFee > 0 ? R.autopilot.profileById(order.profileId) : null;
+		var detail;
+
+		detail = copy.lead + padName(result.status === 'crashed' ? result.departedPadId : (result.landingPadId || result.departedPadId)) + '. ';
+		if (result.status === 'return-blocked') {
+			detail += 'The outbound leg landed safely; no fuel or structure was added for the return.';
+		} else {
+			detail += 'Flight cash flow ' + formatCash(result.cashDelta) + ' · Balance $' + Math.round(game.cash) + '.';
+		}
+		if (profile) {
+			detail += ' Autopilot fee $' + Math.round(result.autopilotFee) + ' (' + profile.label + ' profile).';
+		}
+		detail += ' Touchdown ' + Math.abs(result.touchdownVerticalSpeed).toFixed(1) + ' m/s down and ' +
+			Math.abs(result.touchdownHorizontalSpeed).toFixed(1) + ' m/s across, ' +
+			formatPadError(result.targetError, R.world.findPadById(result.targetPadId), planet) + '.';
+		detail += ' Peak Q ' + (result.peakDynamicPressure / 1000).toFixed(1) + ' kPa at ' +
+			Math.round(result.peakDynamicPressureAltitude) + ' m (AoA ' +
+			(planet.seaLevelDensity > 0 ? (result.peakDynamicPressureAngleOfAttack * 180 / Math.PI).toFixed(1) + '°' : 'n/a') +
+			') · peak AoA ' +
+			(planet.seaLevelDensity > 0 ? (result.peakAngleOfAttack * 180 / Math.PI).toFixed(1) + '° at ' +
+			(result.peakAngleOfAttackDynamicPressure / 1000).toFixed(1) + ' kPa' : 'n/a') +
+			' · peak thrust acceleration ' + result.peakAppliedThrustAcceleration.toFixed(1) + ' m/s².';
+
+		return {
+			status: result.status,
+			title: copy.title,
+			detail: detail,
+			leg: result.leg,
+			legCount: result.legCount,
+			cashDelta: result.cashDelta,
+			elapsed: result.elapsed,
+			landingPadId: result.landingPadId,
+			touchdownVerticalSpeed: result.touchdownVerticalSpeed,
+			touchdownHorizontalSpeed: result.touchdownHorizontalSpeed,
+			targetError: result.targetError,
+			peakDynamicPressure: result.peakDynamicPressure,
+			peakDynamicPressureAltitude: result.peakDynamicPressureAltitude,
+			peakDynamicPressureAngleOfAttack: result.peakDynamicPressureAngleOfAttack,
+			peakAngleOfAttack: result.peakAngleOfAttack,
+			peakAngleOfAttackDynamicPressure: result.peakAngleOfAttackDynamicPressure,
+			peakThrustAcceleration: result.peakThrustAcceleration,
+			peakAppliedThrustAcceleration: result.peakAppliedThrustAcceleration
+		};
 	};
 
 	mission.findLandingPad = findLandingPad;

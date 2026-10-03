@@ -1,6 +1,9 @@
 'use strict';
 
 var assert = require('node:assert/strict');
+var fs = require('node:fs');
+var path = require('node:path');
+var dom = require('./dom.js');
 var renderCalls = 0;
 var drawnText = [];
 var frameCallback = null;
@@ -40,6 +43,9 @@ context.createLinearGradient = function() {
 		}
 	};
 };
+context.setLineDash = function() {
+	renderCalls += 1;
+};
 canvas = {
 	width: 300,
 	height: 150,
@@ -59,20 +65,26 @@ global.addEventListener = function() {};
 global.requestAnimationFrame = function(callback) {
 	frameCallback = callback;
 };
-global.document = {
-	getElementById: function(id) {
-		return id === 'c' ? canvas : null;
-	},
-	createElement: function() {
-		return {
-			width: 0,
-			height: 0,
-			getContext: function() {
-				return tileContext;
-			}
-		};
-	}
+// The deck is tested against the markup it actually ships with, so an id that
+// exists in one file and not the other fails here.
+var fixture = dom.createDocument(fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8'));
+var fixtureGetElementById = fixture.getElementById.bind(fixture);
+var fixtureCreateElement = fixture.createElement.bind(fixture);
+
+fixture.getElementById = function(id) {
+	return id === 'c' ? canvas : fixtureGetElementById(id);
 };
+fixture.createElement = function(tagName) {
+	var node = fixtureCreateElement(tagName);
+
+	node.width = 0;
+	node.height = 0;
+	node.getContext = function() {
+		return tileContext;
+	};
+	return node;
+};
+global.document = fixture;
 
 var R = require('../js/namespaces.js');
 require('../js/util.js');
@@ -83,12 +95,15 @@ require('../js/camera.js');
 require('../js/world.js');
 require('../js/rocket.js');
 require('../js/economy.js');
+require('../js/flight-log.js');
 require('../js/mission.js');
 require('../js/aerodynamics.js');
 require('../js/physics.js');
 require('../js/trajectory.js');
 require('../js/autopilot.js');
+require('../js/operations.js');
 require('../js/builder.js');
+require('../js/deck.js');
 require('../js/controls.js');
 require('../js/input.js');
 require('../js/render.js');
@@ -117,17 +132,22 @@ R.render.draw({
 	rocket: R.rocket.create(R.world.findPadById(R.world.currentPadId))
 });
 
-var flightRocket = R.rocket.create(R.world.findPadById(R.world.currentPadId));
-R.rocket.applyBuild(flightRocket, {
-	targetPadId: R.world.targetPadId,
+var flightPad = R.world.findPadById(R.world.currentPadId);
+var flightRocket = R.rocket.create(flightPad);
+
+// Mid-flight state: stage one burned down, stage two not yet lit.
+R.rocket.applyFleetState(flightRocket, {
 	stageCount: 2,
-	payloadMass: 100,
 	stages: [
 		{ fuelMass: 1000, strength: 0.9 },
 		{ fuelMass: 500, strength: 0.9 },
 		{ fuelMass: 300, strength: 0.9 }
 	]
-});
+}, [
+	{ alive: true, fuelMass: 420 },
+	{ alive: true, fuelMass: 500 },
+	{ alive: false, fuelMass: 0 }
+], 100, flightPad);
 flightRocket.wy = 1400;
 flightRocket.vx = 240;
 flightRocket.vy = 60;
@@ -247,21 +267,29 @@ assert.equal(typeof frameCallback, 'function', 'main schedules the animation fra
 // simulated time a fixed number of frames buys at two time scales.
 var game = R.game;
 var pads = R.world.pads;
-var referenceBuild = {
-	targetPadId: pads[1].id,
-	stageCount: 3,
-	payloadMass: R.world.planet.defaultPayload,
-	stages: R.world.planet.defaultFuel.map(function(fuel, index) {
-		return { fuelMass: fuel, strength: R.constants.rocket.defaultStageStrength[index] };
-	})
-};
+
 var frames = 0;
 var timestamp = 0;
 var elapsedBefore;
 var twoTimes;
 var fourTimes;
 
-assert.ok(R.mission.launch(game, referenceBuild), 'builder build launches');
+assert.equal(R.operations.state.fleet.length, 1, 'a run starts with one rocket on the home pad');
+assert.equal(game.phase, 'deck', 'a run starts at the operations deck');
+assert.equal(R.flightLog.entries.length, 0, 'and with an empty flight log');
+
+R.deck.sync(game);
+
+// The dispatch card is live: the reference rocket sits on the home pad, so the
+// only thing standing between the player and a flight is the send button.
+assert.equal(fixture.getElementById('dispatch-send').disabled, false, 'a validated dispatch can be sent');
+assert.equal(fixture.getElementById('dispatch-blocked').hidden, true, 'with no blocking reason to show');
+assert.ok(fixture.getElementById('dispatch-summary').textContent.indexOf('ROCKET') >= 0,
+	'the summary names the rocket it would use');
+fixture.getElementById('dispatch-send').click();
+assert.equal(game.phase, 'flying', 'one click sends the mission on autopilot');
+assert.equal(R.autopilot.enabled, true, 'and hands it to the autopilot');
+assert.equal(game.flight.payloadMass, R.world.planet.defaultPayload, 'the mission carries the selected payload');
 elapsedBefore = 0;
 R.controls.setTimeScaleIndex(4);
 while (frames < 12) {

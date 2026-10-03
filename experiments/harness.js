@@ -15,11 +15,13 @@ require('../js/camera.js');
 require('../js/world.js');
 require('../js/rocket.js');
 require('../js/economy.js');
+require('../js/flight-log.js');
 require('../js/mission.js');
 require('../js/aerodynamics.js');
 require('../js/physics.js');
 require('../js/trajectory.js');
 require('../js/autopilot.js');
+require('../js/operations.js');
 require('../js/controls.js');
 require('../js/input.js');
 
@@ -37,11 +39,13 @@ harness.createGame = function(sourcePad, targetPadId, timeScale) {
 		currentPadId: sourcePad.id,
 		targetPadId: targetPadId,
 		rocket: R.rocket.create(sourcePad),
-		phase: 'building',
+		phase: 'deck',
 		cash: 1e8,
 		ledger: [],
 		flight: null,
+		mission: null,
 		lastReport: null,
+		selection: { sourcePadId: sourcePad.id, targetPadId: targetPadId, mode: 'oneway', visible: true },
 		simTime: 0,
 		physicsAccumulator: 0,
 		timeScaleIndex: R.constants.time.defaultIndex,
@@ -92,16 +96,41 @@ harness.withLimits = function(overrides, work) {
 	}
 };
 
-// Hands the flight to the autopilot under `profileId`. Returns the launched
-// game, or null when the mission rejects the build.
+// Hands the flight to the autopilot under `profileId` through the operations
+// path the game itself uses: the build becomes a rocket type, one instance is
+// put on the start pad, and a one-way mission order is dispatched. Returns the
+// launched game, or null when the mission rejects the build.
 harness.launch = function(sourcePad, targetPadId, build, profileId, timeScale) {
 	var game = harness.createGame(sourcePad, targetPadId, timeScale);
+	var type;
+	var result;
 
 	R.game = game;
+	R.operations.initialize();
+	R.operations.state.types.length = 0;
+	R.operations.state.fleet.length = 0;
+	type = R.operations.addType({
+		name: 'harness',
+		stageCount: build.stageCount,
+		stages: build.stages,
+		nominalPayload: build.payloadMass,
+		defaultProfileId: profileId
+	});
+	R.operations.createRocket(type, sourcePad);
 	R.autopilot.setEnabled(true);
 	R.autopilot.reset();
 	R.autopilot.setProfile(profileId);
-	return R.mission.launch(game, build) ? game : null;
+	result = R.operations.dispatch({
+		source: sourcePad.id,
+		destination: targetPadId,
+		mode: 'oneway',
+		fuelPolicy: 'refuel',
+		outboundPayload: build.payloadMass,
+		returnPayload: 0,
+		typeId: type.id,
+		profileId: profileId
+	});
+	return result.ok ? game : null;
 };
 
 function fuelLeft(rocket) {

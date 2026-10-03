@@ -11,11 +11,13 @@ require('../js/camera.js');
 require('../js/world.js');
 require('../js/rocket.js');
 require('../js/economy.js');
+require('../js/flight-log.js');
 require('../js/mission.js');
 require('../js/aerodynamics.js');
 require('../js/physics.js');
 require('../js/trajectory.js');
 require('../js/autopilot.js');
+require('../js/operations.js');
 require('../js/controls.js');
 require('../js/input.js');
 
@@ -40,11 +42,13 @@ function createGame(targetPadId) {
 		currentPadId: home.id,
 		targetPadId: targetPadId || defaultConfig.targetPadId,
 		rocket: R.rocket.create(home),
-		phase: 'building',
+		phase: 'deck',
 		cash: R.economy.startingCash,
 		ledger: [],
 		flight: null,
+		mission: null,
 		lastReport: null,
+		selection: { sourcePadId: home.id, targetPadId: targetPadId || defaultConfig.targetPadId, mode: 'oneway', visible: true },
 		simTime: 0,
 		physicsAccumulator: 0,
 		timeScaleIndex: R.constants.time.defaultIndex,
@@ -52,10 +56,48 @@ function createGame(targetPadId) {
 	};
 }
 
-function launch(config) {
+// A build config becomes a rocket type with one instance on the home pad, which
+// is how the deck reaches the same launch path.
+var activeType = null;
+
+function setupRun(config, cash) {
 	var game = createGame(config.targetPadId);
 
-	assert.equal(R.mission.launch(game, config), true);
+	R.game = game;
+	R.operations.initialize();
+	R.operations.state.types.length = 0;
+	R.operations.state.fleet.length = 0;
+	activeType = R.operations.addType({
+		name: 'test type',
+		stageCount: config.stageCount,
+		stages: config.stages,
+		nominalPayload: config.payloadMass,
+		defaultProfileId: R.autopilot.profileId
+	});
+	R.operations.createRocket(activeType, home);
+	if (cash !== undefined) {
+		game.cash = cash;
+	}
+	return game;
+}
+
+function dispatch(config, sourcePadId) {
+	return R.operations.dispatch({
+		source: sourcePadId || home.id,
+		destination: config.targetPadId,
+		mode: 'oneway',
+		fuelPolicy: 'refuel',
+		outboundPayload: config.payloadMass,
+		returnPayload: 0,
+		typeId: activeType.id,
+		profileId: R.autopilot.profileId
+	});
+}
+
+function launch(config) {
+	var game = setupRun(config);
+
+	assert.equal(dispatch(config).ok, true);
 	return game;
 }
 
@@ -71,7 +113,6 @@ assert.equal(cinderStats.deltaV, stats.deltaV, 'rocket equation does not depend 
 assert.ok(cinderStats.twr < stats.twr, 'the same build lifts less on a heavier world');
 R.world.initialize('verdant');
 
-var rejectedGame = createGame();
 var weakConfig = {
 	targetPadId: target.id,
 	stageCount: 1,
@@ -82,15 +123,24 @@ var weakConfig = {
 		{ fuelMass: 1000, strength: 0.9 }
 	]
 };
-assert.equal(R.mission.launch(rejectedGame, weakConfig), false, 'underpowered rocket cannot launch');
-assert.equal(rejectedGame.cash, R.economy.startingCash);
+var rejectedGame = setupRun(weakConfig);
+var rejected = dispatch(weakConfig);
+assert.equal(rejected.ok, false, 'a payload the type cannot lift is refused');
+assert.equal(rejected.reason, R.operations.reasons.PAYLOAD_OVER);
+assert.equal(rejectedGame.cash, R.economy.startingCash, 'a rejected launch changes no cash');
+assert.equal(rejectedGame.phase, 'deck', 'and leaves the rocket on the pad');
 weakConfig.stageCount = 3;
 weakConfig.payloadMass = 80;
 weakConfig.targetPadId = home.id;
-assert.equal(R.mission.launch(rejectedGame, weakConfig), false, 'cannot launch to the current pad');
-weakConfig.targetPadId = target.id;
-rejectedGame.cash = 1;
-assert.equal(R.mission.launch(rejectedGame, weakConfig), false, 'unaffordable rocket cannot launch');
+assert.equal(dispatch(weakConfig).reason, R.operations.reasons.SAME_PAD, 'cannot launch to the pad it is on');
+// A rocket that has flown has to buy its structure and fuel back before the next
+// leg, so a leg is refused when the balance cannot cover it.
+var poorGame = setupRun(defaultConfig, 10);
+poorGame.rocket = R.rocket.create(home);
+R.operations.state.fleet[0].stageState[0].alive = false;
+assert.equal(dispatch(defaultConfig).reason, R.operations.reasons.INSUFFICIENT_FUNDS, 'a leg the balance cannot prepare is refused');
+assert.equal(poorGame.cash, 10, 'and the refusal charges nothing');
+assert.equal(poorGame.phase, 'deck', 'and the rocket stays on the pad');
 
 assert.equal(R.physics.gravityAtAltitude(0), R.world.planet.surfaceGravity);
 assert.ok(R.physics.gravityAtAltitude(10000) < R.physics.gravityAtAltitude(0));
@@ -134,18 +184,22 @@ assert.ok(scaledGame.physicsAccumulator < R.constants.rocket.fixedStep, 'accumul
 
 var game = launch(defaultConfig);
 var launchCash = game.cash;
+assert.equal(game.ledger.length, 0, 'a rocket that is already fuelled and complete charges nothing at launch');
+assert.equal(game.flight.turnaroundCost, 0);
+assert.equal(game.flight.fuelCost, 0);
+assert.ok(game.flight.structureCost > 0, 'the flight records the capital it puts in the air');
 var startingFuel = game.rocket.stages[0].fuelMass;
 R.physics.advance(game, 1 / 30);
 assert.equal(game.phase, 'flying');
 assert.ok(game.rocket.wy > 0, 'default rocket lifts off');
 assert.ok(game.rocket.stages[0].fuelMass < startingFuel, 'fuel is consumed during powered flight');
-assert.ok(game.cash < launchCash, 'fuel consumption reduces cash');
+assert.ok(game.flight.fuelUsed > 0, 'the burn is metered on the flight record');
+assert.equal(game.cash, launchCash, 'propellant is paid for when it is loaded, not as it burns');
 assert.ok(game.flight.peakThrustAcceleration > 0, 'flight record measures peak thrust acceleration');
 assert.ok(game.flight.peakAppliedThrustAcceleration > 0 && game.flight.peakAppliedThrustAcceleration <= game.flight.peakThrustAcceleration, 'applied thrust acceleration never exceeds what the stage can give');
 assert.equal(game.flight.autopilotProfile, R.autopilot.profileId, 'the flight records the autopilot profile it launched with');
 assert.ok(Number.isFinite(game.flight.currentDynamicPressure), 'flight telemetry records current Q');
 assert.ok(Number.isFinite(game.flight.currentAngleOfAttack), 'flight telemetry records current AoA');
-assert.equal(game.ledger[0].type, 'structure');
 
 var stageDryMass = game.rocket.stages[0].dryMass;
 game.rocket.stages[0].fuelMass = 0;
@@ -290,14 +344,25 @@ assert.match(report.detail, /Touchdown 5\.0 m\/s down and 10\.0 m\/s across, 100
 	'the debrief reports where and how hard it arrived');
 assert.equal(deliveredGame.currentPadId, target.id);
 assert.ok(deliveredGame.cash > startingBalance, 'target delivery pays a reward');
-assert.equal(deliveredGame.phase, 'building');
+assert.equal(deliveredGame.phase, 'deck');
 assert.equal(deliveredGame.rocket.padId, target.id);
-assert.equal(deliveredGame.ledger[deliveredGame.ledger.length - 1].type, 'delivery');
+// Every dispatched leg flies on the autopilot, so a delivery books the reward
+// and then its fee.
+assert.equal(deliveredGame.ledger[deliveredGame.ledger.length - 2].type, 'delivery');
+assert.equal(deliveredGame.ledger[deliveredGame.ledger.length - 1].type, 'autopilot');
+var deliveredEntry = R.flightLog.entries[0];
+assert.equal(deliveredEntry.status, 'delivered', 'the delivered leg is logged');
+assert.equal(deliveredEntry.revenue, 80 * R.economy.priceDelivery());
+assert.equal(deliveredEntry.autopilotFee, 80 * R.economy.priceDelivery() * R.autopilot.feeFraction);
+assert.equal(deliveredEntry.cashDelta, deliveredEntry.revenue - deliveredEntry.autopilotFee -
+	deliveredEntry.fuelCost - deliveredEntry.turnaroundCost, 'the itemized cash adds up to the net delta');
+assert.equal(deliveredEntry.landingPadId, target.id);
+assert.ok(deliveredEntry.fuelStart > 0, 'the log records the fuel the leg launched with');
+assert.equal(deliveredEntry.fuelUsed, 0, 'a teleported touchdown burns nothing');
+assert.ok(deliveredEntry.rocketTypeSnapshot.stageCount === 3, 'the log keeps its own build snapshot');
 
 // An autopilot delivery keeps a tenth of the reward as its fee.
 var autopilotGame = launch(defaultConfig);
-R.autopilot.setEnabled(true);
-autopilotGame.flight.usedAutopilot = true;
 autopilotGame.rocket.wx = target.wx;
 autopilotGame.rocket.vy = -3;
 startingBalance = autopilotGame.cash;
@@ -318,7 +383,7 @@ assert.equal(report.status, 'landed');
 assert.equal(report.targetError, farPad.wx - target.wx, 'a safe landing elsewhere quotes its error from the target');
 assert.match(report.detail, /5\.0 km east of Eastport/, 'the error is signed along the wrap map');
 assert.equal(elsewhereGame.currentPadId, farPad.id);
-assert.equal(elsewhereGame.cash, R.economy.startingCash - stats.dryMass * R.economy.priceSteel());
+assert.equal(elsewhereGame.cash, R.economy.startingCash, 'a safe landing elsewhere pays nothing and charges nothing');
 
 var crashGame = launch(defaultConfig);
 crashGame.rocket.wx = target.wx - 1200;
@@ -330,7 +395,7 @@ assert.equal(report.status, 'crashed');
 assert.match(report.detail, /Touchdown 40\.0 m\/s down and 0\.0 m\/s across, 1\.2 km west of Eastport\./,
 	'a crash is reported with the arrival speeds and the side of the pad it fell short on');
 assert.equal(crashGame.currentPadId, home.id);
-assert.equal(crashGame.cash, R.economy.startingCash - stats.dryMass * R.economy.priceSteel());
+assert.equal(crashGame.cash, R.economy.startingCash, 'a crash charges nothing on top of the launch');
 
 // Landing tolerances scale with the planet, not with the rescaled map.
 R.world.initialize('tinmoon');
