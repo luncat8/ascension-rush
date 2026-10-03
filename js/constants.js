@@ -20,7 +20,6 @@
 		// Exhaust velocity is Isp times standard gravity, never local gravity.
 		standardGravity: 9.81,
 		referenceArea: 1.6,
-		dragCoefficient: 0.22,
 		maxAcceleration: 200,
 		fixedStep: 1 / 120,
 		maxFrameStep: 1 / 30,

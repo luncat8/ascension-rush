@@ -2,6 +2,7 @@
 
 var assert = require('node:assert/strict');
 var renderCalls = 0;
+var drawnText = [];
 var frameCallback = null;
 var tileContext = {
 	fillRect: function() {
@@ -22,6 +23,10 @@ for (i = 0; i < contextMethods.length; i += 1) {
 		renderCalls += 1;
 	};
 }
+context.fillText = function(text) {
+	drawnText.push(String(text));
+	renderCalls += 1;
+};
 context.setTransform = function() {
 	renderCalls += 1;
 };
@@ -79,6 +84,7 @@ require('../js/world.js');
 require('../js/rocket.js');
 require('../js/economy.js');
 require('../js/mission.js');
+require('../js/aerodynamics.js');
 require('../js/physics.js');
 require('../js/autopilot.js');
 require('../js/builder.js');
@@ -130,7 +136,7 @@ R.render.draw({
 	currentPadId: R.world.currentPadId,
 	targetPadId: R.world.targetPadId,
 	phase: 'flying',
-	flight: { cashDelta: -600 },
+	flight: { cashDelta: -600, currentDynamicPressure: 24000, currentAngleOfAttack: 0.4, peakDynamicPressure: 28000 },
 	cash: 29400,
 	timeScaleIndex: R.constants.time.defaultIndex,
 	timeScale: R.constants.time.scales[R.constants.time.defaultIndex],
@@ -141,6 +147,8 @@ var main = require('../js/main.js');
 main.start();
 
 assert.ok(renderCalls > 100, 'renderer executed expected drawing operations');
+assert.ok(drawnText.indexOf('ANGLE OF ATTACK') >= 0, 'flight HUD draws AoA telemetry');
+assert.ok(drawnText.indexOf('PEAK Q') >= 0, 'flight HUD draws peak-Q telemetry');
 assert.equal(canvas.width, 2560, 'canvas backing store uses device pixel ratio');
 assert.equal(canvas.height, 1440, 'canvas backing store uses device pixel ratio');
 assert.equal(typeof frameCallback, 'function', 'main schedules the animation frame');

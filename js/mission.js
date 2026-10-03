@@ -78,6 +78,14 @@
 			structureCost: 0,
 			cashDelta: 0,
 			elapsed: 0,
+			currentDynamicPressure: 0,
+			currentAngleOfAttack: 0,
+			peakDynamicPressure: 0,
+			peakDynamicPressureAltitude: 0,
+			peakDynamicPressureAngleOfAttack: 0,
+			peakAngleOfAttack: 0,
+			peakAngleOfAttackDynamicPressure: 0,
+			peakThrustAcceleration: 0,
 			usedAutopilot: R.autopilot.enabled
 		};
 
@@ -131,6 +139,13 @@
 		if (fee > 0) {
 			detail += ' Autopilot fee $' + Math.round(fee) + '.';
 		}
+		detail += ' Peak Q ' + (flight.peakDynamicPressure / 1000).toFixed(1) + ' kPa at ' +
+			Math.round(flight.peakDynamicPressureAltitude) + ' m (AoA ' +
+			(R.world.planet.seaLevelDensity > 0 ? (flight.peakDynamicPressureAngleOfAttack * 180 / Math.PI).toFixed(1) + '°' : 'n/a') +
+			') · peak AoA ' +
+			(R.world.planet.seaLevelDensity > 0 ? (flight.peakAngleOfAttack * 180 / Math.PI).toFixed(1) + '° at ' +
+			(flight.peakAngleOfAttackDynamicPressure / 1000).toFixed(1) + ' kPa' : 'n/a') +
+			' · peak thrust acceleration ' + flight.peakThrustAcceleration.toFixed(1) + ' m/s².';
 
 		game.currentPadId = landedPad.id;
 		game.targetPadId = game.targetPadId === landedPad.id ? nextTargetId(landedPad.id) : game.targetPadId;
@@ -139,7 +154,14 @@
 			title: title,
 			detail: detail,
 			cashDelta: cashDelta,
-			landingPadId: safe ? pad.id : null
+			elapsed: flight.elapsed,
+			landingPadId: safe ? pad.id : null,
+			peakDynamicPressure: flight.peakDynamicPressure,
+			peakDynamicPressureAltitude: flight.peakDynamicPressureAltitude,
+			peakDynamicPressureAngleOfAttack: flight.peakDynamicPressureAngleOfAttack,
+			peakAngleOfAttack: flight.peakAngleOfAttack,
+			peakAngleOfAttackDynamicPressure: flight.peakAngleOfAttackDynamicPressure,
+			peakThrustAcceleration: flight.peakThrustAcceleration
 		};
 		game.rocket = R.rocket.create(landedPad);
 		game.flight = null;

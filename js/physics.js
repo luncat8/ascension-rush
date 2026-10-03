@@ -3,6 +3,14 @@
 
 	var R = root.R || (root.R = {});
 	var physics = R.physics || (R.physics = {});
+	var aeroSample = {
+		speed: 0,
+		dynamicPressure: 0,
+		angleOfAttack: 0,
+		dragCoefficient: 0,
+		dragAccelX: 0,
+		dragAccelY: 0
+	};
 
 	physics.gravityAtAltitude = function(altitude) {
 		var planet = R.world.planet;
@@ -37,8 +45,6 @@
 		var massFlow;
 		var burn = 0;
 		var thrustFraction = 0;
-		var speed = Math.sqrt(oldVx * oldVx + oldVy * oldVy);
-		var dragScale;
 		var accelerationX;
 		var accelerationY;
 		var acceleration;
@@ -50,6 +56,12 @@
 
 		if (game.phase !== 'flying') {
 			return false;
+		}
+		if (stage && stage.fuelMass > 0) {
+			game.flight.peakThrustAcceleration = Math.max(
+				game.flight.peakThrustAcceleration,
+				stage.thrustMax / Math.max(1, massBefore)
+			);
 		}
 
 		if (stage && stage.fuelMass > 0 && state.throttle > 0) {
@@ -75,9 +87,20 @@
 
 		massAfter = R.rocket.totalMass(state);
 		mass = Math.max(1, (massBefore + massAfter) * 0.5);
-		dragScale = 0.5 * density * settings.dragCoefficient * settings.referenceArea * speed / mass;
-		accelerationX = thrust * Math.sin(state.heading) / mass - dragScale * oldVx;
-		accelerationY = thrust * Math.cos(state.heading) / mass - gravity - dragScale * oldVy;
+		R.aerodynamics.calculate(density, oldVx, oldVy, state.heading, mass, aeroSample);
+		game.flight.currentDynamicPressure = aeroSample.dynamicPressure;
+		game.flight.currentAngleOfAttack = aeroSample.angleOfAttack;
+		if (aeroSample.dynamicPressure > game.flight.peakDynamicPressure) {
+			game.flight.peakDynamicPressure = aeroSample.dynamicPressure;
+			game.flight.peakDynamicPressureAltitude = Math.max(0, oldWy);
+			game.flight.peakDynamicPressureAngleOfAttack = aeroSample.angleOfAttack;
+		}
+		if (density > 0 && aeroSample.angleOfAttack > game.flight.peakAngleOfAttack) {
+			game.flight.peakAngleOfAttack = aeroSample.angleOfAttack;
+			game.flight.peakAngleOfAttackDynamicPressure = aeroSample.dynamicPressure;
+		}
+		accelerationX = thrust * Math.sin(state.heading) / mass + aeroSample.dragAccelX;
+		accelerationY = thrust * Math.cos(state.heading) / mass - gravity + aeroSample.dragAccelY;
 		acceleration = Math.sqrt(accelerationX * accelerationX + accelerationY * accelerationY);
 		if (acceleration > settings.maxAcceleration) {
 			accelerationX *= settings.maxAcceleration / acceleration;

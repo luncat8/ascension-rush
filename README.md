@@ -6,8 +6,9 @@ logarithmic altitude view. Persistent parts, damage and a rival company are
 planned follow-ups.
 
 ## Status
-The 0.1 world/render scaffold, the 0.2 playable flight slice and the 0.3
-autopilot + planet presets are implemented. Pick a world from the boot menu,
+The 0.1 world/render scaffold, the 0.2 playable flight slice, the 0.3
+autopilot + planet presets, and the 0.3.1 aerodynamic envelope and load
+measurements are implemented. Pick a world from the boot menu,
 configure a one-to-three-stage rocket against that world's reference build,
 launch, and either fly it by hand (mouse aiming, Shift/Ctrl throttle, Space
 staging) or hand it to the autopilot. `[` and `]` move a `0.5x–4x` time scale.
@@ -36,6 +37,7 @@ tags, `file://`-friendly). Node smoke/regression tests:
 
 ```sh
 node experiments/coords-test.js
+node experiments/aerodynamics-test.js
 node experiments/flight-test.js
 node experiments/builder-test.js
 node experiments/render-smoke-test.js

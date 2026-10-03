@@ -273,7 +273,7 @@
 		var heading = Math.round(R.util.mod(rocket.heading, Math.PI * 2) * 180 / Math.PI);
 		var margin = Math.min(24, render.width * 0.05);
 		var panelWidth = 230;
-		var panelHeight = 262;
+		var panelHeight = 324;
 		var x = render.width - panelWidth - margin;
 		var y = 20;
 
@@ -355,43 +355,70 @@
 		context.fillStyle = '#a8bac2';
 		context.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
 		context.textAlign = 'left';
-		context.fillText('BALANCE', x + 16, y + 168);
+		context.fillText('Q', x + 16, y + 168);
 		context.fillStyle = '#e7eff6';
 		context.textAlign = 'right';
-		context.fillText('$', x + panelWidth - 58, y + 168);
-		context.fillText(Math.round(game.cash), x + panelWidth - 16, y + 168);
+		context.fillText((game.flight.currentDynamicPressure / 1000).toFixed(1), x + panelWidth - 38, y + 168);
+		context.fillStyle = '#a8bac2';
+		context.fillText('kPa', x + panelWidth - 16, y + 168);
 
 		context.textAlign = 'left';
 		context.fillStyle = '#a8bac2';
-		context.fillText('FLIGHT Δ', x + 16, y + 188);
+		context.fillText('ANGLE OF ATTACK', x + 16, y + 188);
+		context.textAlign = 'right';
+		context.fillStyle = '#e7eff6';
+		context.fillText((game.flight.currentAngleOfAttack * 180 / Math.PI).toFixed(1), x + panelWidth - 32, y + 188);
+		context.fillStyle = '#a8bac2';
+		context.fillText('°', x + panelWidth - 16, y + 188);
+
+		context.textAlign = 'left';
+		context.fillStyle = '#a8bac2';
+		context.fillText('PEAK Q', x + 16, y + 208);
+		context.textAlign = 'right';
+		context.fillStyle = '#e7eff6';
+		context.fillText((game.flight.peakDynamicPressure / 1000).toFixed(1), x + panelWidth - 38, y + 208);
+		context.fillStyle = '#a8bac2';
+		context.fillText('kPa', x + panelWidth - 16, y + 208);
+
+		context.fillStyle = '#a8bac2';
+		context.textAlign = 'left';
+		context.fillText('BALANCE', x + 16, y + 234);
+		context.fillStyle = '#e7eff6';
+		context.textAlign = 'right';
+		context.fillText('$', x + panelWidth - 58, y + 234);
+		context.fillText(Math.round(game.cash), x + panelWidth - 16, y + 234);
+
+		context.textAlign = 'left';
+		context.fillStyle = '#a8bac2';
+		context.fillText('FLIGHT Δ', x + 16, y + 254);
 		context.textAlign = 'right';
 		context.fillStyle = game.flight.cashDelta >= 0 ? '#91e3d3' : '#f1a89d';
-		context.fillText(game.flight.cashDelta < 0 ? '−$' : '+$', x + panelWidth - 58, y + 188);
-		context.fillText(Math.round(Math.abs(game.flight.cashDelta)), x + panelWidth - 16, y + 188);
+		context.fillText(game.flight.cashDelta < 0 ? '−$' : '+$', x + panelWidth - 58, y + 254);
+		context.fillText(Math.round(Math.abs(game.flight.cashDelta)), x + panelWidth - 16, y + 254);
 
 		context.fillStyle = '#a8bac2';
 		context.textAlign = 'left';
-		context.fillText('AUTOPILOT', x + 16, y + 209);
+		context.fillText('AUTOPILOT', x + 16, y + 275);
 		context.textAlign = 'right';
 		if (R.autopilot.enabled) {
 			context.fillStyle = '#7de0ca';
-			context.fillText(R.autopilot.label(), x + panelWidth - 16, y + 209);
+			context.fillText(R.autopilot.label(), x + panelWidth - 16, y + 275);
 		} else {
 			context.fillStyle = '#829ba6';
-			context.fillText('OFF', x + panelWidth - 16, y + 209);
+			context.fillText('OFF', x + panelWidth - 16, y + 275);
 		}
 
 		context.textAlign = 'left';
 		context.fillStyle = '#a8bac2';
-		context.fillText('TIME SCALE', x + 16, y + 230);
+		context.fillText('TIME SCALE', x + 16, y + 296);
 		context.textAlign = 'right';
 		context.fillStyle = '#e7eff6';
-		context.fillText(timeLabel(game), x + panelWidth - 16, y + 230);
+		context.fillText(timeLabel(game), x + panelWidth - 16, y + 296);
 
 		context.fillStyle = '#829ba6';
 		context.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
 		context.textAlign = 'left';
-		context.fillText('A  AUTOPILOT    [ ]  TIME    SHIFT/CTRL  THROTTLE', x + 16, y + 250);
+		context.fillText('A  AUTOPILOT    [ ]  TIME    SHIFT/CTRL  THROTTLE', x + 16, y + 316);
 	}
 
 	// Cached so the frame loop does not build a new string every tick.
