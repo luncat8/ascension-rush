@@ -101,9 +101,9 @@ R.render.draw({
 R.input.pointerActive = true;
 R.input.pointerX = 620;
 R.input.pointerY = 340;
-R.input.worldPoint.x = 125000;
-R.input.worldPoint.y = 10000;
-R.input.debugText = 'E 125000 m  ·  ALT 10000 m';
+R.input.worldPoint.x = 12600;
+R.input.worldPoint.y = 900;
+R.input.debugText = 'E 12600 m  ·  ALT 900 m';
 R.render.draw({
 	currentPadId: R.world.currentPadId,
 	targetPadId: R.world.targetPadId,
@@ -121,9 +121,9 @@ R.rocket.applyBuild(flightRocket, {
 		{ fuelMass: 300, strength: 0.9 }
 	]
 });
-flightRocket.wy = 12000;
-flightRocket.vx = 450;
-flightRocket.vy = 600;
+flightRocket.wy = 1400;
+flightRocket.vx = 240;
+flightRocket.vy = 60;
 flightRocket.throttle = 0.75;
 R.camera.follow(flightRocket.wx);
 R.render.draw({
@@ -144,5 +144,49 @@ assert.ok(renderCalls > 100, 'renderer executed expected drawing operations');
 assert.equal(canvas.width, 2560, 'canvas backing store uses device pixel ratio');
 assert.equal(canvas.height, 1440, 'canvas backing store uses device pixel ratio');
 assert.equal(typeof frameCallback, 'function', 'main schedules the animation frame');
+
+// Drive the real frame loop: launch through the mission, then measure how much
+// simulated time a fixed number of frames buys at two time scales.
+var game = R.game;
+var pads = R.world.pads;
+var referenceBuild = {
+	targetPadId: pads[1].id,
+	stageCount: 3,
+	payloadMass: R.world.planet.defaultPayload,
+	stages: R.world.planet.defaultFuel.map(function(fuel, index) {
+		return { fuelMass: fuel, strength: R.constants.rocket.defaultStageStrength[index] };
+	})
+};
+var frames = 0;
+var timestamp = 0;
+var elapsedBefore;
+var twoTimes;
+var fourTimes;
+
+assert.ok(R.mission.launch(game, referenceBuild), 'builder build launches');
+elapsedBefore = 0;
+R.controls.setTimeScaleIndex(4);
+while (frames < 12) {
+	timestamp += 16.7;
+	frameCallback(timestamp);
+	frames += 1;
+}
+twoTimes = game.flight.elapsed - elapsedBefore;
+assert.ok(game.rocket.wy > 0, 'frame loop lifts the rocket off the pad');
+assert.ok(game.rocket.stages[0].fuelMass < R.world.planet.defaultFuel[0], 'frame loop burns fuel');
+
+elapsedBefore = game.flight.elapsed;
+R.controls.setTimeScaleIndex(6);
+frames = 0;
+while (frames < 12) {
+	timestamp += 16.7;
+	frameCallback(timestamp);
+	frames += 1;
+}
+fourTimes = game.flight.elapsed - elapsedBefore;
+assert.equal(game.timeScale, R.constants.time.scales[6], 'time scale index selects the multiplier');
+assert.ok(fourTimes > 0 && fourTimes > twoTimes, 'a higher time scale buys more simulated time per frame');
+assert.ok(R.util.mod(game.rocket.wx - pads[0].wx, R.world.planet.circumference) > 0, 'the frame loop flies downrange');
+
 delete global.document;
 console.log('Render and app startup smoke test passed.');
