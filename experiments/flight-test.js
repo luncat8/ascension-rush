@@ -167,6 +167,23 @@ ignitionRocket.stages[2].alive = false;
 R.rocket.separateStage(ignitionRocket, 0.4);
 assert.equal(ignitionRocket.throttle, 0, 'with no stage left there is nothing to light');
 
+// The staging rule reads a stack as if a given stage were burning: everything
+// below it is gone, and burning only ever sheds mass.
+var stackRocket = launch(defaultConfig).rocket;
+var stackPayload = stackRocket.payloadMass;
+
+assert.equal(R.rocket.nextAliveStageIndex(stackRocket, 0), 0, 'the first stage burns first');
+assert.equal(R.rocket.nextAliveStageIndex(stackRocket, 3), -1, 'and nothing burns past the configured stack');
+stackRocket.stages[1].alive = false;
+assert.equal(R.rocket.nextAliveStageIndex(stackRocket, 1), 2, 'a separated stage is skipped, not assumed away');
+assert.equal(R.rocket.stackThrustAcceleration(stackRocket, 0, stackRocket.stages[0].fuelMass),
+	stackRocket.stages[0].thrustMax / R.rocket.totalMass(stackRocket), 'a stage at light-off is the live figure');
+assert.ok(R.rocket.stackThrustAcceleration(stackRocket, 0, 0) > R.rocket.stackThrustAcceleration(stackRocket, 0, stackRocket.stages[0].fuelMass),
+	'and burning only sheds mass, so the same engine is stronger at burnout');
+assert.equal(R.rocket.stackThrustAcceleration(stackRocket, 2, stackRocket.stages[2].fuelMass),
+	stackRocket.stages[2].thrustMax / (stackPayload + stackRocket.stages[2].dryMass + stackRocket.stages[2].fuelMass),
+	'a later stage is judged on the stack it would inherit, with the stages below it gone');
+
 var burnGame = launch(defaultConfig);
 burnGame.rocket.wy = 1000;
 burnGame.rocket.stages[0].fuelMass = 0.001;

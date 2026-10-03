@@ -79,9 +79,13 @@
 		// must brake sideways and hold altitude at once), and an angle-of-attack
 		// limit never leaves less than this multiple of the thrust that holds
 		// the rocket's weight when flying sideways.
-		minThrustToWeight: 1.7,
-		weightSupportMargin: 1.3
-	};
+	minThrustToWeight: 1.7,
+	weightSupportMargin: 1.3,
+	// Staging on authority: separate a stage that cannot hold the rocket up
+	// for the whole burn it has left when a later stage can, instead of
+	// flying it dry and landing with an engine that cannot stop the fall.
+	stageOnAuthority: true
+};
 
 	// Autopilot profiles are named global multipliers on a planet's envelope
 	// limits. The first entry is the default.

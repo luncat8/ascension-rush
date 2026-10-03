@@ -23,7 +23,7 @@ require('../js/autopilot.js');
 require('../js/controls.js');
 require('../js/input.js');
 
-var harness = { R: R, maxSeconds: 300, limitKeys: ['maxDynamicPressure', 'maxThrustAcceleration', 'maxAngleOfAttackDeg'] };
+var harness = { R: R, maxSeconds: 300, overrideKeys: ['maxDynamicPressure', 'maxThrustAcceleration', 'maxAngleOfAttackDeg', 'stageOnAuthority'] };
 // Flights that come back within this distance of the target count as arrived.
 var arrivalRadius = 500;
 // An axis flip only counts while the rocket is fast enough to have a clear
@@ -60,14 +60,16 @@ harness.referenceBuild = function(planet, targetPadId) {
 	};
 };
 
-// Runs `work` with the live planet's envelope limits replaced (a limit missing
-// from `overrides` is switched off), then restores them. The autopilot is reset
-// on both sides so the next flight resolves the limits in force.
+// Runs `work` with the live planet's flight tuning replaced (a key missing
+// from `overrides` is switched off), then restores it. The envelope limits and
+// the staging-authority switch both live here, so a variant can be flown with
+// either held back. The autopilot is reset on both sides so the next flight
+// resolves the tuning in force.
 harness.withLimits = function(overrides, work) {
 	var flight = R.world.planet.flight;
 	var saved = {};
 
-	harness.limitKeys.forEach(function(key) {
+	harness.overrideKeys.forEach(function(key) {
 		saved[key] = flight[key];
 		flight[key] = overrides[key] === undefined ? null : overrides[key];
 	});
@@ -75,8 +77,16 @@ harness.withLimits = function(overrides, work) {
 	try {
 		return work();
 	} finally {
-		harness.limitKeys.forEach(function(key) {
-			flight[key] = saved[key];
+		harness.overrideKeys.forEach(function(key) {
+			// Restore the shape as well as the values. A key that was absent
+			// has to go back to being absent: left behind as an explicit
+			// undefined it overrides the shared default with nothing, and a
+			// flag resolved from it reads as undefined instead of true.
+			if (saved[key] === undefined) {
+				delete flight[key];
+			} else {
+				flight[key] = saved[key];
+			}
 		});
 		R.autopilot.reset();
 	}

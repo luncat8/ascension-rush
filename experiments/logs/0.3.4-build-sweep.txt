@@ -1,0 +1,58 @@
+# Staging-authority sweep: node experiments/build-sweep.js <buildsPerPlanet> <seed>
+# Random launchable builds, routes, frame rates and time scales, each flown four times.
+# 'dry' is the pre-0.3.4 baseline (limits off, staging only on a dry tank); every other
+# variant is judged against it as flights fixed against flights broken.
+#
+# Result: authority staging fixes 21-50 flights per variant and breaks none. The
+# single regression on seed 5 (a gossamer three-stage build) is present with the
+# rule switched off as well: it is the acceleration limit, not the staging.
+
+$ node experiments/build-sweep.js 300 1
+Verdant  dry 283/300   off 294/300   balanced 295/300   gentle 295/300
+Tinmoon  dry 300/300   off 300/300   balanced 300/300   gentle 300/300
+Cinder   dry 271/300   off 280/300   balanced 284/300   gentle 284/300
+Gossamer dry 277/300   off 278/300   balanced 290/300   gentle 294/300
+--- totals (delivered flights only for the means)
+dry      1131/1200 delivered · mean 58.1 s · mean peak Q 62.8 kPa · mean applied acceleration 36.1 m/s²
+off      1152/1200 delivered · mean 56.3 s · mean peak Q 64.2 kPa · mean applied acceleration 36.7 m/s² · fixed 21 flights the dry baseline loses
+balanced 1169/1200 delivered · mean 59.5 s · mean peak Q 32.2 kPa · mean applied acceleration 23.8 m/s² · fixed 38 flights the dry baseline loses
+gentle   1173/1200 delivered · mean 64.2 s · mean peak Q 23.3 kPa · mean applied acceleration 20.2 m/s² · fixed 42 flights the dry baseline loses
+regressions (the dry baseline delivers them, the variant does not): 0
+
+$ node experiments/build-sweep.js 300 2
+Verdant  dry 287/300   off 296/300   balanced 297/300   gentle 298/300
+Tinmoon  dry 300/300   off 300/300   balanced 300/300   gentle 300/300
+Cinder   dry 259/300   off 276/300   balanced 278/300   gentle 283/300
+Gossamer dry 270/300   off 271/300   balanced 282/300   gentle 285/300
+--- totals (delivered flights only for the means)
+dry      1116/1200 delivered · mean 57.5 s · mean peak Q 61.3 kPa · mean applied acceleration 35.4 m/s²
+off      1143/1200 delivered · mean 56.4 s · mean peak Q 62.2 kPa · mean applied acceleration 35.9 m/s² · fixed 27 flights the dry baseline loses
+balanced 1157/1200 delivered · mean 59.1 s · mean peak Q 31.9 kPa · mean applied acceleration 23.6 m/s² · fixed 41 flights the dry baseline loses
+gentle   1166/1200 delivered · mean 63.7 s · mean peak Q 23.2 kPa · mean applied acceleration 20.1 m/s² · fixed 50 flights the dry baseline loses
+regressions (the dry baseline delivers them, the variant does not): 0
+
+$ node experiments/build-sweep.js 300 3
+Verdant  dry 289/300   off 299/300   balanced 299/300   gentle 299/300
+Tinmoon  dry 299/300   off 299/300   balanced 299/300   gentle 300/300
+Cinder   dry 259/300   off 270/300   balanced 274/300   gentle 277/300
+Gossamer dry 275/300   off 278/300   balanced 286/300   gentle 290/300
+--- totals (delivered flights only for the means)
+dry      1122/1200 delivered · mean 58.0 s · mean peak Q 61.4 kPa · mean applied acceleration 35.2 m/s²
+off      1146/1200 delivered · mean 56.9 s · mean peak Q 62.7 kPa · mean applied acceleration 35.6 m/s² · fixed 24 flights the dry baseline loses
+balanced 1158/1200 delivered · mean 59.5 s · mean peak Q 32.0 kPa · mean applied acceleration 23.6 m/s² · fixed 36 flights the dry baseline loses
+gentle   1166/1200 delivered · mean 64.1 s · mean peak Q 23.1 kPa · mean applied acceleration 20.1 m/s² · fixed 44 flights the dry baseline loses
+regressions (the dry baseline delivers them, the variant does not): 0
+
+$ node experiments/build-sweep.js 300 5
+Verdant  dry 285/300   off 296/300   balanced 298/300   gentle 298/300
+Tinmoon  dry 300/300   off 300/300   balanced 300/300   gentle 300/300
+Cinder   dry 261/300   off 281/300   balanced 283/300   gentle 285/300
+Gossamer dry 281/300   off 282/300   balanced 291/300   gentle 293/300
+--- totals (delivered flights only for the means)
+dry      1127/1200 delivered · mean 58.0 s · mean peak Q 61.5 kPa · mean applied acceleration 35.4 m/s²
+off      1159/1200 delivered · mean 56.4 s · mean peak Q 63.0 kPa · mean applied acceleration 35.9 m/s² · fixed 32 flights the dry baseline loses
+balanced 1172/1200 delivered · mean 59.3 s · mean peak Q 32.1 kPa · mean applied acceleration 23.7 m/s² · fixed 46 flights the dry baseline loses
+gentle   1176/1200 delivered · mean 63.8 s · mean peak Q 23.3 kPa · mean applied acceleration 20.2 m/s² · fixed 49 flights the dry baseline loses
+regressions (the dry baseline delivers them, the variant does not): 1
+  balanced: gossamer Zephyr>Drift stages 1290/360/1260 kg, payload 290 kg, 60 fps x4 (crashed)
+

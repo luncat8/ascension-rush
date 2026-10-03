@@ -203,6 +203,135 @@ R.controls.update(stagedGame, step);
 assert.equal(stagedGame.rocket.currentStage, 1, 'the autopilot stages a dry booster');
 assert.ok(stagedGame.rocket.throttle < 0.7, 'and the next stage lights at the throttle the autopilot was holding');
 
+// ---- Staging on authority: a stage that cannot hold the rocket up.
+// Verdant needs 1.7 x 9.81 = 16.7 m/s² of thrust acceleration to fly the
+// descent. A booster that never reaches it loses the landing however long it
+// burns, so a later stage that clears it takes over now.
+var authorityLimits = { maxDynamicPressure: null, maxThrustAcceleration: null, maxAngleOfAttackDeg: null, stageOnAuthority: true };
+var blindBuild = {
+	targetPadId: R.world.pads[2].id,
+	stageCount: 2,
+	payloadMass: 80,
+	stages: [{ fuelMass: 380, strength: 0.5 }, { fuelMass: 900, strength: 1 }, { fuelMass: 100, strength: 1 }]
+};
+var weakMiddleBuild = {
+	targetPadId: R.world.pads[2].id,
+	stageCount: 3,
+	payloadMass: 80,
+	stages: [{ fuelMass: 900, strength: 1 }, { fuelMass: 380, strength: 0.5 }, { fuelMass: 900, strength: 1 }]
+};
+var blindStackBuild = {
+	targetPadId: R.world.pads[2].id,
+	stageCount: 3,
+	payloadMass: 80,
+	stages: [{ fuelMass: 380, strength: 0.5 }, { fuelMass: 100, strength: 0.5 }, { fuelMass: 900, strength: 1 }]
+};
+// A stack whose last stage cannot hover either: nothing can take over from
+// it, so the rule has to leave it alone rather than strand the rocket.
+var lastStageBuild = {
+	targetPadId: R.world.pads[2].id,
+	stageCount: 2,
+	payloadMass: 600,
+	stages: [{ fuelMass: 200, strength: 0.5 }, { fuelMass: 100, strength: 0.5 }, { fuelMass: 100, strength: 1 }]
+};
+
+function stagingProbe(limits, build, stageIndex) {
+	return withLimits(limits, function() {
+		var game = launchReference(0, 2, 'balanced', build);
+
+		game.rocket.currentStage = stageIndex;
+		R.autopilot.update(game);
+		return { staged: R.autopilot.command.stage, early: R.autopilot.stagedEarly, game: game };
+	});
+}
+
+var blindProbe = stagingProbe(authorityLimits, blindBuild, 0);
+
+assert.ok(blindProbe.staged, 'a stage that cannot hover at burnout is separated early');
+assert.ok(blindProbe.early, 'and the HUD is told it was an authority separation');
+assert.equal(stagingProbe({ stageOnAuthority: false }, blindBuild, 0).staged, false,
+	'with authority staging off only a dry tank separates');
+assert.equal(stagingProbe(authorityLimits, blindBuild, 1).staged, false,
+	'the last stage is never dropped: there is nothing behind it to take over');
+assert.equal(stagingProbe(authorityLimits, lastStageBuild, 1).staged, false,
+	'not even a last stage that cannot hover itself');
+assert.equal(stagingProbe(authorityLimits, blindStackBuild, 0).staged, false,
+	'nor is a stage dropped when the next one cannot hover either');
+assert.equal(stagingProbe(authorityLimits, blindStackBuild, 1).staged, true,
+	'the same build separates once the stage that can hover is the next one');
+
+var lastStageGame = launchReference(0, 2, 'balanced', lastStageBuild);
+
+lastStageGame.rocket.currentStage = 1;
+R.controls.update(lastStageGame, step);
+assert.equal(lastStageGame.rocket.currentStage, 1, 'and no control update strands the rocket on its last stage');
+assert.equal(lastStageGame.rocket.stages[1].alive, true, 'the last stage stays attached');
+
+// The bar is local gravity, the same figure the guidance budgets its braking
+// against, so a stage is left alone while it cruises where gravity is weak and
+// is separated as the descent brings it into stronger gravity.
+var highProbe = stagingProbe(authorityLimits, blindBuild, 0);
+
+highProbe.game.rocket.wy = 3000;
+R.autopilot.update(highProbe.game);
+assert.equal(R.autopilot.command.stage, false, 'the same stage is not separated where local gravity is weak');
+highProbe.game.rocket.wy = 0;
+R.autopilot.update(highProbe.game);
+assert.ok(R.autopilot.command.stage, 'and is separated again once it is back where the landing happens');
+
+// A booster that lightens into competence is left to burn: Cinder's reference
+// booster lifts at 1.4 TWR and reaches 2.1 by burnout, and the routes it flies
+// are the ones 0.3.3 measured.
+R.world.initialize('cinder');
+assert.equal(stagingProbe(authorityLimits, harness.referenceBuild(R.world.planet, R.world.pads[2].id), 0).staged, false,
+	'a booster that can hover by burnout keeps burning');
+// This build's booster cannot hold the rocket up at burnout and its upper stage
+// can, but the upper stage is the smaller tank: the separation would throw away
+// more propellant than the authority it buys.
+var smallSuccessorBuild = {
+	targetPadId: R.world.pads[2].id,
+	stageCount: 2,
+	payloadMass: 30,
+	stages: [{ fuelMass: 150, strength: 0.9 }, { fuelMass: 100, strength: 0.9 }, { fuelMass: 100, strength: 1 }]
+};
+
+assert.equal(stagingProbe(authorityLimits, smallSuccessorBuild, 0).staged, false,
+	'a stage is not dropped for a successor carrying less fuel than the tank it would inherit');
+R.world.initialize('verdant');
+
+// A dry tank still separates, and is not reported as an authority separation.
+var dryProbe = stagingProbe(authorityLimits, blindBuild, 0);
+
+dryProbe.game.rocket.stages[0].fuelMass = 0.2;
+R.autopilot.update(dryProbe.game);
+assert.ok(R.autopilot.command.stage, 'a dry stage still separates');
+assert.equal(R.autopilot.stagedEarly, false, 'and is not called an authority separation');
+
+var earlyGame = launchReference(0, 2, 'balanced', weakMiddleBuild);
+
+earlyGame.rocket.currentStage = 1;
+earlyGame.rocket.throttle = 0.4;
+R.controls.update(earlyGame, step);
+assert.equal(earlyGame.rocket.currentStage, 2, 'an authority separation advances the stack');
+assert.ok(earlyGame.rocket.throttle < 0.5, 'and lights the next stage at the throttle the guidance holds');
+
+// The whole flight: the weak middle stage cannot hold the rocket up, so flying
+// it dry arrives with an engine that cannot stop the descent.
+var weakFlight = function(authority) {
+	return withLimits(authority ? authorityLimits : { stageOnAuthority: false }, function() {
+		return harness.fly(launchReference(0, 2, 'balanced', weakMiddleBuild), step);
+	});
+};
+var authorityFlight = weakFlight(true);
+var dryFlight = weakFlight(false);
+
+assert.equal(authorityFlight.status, 'delivered', 'a build with a weak middle stage delivers when the strong stage takes over');
+assert.notEqual(dryFlight.status, 'delivered', 'flying the weak stage dry loses the landing');
+assert.ok(authorityFlight.report.touchdownVerticalSpeed > dryFlight.report.touchdownVerticalSpeed,
+	'and arrives far softer than the descent the weak stage cannot brake');
+assert.ok(authorityFlight.fuelLeft < dryFlight.fuelLeft,
+	'the separation leaves the weak stage’s unburned fuel behind, which is what it costs');
+
 // ---- AoA clamp: a backstop inside the band that cannot starve weight support.
 var lateral = Object.assign({ vx: 400 }, cruise);
 var angleLimits = { maxDynamicPressure: cap, maxAngleOfAttackDeg: 55 };

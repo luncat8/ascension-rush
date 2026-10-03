@@ -15,6 +15,9 @@
 	// Bit flags for the envelope limits that shaped the latest command.
 	autopilot.limitFlags = { Q: 1, ACCEL: 2, AOA: 4 };
 	autopilot.limiter = 0;
+	// Set for the frame an authority separation is commanded, so the HUD can
+	// say why the stage number changed.
+	autopilot.stagedEarly = false;
 
 	var labels = {
 		PAD: 'PAD',
@@ -195,6 +198,7 @@
 	autopilot.reset = function() {
 		autopilot.phase = 'PAD';
 		autopilot.limiter = 0;
+		autopilot.stagedEarly = false;
 		tuningCache.planetId = '';
 		flight.cruiseAltitude = 0;
 		flight.distance = 0;
@@ -284,9 +288,15 @@
 		var vectorX;
 		var vectorY;
 		var vectorMax;
+		var stageIndex;
+		var nextStage;
+		var hoverAuthority;
+		var dryStage;
+		var earlyStage;
 
 		command.stage = false;
 		autopilot.limiter = 0;
+		autopilot.stagedEarly = false;
 		if (!autopilot.enabled || game.phase !== 'flying' || !target) {
 			autopilot.phase = 'PAD';
 			command.throttle = 0;
@@ -305,13 +315,22 @@
 			);
 		}
 		dir = dx >= 0 ? 1 : -1;
-		stage = R.rocket.activeStage(rocket);
+		// The index of the stage that burns and of the one behind it, so the
+		// staging rule below never has to guess which stage `stage` is.
+		stageIndex = R.rocket.nextAliveStageIndex(rocket, rocket.currentStage);
+		stage = stageIndex < 0 ? null : rocket.stages[stageIndex];
+		nextStage = R.rocket.nextAliveStageIndex(rocket, stageIndex + 1);
 		mass = R.rocket.totalMass(rocket);
 		thrustAccel = stage && stage.fuelMass > 0 ? stage.thrustMax / mass : 0;
 		// The acceleration cap lowers the budget itself, so the climb, brake and
 		// descent profiles below plan with thrust the rocket may really use.
 		budget = Math.min(tuning.thrustReserve * thrustAccel, tuning.accelerationCap);
 		gravity = R.physics.gravityAtAltitude(rocket.wy);
+		// The thrust acceleration a stage needs to fly the descent: braking
+		// sideways and holding altitude at once. It is the same multiple of
+		// gravity the acceleration cap is never allowed to fall below, so a
+		// capped flight and an uncapped one judge a stage by one number.
+		hoverAuthority = tuning.minThrustToWeight * gravity;
 		horizontalCapability = Math.sqrt(Math.max(0, budget * budget - gravity * gravity));
 		horizontalCapability = Math.max(horizontalCapability, 0.12 * budget);
 		brakeAccel = Math.max(0.3, horizontalCapability / tuning.brakeMargin);
@@ -320,8 +339,26 @@
 			autopilot.phase = 'LIFT';
 		}
 
-		if (stage && stage.fuelMass <= 0.5 && rocket.currentStage + 1 < rocket.stageCount) {
+		// Staging. A dry stage has to go, and so does a stage that cannot hold
+		// the rocket up at any point in the burn it has left: the descent needs
+		// thrust for braking sideways and holding altitude at once, and a stage
+		// below that multiple loses the landing however much fuel it still has.
+		// Burning only sheds mass, so the burnout figure is the most this stage
+		// will ever manage — a stage that clears the multiple later in its burn
+		// (a heavy booster lightening as it empties) is left alone. The stage
+		// taking over has to carry at least as much fuel as the one it replaces,
+		// because the separation throws the rest of this tank away: trading a
+		// full tank for a smaller one spends more propellant than the authority
+		// it buys. The last stage is never dropped this way, and neither is a
+		// stage whose successor cannot take over from it.
+		dryStage = !!stage && stage.fuelMass <= 0.5;
+		earlyStage = !!stage && tuning.stageOnAuthority && !dryStage && nextStage >= 0 &&
+			rocket.stages[nextStage].fuelMass >= stage.fuelMass &&
+			R.rocket.stackThrustAcceleration(rocket, stageIndex, 0) < hoverAuthority &&
+			R.rocket.stackThrustAcceleration(rocket, nextStage, rocket.stages[nextStage].fuelMass) >= hoverAuthority;
+		if (stage && nextStage >= 0 && (dryStage || earlyStage)) {
 			command.stage = true;
+			autopilot.stagedEarly = earlyStage;
 		}
 		if (thrustAccel <= 0) {
 			autopilot.phase = 'ABORT';

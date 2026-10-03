@@ -314,6 +314,12 @@
 		context.fillStyle = '#a8bac2';
 		context.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
 		context.fillText('STAGE', x + 16, y + 65);
+		// Why the stage number just changed: the guidance dropped a stage that
+		// could not hold the rocket up, rather than waiting for it to run dry.
+		if (R.autopilot.enabled && R.autopilot.stagedEarly) {
+			context.fillStyle = '#f4c76a';
+			context.fillText('EARLY', x + 74, y + 65);
+		}
 		context.textAlign = 'right';
 		context.fillStyle = '#e7eff6';
 		if (stage) {

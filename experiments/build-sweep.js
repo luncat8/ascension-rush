@@ -1,10 +1,13 @@
 'use strict';
 
-// Randomised regression sweep for the autopilot's envelope limits. Random
-// launchable builds (stage count, fuel, strength, payload), routes, frame
-// rates and time scales are each flown three times: with the planet's limits
-// off, and with every autopilot profile. A flight is a regression when it
-// delivers without limits and fails with them, and a fix in the other case.
+// Randomised regression sweep for the autopilot. Random launchable builds
+// (stage count, fuel, strength, payload), routes, frame rates and time scales
+// are each flown four times: the pre-authority baseline (limits off, staging
+// only on a dry tank), then the same flight with staging on authority, and
+// with the planet's limits under both autopilot profiles. A flight is a
+// regression when the baseline delivers it and a variant does not, and a fix
+// in the other case, so the sweep reports what a change fixed against what it
+// broke on identical builds.
 // Usage: node experiments/build-sweep.js [buildsPerPlanet] [seed]
 
 var harness = require('./harness.js');
@@ -16,7 +19,10 @@ var seed = Number(process.argv[3] || 1);
 var frameRates = [30, 60, 144];
 var timeScales = [0.5, 1, 2, 4];
 var planetIds = ['verdant', 'tinmoon', 'cinder', 'gossamer'];
-var variants = ['off'].concat(R.constants.autopilotProfiles.map(function(profile) {
+// `dry` is the baseline every other variant is judged against; it flies the
+// staging rule the game shipped before authority staging existed.
+var baseline = 'dry';
+var variants = [baseline, 'off'].concat(R.constants.autopilotProfiles.map(function(profile) {
 	return profile.id;
 }));
 var stats = R.rocket.createStats();
@@ -58,11 +64,12 @@ function describe(planet, sourcePad, targetPad, build, frames, scale) {
 }
 
 function flyVariant(variant, sourcePad, targetPad, build, frames, scale) {
-	var limits = variant === 'off' ? {} : R.world.planet.flight;
+	var overrides = variant === 'off' || variant === baseline ? {} : R.world.planet.flight;
 	var shipped = Object.assign({ targetPadId: targetPad.id }, JSON.parse(JSON.stringify(build)));
 
-	return harness.withLimits(limits, function() {
-		var game = harness.launch(sourcePad, targetPad.id, shipped, variant === 'off' ? variants[1] : variant, scale);
+	overrides = Object.assign({}, overrides, { stageOnAuthority: variant !== baseline });
+	return harness.withLimits(overrides, function() {
+		var game = harness.launch(sourcePad, targetPad.id, shipped, variant === baseline ? variants[1] : variant, scale);
 
 		return harness.fly(game, 1 / frames);
 	});
@@ -106,6 +113,7 @@ planetIds.forEach(function(planetId) {
 			variants.forEach(function(variant) {
 				var result = results[variant];
 				var delivered = result.status === 'delivered';
+				var baselineDelivered = results[baseline].status === 'delivered';
 
 				totals[variant].flights += 1;
 				counts[variant] += delivered ? 1 : 0;
@@ -115,11 +123,11 @@ planetIds.forEach(function(planetId) {
 					totals[variant].pressure += result.flight.peakDynamicPressure;
 					totals[variant].acceleration += result.flight.peakAppliedThrustAcceleration;
 				}
-				if (variant === 'off') {
+				if (variant === baseline) {
 					return;
 				}
-				fixes[variant] += delivered && results.off.status !== 'delivered' ? 1 : 0;
-				if (!delivered && results.off.status === 'delivered') {
+				fixes[variant] += delivered && !baselineDelivered ? 1 : 0;
+				if (!delivered && baselineDelivered) {
 					regressions.push(variant + ': ' + describe(planet, sourcePad, targetPad, build, frames, scale) + ' (' + result.status + ')');
 				}
 			});
@@ -137,9 +145,9 @@ variants.forEach(function(variant) {
 
 	console.log(variant.padEnd(9) + total.delivered + '/' + total.flights + ' delivered · mean ' + (total.seconds / delivered).toFixed(1) +
 		' s · mean peak Q ' + (total.pressure / delivered / 1000).toFixed(1) + ' kPa · mean applied acceleration ' + (total.acceleration / delivered).toFixed(1) + ' m/s²' +
-		(variant === 'off' ? '' : ' · fixed ' + fixes[variant] + ' flights that crash without limits'));
+		(variant === baseline ? '' : ' · fixed ' + fixes[variant] + ' flights the ' + baseline + ' baseline loses'));
 });
-console.log('regressions (deliver without limits, fail with them): ' + regressions.length);
+console.log('regressions (the ' + baseline + ' baseline delivers them, the variant does not): ' + regressions.length);
 regressions.forEach(function(line) {
 	console.log('  ' + line);
 });

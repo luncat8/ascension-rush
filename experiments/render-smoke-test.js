@@ -226,6 +226,11 @@ drawnText.length = 0;
 R.render.draw(autopilotFlight);
 assert.ok(drawnText.indexOf('—') >= 0, 'flight HUD shows a dash when nothing is limiting');
 assert.equal(drawnText.indexOf('Q + ACCEL LIMIT'), -1, 'and no limiter name');
+assert.equal(drawnText.indexOf('EARLY'), -1, 'and no staging marker on an ordinary frame');
+R.autopilot.stagedEarly = true;
+R.render.draw(autopilotFlight);
+assert.ok(drawnText.indexOf('EARLY') >= 0, 'the HUD marks the frame an authority separation is commanded');
+R.autopilot.stagedEarly = false;
 R.autopilot.setEnabled(false);
 
 var main = require('../js/main.js');

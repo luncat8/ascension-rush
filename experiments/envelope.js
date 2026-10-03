@@ -84,7 +84,9 @@ function flyTo(sourcePad, targetPad) {
 }
 
 function fly(sourcePad, targetPad) {
-	return limitsOff ? harness.withLimits({}, function() {
+	// `off` holds the envelope limits back, not the staging authority: that is
+	// guidance behaviour, and the routes are compared with it in force.
+	return limitsOff ? harness.withLimits({ stageOnAuthority: true }, function() {
 		return flyTo(sourcePad, targetPad);
 	}) : flyTo(sourcePad, targetPad);
 }
