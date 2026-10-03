@@ -273,7 +273,7 @@
 		var heading = Math.round(R.util.mod(rocket.heading, Math.PI * 2) * 180 / Math.PI);
 		var margin = Math.min(24, render.width * 0.05);
 		var panelWidth = 230;
-		var panelHeight = 324;
+		var panelHeight = 345;
 		var x = render.width - panelWidth - margin;
 		var y = 20;
 
@@ -408,17 +408,33 @@
 			context.fillText('OFF', x + panelWidth - 16, y + 275);
 		}
 
+		// Why the guidance is holding back, with the profile whose limits it flies.
 		context.textAlign = 'left';
 		context.fillStyle = '#a8bac2';
-		context.fillText('TIME SCALE', x + 16, y + 296);
+		context.fillText('LIMITER', x + 16, y + 296);
+		context.textAlign = 'right';
+		if (!R.autopilot.enabled) {
+			context.fillStyle = '#829ba6';
+			context.fillText('OFF', x + panelWidth - 16, y + 296);
+		} else {
+			context.fillStyle = R.autopilot.limiter ? '#f4c76a' : '#829ba6';
+			context.fillText(R.autopilot.limiter ? R.autopilot.limiterLabel() : '—', x + panelWidth - 16, y + 296);
+			context.textAlign = 'left';
+			context.fillStyle = '#829ba6';
+			context.fillText(R.autopilot.profileById(game.flight.autopilotProfile).label, x + 74, y + 296);
+		}
+
+		context.textAlign = 'left';
+		context.fillStyle = '#a8bac2';
+		context.fillText('TIME SCALE', x + 16, y + 317);
 		context.textAlign = 'right';
 		context.fillStyle = '#e7eff6';
-		context.fillText(timeLabel(game), x + panelWidth - 16, y + 296);
+		context.fillText(timeLabel(game), x + panelWidth - 16, y + 317);
 
 		context.fillStyle = '#829ba6';
 		context.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
 		context.textAlign = 'left';
-		context.fillText('A  AUTOPILOT    [ ]  TIME    SHIFT/CTRL  THROTTLE', x + 16, y + 316);
+		context.fillText('A  AUTOPILOT    [ ]  TIME    SHIFT/CTRL  THROTTLE', x + 16, y + 337);
 	}
 
 	// Cached so the frame loop does not build a new string every tick.

@@ -99,8 +99,9 @@ assert.ok(R.physics.densityAtAltitude(1000) < R.physics.densityAtAltitude(0));
 // fuel mass per second on every world.
 R.world.initialize('tinmoon');
 var tinmoonBurn = { currentStage: 0, stageCount: 1, stages: [{ fuelMass: 100, thrustMax: 7200, ispSea: 265, ispVac: 330, alive: true, dryMass: 100 }], throttle: 1, heading: 0, wx: 0, wy: 500, vx: 0, vy: 0, payloadMass: 0 };
-var tinmoonGame = { phase: 'flying', rocket: tinmoonBurn, flight: { elapsed: 0, currentDynamicPressure: 0, currentAngleOfAttack: 0, peakDynamicPressure: 0, peakDynamicPressureAltitude: 0, peakDynamicPressureAngleOfAttack: 0, peakAngleOfAttack: 0, peakAngleOfAttackDynamicPressure: 0, peakThrustAcceleration: 0 }, cash: 0, ledger: [] };
+var tinmoonGame = { phase: 'flying', rocket: tinmoonBurn, flight: { elapsed: 0, currentDynamicPressure: 0, currentAngleOfAttack: 0, peakDynamicPressure: 0, peakDynamicPressureAltitude: 0, peakDynamicPressureAngleOfAttack: 0, peakAngleOfAttack: 0, peakAngleOfAttackDynamicPressure: 0, peakThrustAcceleration: 0, peakAppliedThrustAcceleration: 0 }, cash: 0, ledger: [] };
 R.physics.step(tinmoonGame, 1);
+assert.ok(Math.abs(tinmoonGame.flight.peakAppliedThrustAcceleration - 7200 / 200) < 1e-9, 'the flight record measures the thrust acceleration actually applied');
 assert.ok(Math.abs(100 - tinmoonBurn.stages[0].fuelMass - 7200 / (330 * R.constants.rocket.standardGravity)) < 1e-6, 'airless worlds burn on vacuum Isp and standard gravity');
 R.world.initialize('verdant');
 
@@ -139,6 +140,8 @@ assert.ok(game.rocket.wy > 0, 'default rocket lifts off');
 assert.ok(game.rocket.stages[0].fuelMass < startingFuel, 'fuel is consumed during powered flight');
 assert.ok(game.cash < launchCash, 'fuel consumption reduces cash');
 assert.ok(game.flight.peakThrustAcceleration > 0, 'flight record measures peak thrust acceleration');
+assert.ok(game.flight.peakAppliedThrustAcceleration > 0 && game.flight.peakAppliedThrustAcceleration <= game.flight.peakThrustAcceleration, 'applied thrust acceleration never exceeds what the stage can give');
+assert.equal(game.flight.autopilotProfile, R.autopilot.profileId, 'the flight records the autopilot profile it launched with');
 assert.ok(Number.isFinite(game.flight.currentDynamicPressure), 'flight telemetry records current Q');
 assert.ok(Number.isFinite(game.flight.currentAngleOfAttack), 'flight telemetry records current AoA');
 assert.equal(game.ledger[0].type, 'structure');
@@ -155,6 +158,13 @@ assert.equal(game.rocket.currentStage, 2);
 assert.equal(R.rocket.separateStage(game.rocket), true);
 assert.equal(game.rocket.currentStage, 3);
 assert.equal(R.rocket.separateStage(game.rocket), false, 'cannot stage beyond the configured stack');
+
+var ignitionRocket = launch(defaultConfig).rocket;
+R.rocket.separateStage(ignitionRocket, 0.4);
+assert.equal(ignitionRocket.throttle, 0.4, 'the autopilot can light the next stage at the throttle it holds');
+ignitionRocket.stages[2].alive = false;
+R.rocket.separateStage(ignitionRocket, 0.4);
+assert.equal(ignitionRocket.throttle, 0, 'with no stage left there is nothing to light');
 
 var burnGame = launch(defaultConfig);
 burnGame.rocket.wy = 1000;
@@ -242,6 +252,7 @@ deliveredGame.flight.peakDynamicPressureAngleOfAttack = 0.25;
 deliveredGame.flight.peakAngleOfAttack = 0.5;
 deliveredGame.flight.peakAngleOfAttackDynamicPressure = 4321;
 deliveredGame.flight.peakThrustAcceleration = 12.3;
+deliveredGame.flight.peakAppliedThrustAcceleration = 11.1;
 var startingBalance = deliveredGame.cash;
 var report = R.mission.touchdown(deliveredGame);
 assert.equal(report.status, 'delivered');
@@ -251,6 +262,8 @@ assert.equal(report.peakDynamicPressureAngleOfAttack, 0.25);
 assert.equal(report.peakAngleOfAttack, 0.5);
 assert.equal(report.peakAngleOfAttackDynamicPressure, 4321);
 assert.equal(report.peakThrustAcceleration, 12.3);
+assert.equal(report.peakAppliedThrustAcceleration, 11.1);
+assert.match(report.detail, /peak thrust acceleration 11.1 m\/s²/, 'the debrief reports the thrust the rocket actually felt');
 assert.match(report.detail, /Peak Q 12.3 kPa at 678 m/);
 assert.equal(deliveredGame.currentPadId, target.id);
 assert.ok(deliveredGame.cash > startingBalance, 'target delivery pays a reward');
@@ -268,6 +281,7 @@ startingBalance = autopilotGame.cash;
 report = R.mission.touchdown(autopilotGame);
 assert.equal(report.status, 'delivered');
 assert.ok(Math.abs(autopilotGame.cash - (startingBalance + 80 * R.economy.priceDelivery() * 0.9)) < 1e-6, 'autopilot fee is deducted');
+assert.match(report.detail, /Autopilot fee \$\d+ \(Balanced profile\)\./, 'the debrief names the profile that flew');
 R.autopilot.setEnabled(false);
 
 var elsewhereGame = launch(defaultConfig);

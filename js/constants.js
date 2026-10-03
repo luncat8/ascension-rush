@@ -66,8 +66,43 @@
 		velocityGain: 1.15,
 		thrustReserve: 0.92,
 		brakeMargin: 1.15,
-		speedCap: 700
+		speedCap: 700,
+		// Flight-envelope limits; a limit that is null or not positive is off.
+		// A planet's `flight` block sets them per world and a profile scales
+		// them. Pressure in pascals, acceleration in m/s², angle in degrees.
+		maxDynamicPressure: null,
+		qFadeStartFraction: 0.75,
+		maxThrustAcceleration: null,
+		maxAngleOfAttackDeg: null,
+		// Floors that keep a profile from starving the landing: an acceleration
+		// cap never drops below this multiple of surface gravity (the descent
+		// must brake sideways and hold altitude at once), and an angle-of-attack
+		// limit never leaves less than this multiple of the thrust that holds
+		// the rocket's weight when flying sideways.
+		minThrustToWeight: 1.7,
+		weightSupportMargin: 1.3
 	};
+
+	// Autopilot profiles are named global multipliers on a planet's envelope
+	// limits. The first entry is the default.
+	constants.autopilotProfiles = [
+		{
+			id: 'balanced',
+			label: 'Balanced',
+			description: 'The recommended limits for this world.',
+			dynamicPressure: 1,
+			thrustAcceleration: 1,
+			angleOfAttack: 1
+		},
+		{
+			id: 'gentle',
+			label: 'Gentle',
+			description: 'Lower pressure and acceleration limits for a softer ride; flights run longer.',
+			dynamicPressure: 0.7,
+			thrustAcceleration: 0.8,
+			angleOfAttack: 0.7
+		}
+	];
 
 	constants.render = {
 		backgroundTop: '#071322',

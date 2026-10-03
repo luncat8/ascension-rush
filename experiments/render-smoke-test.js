@@ -143,6 +143,33 @@ R.render.draw({
 	rocket: flightRocket
 });
 
+// The limiter row is shown in manual flight too, as OFF; with the autopilot on it names the active limits.
+assert.ok(drawnText.indexOf('LIMITER') >= 0, 'flight HUD draws the limiter row');
+assert.ok(drawnText.indexOf('Q + ACCEL LIMIT') < 0, 'no limiter is named while flying by hand');
+
+var autopilotFlight = {
+	currentPadId: R.world.pads[0].id,
+	targetPadId: R.world.pads[1].id,
+	phase: 'flying',
+	flight: { cashDelta: -600, currentDynamicPressure: 24000, currentAngleOfAttack: 0.4, peakDynamicPressure: 28000, autopilotProfile: 'gentle' },
+	cash: 29400,
+	timeScaleIndex: R.constants.time.defaultIndex,
+	timeScale: R.constants.time.scales[R.constants.time.defaultIndex],
+	rocket: flightRocket
+};
+
+R.autopilot.setEnabled(true);
+R.autopilot.limiter = R.autopilot.limitFlags.Q | R.autopilot.limitFlags.ACCEL;
+R.render.draw(autopilotFlight);
+assert.ok(drawnText.indexOf('Q + ACCEL LIMIT') >= 0, 'flight HUD names the active limiters');
+assert.ok(drawnText.indexOf('Gentle') >= 0, 'flight HUD names the profile the flight launched with');
+R.autopilot.limiter = 0;
+drawnText.length = 0;
+R.render.draw(autopilotFlight);
+assert.ok(drawnText.indexOf('—') >= 0, 'flight HUD shows a dash when nothing is limiting');
+assert.equal(drawnText.indexOf('Q + ACCEL LIMIT'), -1, 'and no limiter name');
+R.autopilot.setEnabled(false);
+
 var main = require('../js/main.js');
 main.start();
 

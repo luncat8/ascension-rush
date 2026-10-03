@@ -353,6 +353,10 @@ input[type="range"] {
 	accent-color: #64d5c2;
 }
 
+.autopilot-profile {
+	margin: 8px 0 0;
+}
+
 .builder-hint {
 	margin: 5px 0 10px;
 	color: #7893a0;

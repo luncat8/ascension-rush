@@ -194,7 +194,9 @@
 		return state.stages[state.currentStage];
 	};
 
-	rocket.separateStage = function(state) {
+	// The next stage ignites at `ignitionThrottle`; a player's staging lights it
+	// at full throttle.
+	rocket.separateStage = function(state, ignitionThrottle = 1) {
 		var stage = rocket.activeStage(state);
 		if (!stage) {
 			return false;
@@ -205,7 +207,7 @@
 		while (state.currentStage < state.stageCount && !state.stages[state.currentStage].alive) {
 			state.currentStage += 1;
 		}
-		state.throttle = state.currentStage < state.stageCount ? 1 : 0;
+		state.throttle = state.currentStage < state.stageCount ? ignitionThrottle : 0;
 		return true;
 	};
 

@@ -84,7 +84,11 @@
     </section>
 
     <label class="builder-toggle"><input id="builder-autopilot" type="checkbox"> Hand the flight to the autopilot</label>
-    <p class="builder-hint">Autopilot flies the same physics you do and keeps 10% of the delivery reward.</p>
+    <div class="builder-control builder-row autopilot-profile">
+      <label for="builder-autopilot-profile">Autopilot profile</label>
+      <select id="builder-autopilot-profile"></select>
+    </div>
+    <p class="builder-hint">Autopilot flies the same physics you do and keeps 10% of the delivery reward. <span id="builder-autopilot-profile-hint"></span></p>
 
     <p id="builder-warning" class="builder-warning" aria-live="polite"></p>
     <button id="launch-button" class="launch-button" type="button">Launch · full throttle</button>

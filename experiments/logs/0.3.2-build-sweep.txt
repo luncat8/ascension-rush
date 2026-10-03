@@ -1,0 +1,43 @@
+# Randomised regression sweep: node experiments/build-sweep.js <buildsPerPlanet> <seed>
+
+$ node experiments/build-sweep.js 300 1
+Verdant  off 283/300   balanced 283/300   gentle 287/300
+Tinmoon  off 300/300   balanced 300/300   gentle 300/300
+Cinder   off 271/300   balanced 275/300   gentle 276/300
+Gossamer off 277/300   balanced 287/300   gentle 290/300
+--- totals (delivered flights only for the means)
+off      1131/1200 delivered · mean 58.1 s · mean peak Q 62.8 kPa · mean applied acceleration 36.1 m/s²
+balanced 1145/1200 delivered · mean 60.9 s · mean peak Q 31.8 kPa · mean applied acceleration 23.5 m/s² · fixed 17 flights that crash without limits
+gentle   1153/1200 delivered · mean 65.4 s · mean peak Q 23.1 kPa · mean applied acceleration 19.8 m/s² · fixed 26 flights that crash without limits
+regressions (deliver without limits, fail with them): 7
+  balanced: verdant Homeport>Farport stages 1130/550/1120 kg, payload 310 kg, 60 fps x0.5 (crashed)
+  gentle: verdant Homeport>Farport stages 1130/550/1120 kg, payload 310 kg, 60 fps x0.5 (crashed)
+  balanced: gossamer Canopy>Halcyon stages 850/160/880 kg, payload 240 kg, 144 fps x0.5 (crashed)
+  gentle: gossamer Canopy>Halcyon stages 850/160/880 kg, payload 240 kg, 144 fps x0.5 (crashed)
+  gentle: gossamer Zephyr>Drift stages 1010/240/1370 kg, payload 180 kg, 30 fps x0.5 (crashed)
+  balanced: gossamer Halcyon>Canopy stages 1120/300/1250 kg, payload 190 kg, 30 fps x4 (crashed)
+  gentle: gossamer Halcyon>Canopy stages 1120/300/1250 kg, payload 190 kg, 30 fps x4 (crashed)
+
+$ node experiments/build-sweep.js 300 2
+Verdant  off 287/300   balanced 290/300   gentle 291/300
+Tinmoon  off 300/300   balanced 300/300   gentle 300/300
+Cinder   off 259/300   balanced 261/300   gentle 267/300
+Gossamer off 270/300   balanced 280/300   gentle 283/300
+--- totals (delivered flights only for the means)
+off      1116/1200 delivered · mean 57.5 s · mean peak Q 61.3 kPa · mean applied acceleration 35.4 m/s²
+balanced 1131/1200 delivered · mean 60.1 s · mean peak Q 31.4 kPa · mean applied acceleration 23.2 m/s² · fixed 16 flights that crash without limits
+gentle   1141/1200 delivered · mean 64.4 s · mean peak Q 22.9 kPa · mean applied acceleration 19.7 m/s² · fixed 26 flights that crash without limits
+regressions (deliver without limits, fail with them): 2
+  balanced: gossamer Zephyr>Drift stages 1100/270/1410 kg, payload 120 kg, 60 fps x0.5 (crashed)
+  gentle: gossamer Zephyr>Drift stages 1100/270/1410 kg, payload 120 kg, 60 fps x0.5 (crashed)
+
+$ node experiments/build-sweep.js 300 3
+Verdant  off 289/300   balanced 294/300   gentle 295/300
+Tinmoon  off 299/300   balanced 299/300   gentle 300/300
+Cinder   off 259/300   balanced 263/300   gentle 266/300
+Gossamer off 275/300   balanced 285/300   gentle 289/300
+--- totals (delivered flights only for the means)
+off      1122/1200 delivered · mean 58.0 s · mean peak Q 61.4 kPa · mean applied acceleration 35.2 m/s²
+balanced 1141/1200 delivered · mean 60.4 s · mean peak Q 31.5 kPa · mean applied acceleration 23.2 m/s² · fixed 19 flights that crash without limits
+gentle   1150/1200 delivered · mean 64.8 s · mean peak Q 23.0 kPa · mean applied acceleration 19.7 m/s² · fixed 28 flights that crash without limits
+regressions (deliver without limits, fail with them): 0

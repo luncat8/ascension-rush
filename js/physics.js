@@ -87,6 +87,7 @@
 
 		massAfter = R.rocket.totalMass(state);
 		mass = Math.max(1, (massBefore + massAfter) * 0.5);
+		game.flight.peakAppliedThrustAcceleration = Math.max(game.flight.peakAppliedThrustAcceleration, thrust / Math.max(1, massBefore));
 		R.aerodynamics.calculate(density, oldVx, oldVy, state.heading, mass, aeroSample);
 		game.flight.currentDynamicPressure = aeroSample.dynamicPressure;
 		game.flight.currentAngleOfAttack = aeroSample.angleOfAttack;

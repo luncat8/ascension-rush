@@ -7,17 +7,21 @@ planned follow-ups.
 
 ## Status
 The 0.1 world/render scaffold, the 0.2 playable flight slice, the 0.3
-autopilot + planet presets, and the 0.3.1 aerodynamic envelope and load
-measurements are implemented. Pick a world from the boot menu,
-configure a one-to-three-stage rocket against that world's reference build,
-launch, and either fly it by hand (mouse aiming, Shift/Ctrl throttle, Space
-staging) or hand it to the autopilot. `[` and `]` move a `0.5x–4x` time scale.
+autopilot + planet presets, the 0.3.1 aerodynamic envelope and load
+measurements, and the 0.3.2 flight-envelope autopilot are implemented. Pick a
+world from the boot menu, configure a one-to-three-stage rocket against that
+world's reference build, launch, and either fly it by hand (mouse aiming,
+Shift/Ctrl throttle, Space staging, no limits) or hand it to the autopilot in
+the builder. The autopilot flies a **Balanced** or **Gentle** profile: it fades
+forward thrust as dynamic pressure nears the world's cap, caps its thrust
+acceleration, keeps an angle-of-attack backstop, and the flight HUD names the
+limit that is holding it back. `[` and `]` move a `0.5x–4x` time scale.
 Flights are sized for 20–30 s of real time at the default `2x`. Economy is
 still prototype balance; parts, wear and failures are not implemented yet.
 
 ## Plans (subject-numbered, not version sequence)
 Active:
-- [`0.3.x-plan.md`](./0.3.x-plan.md) — Aerodynamics, Q / acceleration-aware autopilot, drag-aware impact prediction & flight diagnostics.
+- [`0.3.x-plan.md`](./0.3.x-plan.md) — Aerodynamics, Q / acceleration-aware autopilot, drag-aware impact prediction & flight diagnostics (0.3.3, the impact prediction and debrief, remains).
 - [`0.4-plan.md`](./0.4-plan.md) — Economy balance, parts catalog with service/repair, market prices & contract board.
 - [`0.5-plan.md`](./0.5-plan.md) — Damage/failures mid-flight and landing, competitor company AI.
 
@@ -41,5 +45,11 @@ node experiments/aerodynamics-test.js
 node experiments/flight-test.js
 node experiments/builder-test.js
 node experiments/render-smoke-test.js
+node experiments/autopilot-test.js         # envelope limits, profiles, frame rates
 node experiments/envelope.js verdant 0     # flight envelope per planet/build
+node experiments/envelope.js cinder 0 gentle 30 4   # profile (or `off`), fps, time scale
+node experiments/build-sweep.js 100 1      # random builds: limits off vs profiles
 ```
+
+Measurement scripts share `experiments/harness.js`; their recorded output is in
+`experiments/logs/`.

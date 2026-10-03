@@ -51,6 +51,25 @@
 		return false;
 	}
 
+	function populateProfiles() {
+		var profiles = R.constants.autopilotProfiles;
+		var option;
+		var i;
+
+		ui.profile.innerHTML = '';
+		for (i = 0; i < profiles.length; i += 1) {
+			option = root.document.createElement('option');
+			option.value = profiles[i].id;
+			option.textContent = profiles[i].label;
+			ui.profile.appendChild(option);
+		}
+	}
+
+	function showProfile() {
+		ui.profile.value = R.autopilot.profileId;
+		ui.profileHint.textContent = R.autopilot.profileById(R.autopilot.profileId).description;
+	}
+
 	function populateTargets(game) {
 		var pads = R.world.pads;
 		var source = R.world.findPadById(game.currentPadId);
@@ -130,6 +149,7 @@
 		if (ui.autopilot) {
 			ui.autopilot.checked = R.autopilot.enabled;
 		}
+		showProfile();
 		ui.report.hidden = !game.lastReport;
 		if (game.lastReport) {
 			ui.reportTitle.textContent = game.lastReport.title;
@@ -235,6 +255,9 @@
 		ui.planetName = getElement('builder-planet-name');
 		ui.planetButton = getElement('builder-planet-button');
 		ui.autopilot = getElement('builder-autopilot');
+		ui.profile = getElement('builder-autopilot-profile');
+		ui.profileHint = getElement('builder-autopilot-profile-hint');
+		populateProfiles();
 
 		for (i = 0; i < 3; i += 1) {
 			stageCards[i] = getElement('builder-stage-' + i);
@@ -258,6 +281,10 @@
 				R.autopilot.setEnabled(ui.autopilot.checked);
 			});
 		}
+		ui.profile.addEventListener('change', function() {
+			R.autopilot.setProfile(ui.profile.value);
+			showProfile();
+		});
 		ui.target.addEventListener('change', onInput);
 		ui.stageCount.addEventListener('change', onInput);
 		ui.payload.addEventListener('input', onInput);

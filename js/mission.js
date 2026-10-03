@@ -86,7 +86,9 @@
 			peakAngleOfAttack: 0,
 			peakAngleOfAttackDynamicPressure: 0,
 			peakThrustAcceleration: 0,
-			usedAutopilot: R.autopilot.enabled
+			peakAppliedThrustAcceleration: 0,
+			usedAutopilot: R.autopilot.enabled,
+			autopilotProfile: R.autopilot.profileId
 		};
 
 		rocketState = game.rocket;
@@ -99,6 +101,12 @@
 		game.physicsAccumulator = 0;
 		R.controls.reset();
 		R.economy.beginFlight(game);
+		if (R.autopilot.enabled) {
+			// An autopilot launch lights the engine at the throttle the guidance
+			// wants, so an acceleration cap holds from the first step.
+			R.autopilot.update(game);
+			rocketState.throttle = R.autopilot.command.throttle;
+		}
 		return true;
 	};
 
@@ -137,7 +145,7 @@
 			detail = 'The rocket missed a safe pad landing. Rebuilding at ' + departurePad.name + '. Cash flow ' + formatCash(cashDelta) + ' · Balance $' + Math.round(game.cash) + '.';
 		}
 		if (fee > 0) {
-			detail += ' Autopilot fee $' + Math.round(fee) + '.';
+			detail += ' Autopilot fee $' + Math.round(fee) + ' (' + R.autopilot.profileById(flight.autopilotProfile).label + ' profile).';
 		}
 		detail += ' Peak Q ' + (flight.peakDynamicPressure / 1000).toFixed(1) + ' kPa at ' +
 			Math.round(flight.peakDynamicPressureAltitude) + ' m (AoA ' +
@@ -145,7 +153,7 @@
 			') · peak AoA ' +
 			(R.world.planet.seaLevelDensity > 0 ? (flight.peakAngleOfAttack * 180 / Math.PI).toFixed(1) + '° at ' +
 			(flight.peakAngleOfAttackDynamicPressure / 1000).toFixed(1) + ' kPa' : 'n/a') +
-			' · peak thrust acceleration ' + flight.peakThrustAcceleration.toFixed(1) + ' m/s².';
+			' · peak thrust acceleration ' + flight.peakAppliedThrustAcceleration.toFixed(1) + ' m/s².';
 
 		game.currentPadId = landedPad.id;
 		game.targetPadId = game.targetPadId === landedPad.id ? nextTargetId(landedPad.id) : game.targetPadId;
@@ -161,7 +169,8 @@
 			peakDynamicPressureAngleOfAttack: flight.peakDynamicPressureAngleOfAttack,
 			peakAngleOfAttack: flight.peakAngleOfAttack,
 			peakAngleOfAttackDynamicPressure: flight.peakAngleOfAttackDynamicPressure,
-			peakThrustAcceleration: flight.peakThrustAcceleration
+			peakThrustAcceleration: flight.peakThrustAcceleration,
+			peakAppliedThrustAcceleration: flight.peakAppliedThrustAcceleration
 		};
 		game.rocket = R.rocket.create(landedPad);
 		game.flight = null;

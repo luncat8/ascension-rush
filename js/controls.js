@@ -131,7 +131,9 @@
 			controls.applyHeading(state, R.autopilot.command.heading, dt);
 			controls.applyThrottle(state, R.autopilot.command.throttle, dt);
 			if (R.autopilot.command.stage) {
-				R.rocket.separateStage(state);
+				// The guidance's throttle carries over, so an ignition cannot
+				// break an acceleration cap with a full-throttle start.
+				R.rocket.separateStage(state, state.throttle);
 			}
 			return;
 		}

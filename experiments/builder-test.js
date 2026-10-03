@@ -82,6 +82,8 @@ var elements = {
 	'builder-planet-name': new Element(),
 	'builder-planet-button': new Element(),
 	'builder-autopilot': new Element(),
+	'builder-autopilot-profile': new Element(),
+	'builder-autopilot-profile-hint': new Element(),
 	'launch-button': new Element()
 };
 var i;
@@ -131,11 +133,23 @@ target.value = R.world.pads[2].id;
 target.dispatch('change');
 assert.equal(game.targetPadId, R.world.pads[2].id);
 
+// The profile choice lists every profile, defaults to the first, and rides along with the launch.
+var profileSelect = elements['builder-autopilot-profile'];
+var profileHint = elements['builder-autopilot-profile-hint'];
+assert.deepEqual(profileSelect.options.map(function(option) { return option.value; }), R.constants.autopilotProfiles.map(function(profile) { return profile.id; }));
+assert.equal(profileSelect.value, 'balanced', 'the first profile is the default');
+assert.equal(profileHint.textContent, R.autopilot.profileById('balanced').description);
+profileSelect.value = 'gentle';
+profileSelect.dispatch('change');
+assert.equal(R.autopilot.profileId, 'gentle', 'the select chooses the autopilot profile');
+assert.equal(profileHint.textContent, R.autopilot.profileById('gentle').description, 'the hint describes the chosen profile');
+
 elements['launch-button'].dispatch('click');
 assert.equal(game.phase, 'flying');
 assert.equal(game.targetPadId, R.world.pads[2].id);
 assert.equal(elements['builder-panel'].hidden, true);
 assert.equal(elements['launch-button'].wasBlurred, true);
+assert.equal(game.flight.autopilotProfile, 'gentle', 'the launch snapshots the chosen profile');
 
 var farport = R.world.pads[2];
 game.rocket.wx = farport.wx;
@@ -149,6 +163,8 @@ assert.equal(elements['builder-report'].hidden, false);
 assert.equal(elements['builder-report'].dataset.status, 'delivered');
 assert.equal(game.currentPadId, farport.id);
 assert.equal(elements['builder-target'].value, home.id, 'the destination list excludes the pad under the rocket');
+assert.equal(profileSelect.value, 'gentle', 'the profile choice outlives the flight');
+R.autopilot.setProfile('balanced');
 
 // Switching worlds reloads that planet's reference build and pad list.
 R.world.initialize('cinder');

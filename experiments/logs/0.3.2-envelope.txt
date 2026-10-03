@@ -1,0 +1,218 @@
+# Reference-build route reports: node experiments/envelope.js <world> 0 <off|balanced|gentle>
+# 'off' flies without the planet's envelope limits. Fixed physics step, one control update per step.
+
+$ node experiments/envelope.js verdant 0 off
+(planet reference build: payload 80 kg, stages 420/260/200 kg)
+=== Verdant · planet reference · limits off · C 20 km · g 9.81 m/s² · 1.225 kg/m³ · 120 fps x1 ===
+directed route               km    result    time  peak alt   peak v  dry mass     peak Q    Q alt   AoA@Qpk      AoAmax/Q  peak T/m  applied   limit s Q/A/α  fuel left
+Homeport → Eastport         5.0 delivered   44.8s      406m   257m/s     666kg    24.5kPa     400m     35.0°     90.0/16.4      24.1     21.4     0.0/0.0/0.0    511.4kg
+Homeport → Farport         10.0 delivered   62.4s      804m   378m/s     666kg    32.2kPa     800m     27.6°     89.5/18.3      25.1     23.0     0.0/0.0/0.0    413.7kg
+Homeport → Westport         5.0 delivered   44.8s      406m   257m/s     666kg    24.5kPa     400m     35.0°     90.0/16.4      24.1     21.4     0.0/0.0/0.0    511.4kg
+Eastport → Homeport         5.0 delivered   44.8s      406m   257m/s     666kg    24.5kPa     400m     35.0°     90.0/16.4      24.1     21.4     0.0/0.0/0.0    511.4kg
+Eastport → Farport          5.0 delivered   44.8s      406m   257m/s     666kg    24.5kPa     400m     35.0°     90.0/16.4      24.1     21.4     0.0/0.0/0.0    511.4kg
+Eastport → Westport        10.0 delivered   62.4s      804m   378m/s     666kg    32.2kPa     800m     27.6°     89.5/18.3      25.1     23.0     0.0/0.0/0.0    413.7kg
+Farport → Homeport         10.0 delivered   62.4s      804m   378m/s     666kg    32.2kPa     800m     27.6°     89.5/18.3      25.1     23.0     0.0/0.0/0.0    413.7kg
+Farport → Eastport          5.0 delivered   44.8s      406m   257m/s     666kg    24.5kPa     400m     35.0°     90.0/16.4      24.1     21.4     0.0/0.0/0.0    511.4kg
+Farport → Westport          5.0 delivered   44.8s      406m   257m/s     666kg    24.5kPa     400m     35.0°     90.0/16.4      24.1     21.4     0.0/0.0/0.0    511.4kg
+Westport → Homeport         5.0 delivered   44.8s      406m   257m/s     666kg    24.5kPa     400m     35.0°     90.0/16.4      24.1     21.4     0.0/0.0/0.0    511.4kg
+Westport → Eastport        10.0 delivered   62.4s      804m   378m/s     666kg    32.2kPa     800m     27.6°     89.5/18.3      25.1     23.0     0.0/0.0/0.0    413.7kg
+Westport → Farport          5.0 delivered   44.8s      406m   257m/s     666kg    24.5kPa     400m     35.0°     90.0/16.4      24.1     21.4     0.0/0.0/0.0    511.4kg
+routes delivered: 12/12 · envelope maxima: Q 32.2 kPa at AoA 27.6° · max AoA 90.0° at Q 16.4 kPa · thrust acceleration 23.0 applied / 25.1 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js tinmoon 0 off
+(planet reference build: payload 80 kg, stages 200/140/100 kg)
+=== Tinmoon · planet reference · limits off · C 16 km · g 1.62 m/s² · 0 kg/m³ · 120 fps x1 ===
+directed route               km    result    time  peak alt   peak v  dry mass     peak Q    Q alt   AoA@Qpk      AoAmax/Q  peak T/m  applied   limit s Q/A/α  fuel left
+Anchor → Dustfield          2.6 delivered   45.9s      238m   180m/s     423kg     0.0kPa       0m       n/a           n/a      17.3     15.7     0.0/0.0/0.0    330.1kg
+Anchor → Rim Relay          8.0 delivered   84.1s      678m   331m/s     423kg     0.0kPa       0m       n/a           n/a      19.1     17.2     0.0/0.0/0.0    251.3kg
+Anchor → Tinstack           5.1 delivered   65.3s      446m   261m/s     423kg     0.0kPa       0m       n/a           n/a      18.2     16.5     0.0/0.0/0.0    286.8kg
+Dustfield → Anchor          2.6 delivered   46.0s      238m   180m/s     423kg     0.0kPa       0m       n/a           n/a      17.3     15.7     0.0/0.0/0.0    330.1kg
+Dustfield → Rim Relay       5.4 delivered   67.3s      471m   269m/s     423kg     0.0kPa       0m       n/a           n/a      18.3     16.6     0.0/0.0/0.0    282.4kg
+Dustfield → Tinstack        7.7 delivered   82.1s      652m   323m/s     423kg     0.0kPa       0m       n/a           n/a      19.0     17.1     0.0/0.0/0.0    254.8kg
+Rim Relay → Anchor          8.0 delivered   84.1s      678m   331m/s     423kg     0.0kPa       0m       n/a           n/a      19.1     17.2     0.0/0.0/0.0    251.3kg
+Rim Relay → Dustfield       5.4 delivered   67.5s      471m   269m/s     423kg     0.0kPa       0m       n/a           n/a      18.3     16.6     0.0/0.0/0.0    282.4kg
+Rim Relay → Tinstack        2.9 delivered   48.5s      264m   192m/s     423kg     0.0kPa       0m       n/a           n/a      17.4     15.8     0.0/0.0/0.0    323.6kg
+Tinstack → Anchor           5.1 delivered   65.1s      446m   261m/s     423kg     0.0kPa       0m       n/a           n/a      18.2     16.5     0.0/0.0/0.0    286.8kg
+Tinstack → Dustfield        7.7 delivered   81.9s      652m   323m/s     423kg     0.0kPa       0m       n/a           n/a      19.0     17.1     0.0/0.0/0.0    254.7kg
+Tinstack → Rim Relay        2.9 delivered   48.7s      264m   192m/s     423kg     0.0kPa       0m       n/a           n/a      17.4     15.8     0.0/0.0/0.0    323.7kg
+routes delivered: 12/12 · envelope maxima: Q 0.0 kPa at AoA n/a · max AoA n/a · thrust acceleration 17.2 applied / 19.1 available m/s² · worst re-climb 14 m · most axis flips 1
+
+$ node experiments/envelope.js cinder 0 off
+(planet reference build: payload 60 kg, stages 1500/900/400 kg)
+=== Cinder · planet reference · limits off · C 24 km · g 16.5 m/s² · 1.9 kg/m³ · 120 fps x1 ===
+directed route               km    result    time  peak alt   peak v  dry mass     peak Q    Q alt   AoA@Qpk      AoAmax/Q  peak T/m  applied   limit s Q/A/α  fuel left
+Bastion → Forge             6.0 delivered   48.8s      496m   326m/s    1725kg    59.1kPa     480m     46.7°     90.0/52.2      35.0     30.4     0.0/0.0/0.0   1301.4kg
+Bastion → Slagworks        12.0 delivered   68.0s      967m   493m/s    1725kg    79.6kPa     960m     35.8°     90.0/60.4      35.0     32.1     0.0/0.0/0.0   1006.6kg
+Bastion → Anvil             6.0 delivered   48.8s      496m   326m/s    1725kg    59.1kPa     480m     46.7°     90.0/52.2      35.0     30.4     0.0/0.0/0.0   1301.4kg
+Forge → Bastion             6.0 delivered   48.8s      496m   326m/s    1725kg    59.1kPa     480m     46.7°     90.0/52.2      35.0     30.4     0.0/0.0/0.0   1301.4kg
+Forge → Slagworks           6.0 delivered   48.8s      496m   326m/s    1725kg    59.1kPa     480m     46.7°     90.0/52.2      35.0     30.4     0.0/0.0/0.0   1301.4kg
+Forge → Anvil              12.0 delivered   68.0s      967m   493m/s    1725kg    79.6kPa     960m     35.8°     90.0/60.4      35.0     32.1     0.0/0.0/0.0   1006.6kg
+Slagworks → Bastion        12.0 delivered   68.0s      967m   493m/s    1725kg    79.6kPa     960m     35.8°     90.0/60.4      35.0     32.1     0.0/0.0/0.0   1006.6kg
+Slagworks → Forge           6.0 delivered   48.8s      496m   326m/s    1725kg    59.1kPa     480m     46.7°     90.0/52.2      35.0     30.4     0.0/0.0/0.0   1301.4kg
+Slagworks → Anvil           6.0 delivered   48.8s      496m   326m/s    1725kg    59.1kPa     480m     46.7°     90.0/52.2      35.0     30.4     0.0/0.0/0.0   1301.4kg
+Anvil → Bastion             6.0 delivered   48.8s      496m   326m/s    1725kg    59.1kPa     480m     46.7°     90.0/52.2      35.0     30.4     0.0/0.0/0.0   1301.4kg
+Anvil → Forge              12.0 delivered   68.0s      967m   493m/s    1725kg    79.6kPa     960m     35.8°     90.0/60.4      35.0     32.1     0.0/0.0/0.0   1006.6kg
+Anvil → Slagworks           6.0 delivered   48.8s      496m   326m/s    1725kg    59.1kPa     480m     46.7°     90.0/52.2      35.0     30.4     0.0/0.0/0.0   1301.4kg
+routes delivered: 12/12 · envelope maxima: Q 79.6 kPa at AoA 35.8° · max AoA 90.0° at Q 60.4 kPa · thrust acceleration 32.1 applied / 35.0 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js gossamer 0 off
+(planet reference build: payload 80 kg, stages 380/240/180 kg)
+=== Gossamer · planet reference · limits off · C 26 km · g 5.4 m/s² · 3.4 kg/m³ · 120 fps x1 ===
+directed route               km    result    time  peak alt   peak v  dry mass     peak Q    Q alt   AoA@Qpk      AoAmax/Q  peak T/m  applied   limit s Q/A/α  fuel left
+Canopy → Drift              5.2 delivered   52.8s      418m   207m/s     621kg    60.1kPa     416m     13.1°     90.0/23.9      23.8     20.4     0.0/0.0/0.0    449.2kg
+Canopy → Halcyon           11.7 delivered   95.4s      938m   244m/s     621kg    66.2kPa     936m      9.2°      90.0/1.7      24.4     22.4     0.0/0.0/0.0    277.8kg
+Canopy → Zephyr             6.5 delivered   59.6s      522m   216m/s     621kg    62.8kPa     520m     12.0°     89.9/16.6      24.4     21.0     0.0/0.0/0.0    407.3kg
+Drift → Canopy              5.2 delivered   52.0s      418m   207m/s     621kg    60.1kPa     416m     13.1°     89.9/18.7      23.8     20.4     0.0/0.0/0.0    450.4kg
+Drift → Halcyon             6.5 delivered   60.2s      522m   216m/s     621kg    62.8kPa     520m     12.0°     90.0/21.5      24.4     21.0     0.0/0.0/0.0    406.5kg
+Drift → Zephyr             11.7 delivered   90.7s      938m   244m/s     621kg    66.2kPa     936m      9.2°     90.0/10.9      24.4     22.4     0.0/0.0/0.0    280.8kg
+Halcyon → Canopy           11.7 delivered   90.7s      938m   244m/s     621kg    66.2kPa     936m      9.2°     90.0/10.9      24.4     22.4     0.0/0.0/0.0    280.8kg
+Halcyon → Drift             6.5 delivered   59.6s      522m   216m/s     621kg    62.8kPa     520m     12.0°     89.9/16.6      24.4     21.0     0.0/0.0/0.0    407.3kg
+Halcyon → Zephyr            7.8 delivered   68.6s      626m   224m/s     621kg    64.4kPa     624m     10.9°     89.8/18.7      24.4     21.9     0.0/0.0/0.0    373.3kg
+Zephyr → Canopy             6.5 delivered   60.2s      522m   216m/s     621kg    62.8kPa     520m     12.0°     90.0/21.5      24.4     21.0     0.0/0.0/0.0    406.5kg
+Zephyr → Drift             11.7 delivered   95.4s      938m   244m/s     621kg    66.2kPa     936m      9.2°      90.0/1.7      24.4     22.4     0.0/0.0/0.0    277.8kg
+Zephyr → Halcyon            7.8 delivered   68.3s      626m   224m/s     621kg    64.4kPa     624m     10.9°     90.0/20.3      24.4     21.9     0.0/0.0/0.0    372.4kg
+routes delivered: 12/12 · envelope maxima: Q 66.2 kPa at AoA 9.2° · max AoA 90.0° at Q 1.7 kPa · thrust acceleration 22.4 applied / 24.4 available m/s² · worst re-climb 0 m · most axis flips 3
+
+$ node experiments/envelope.js verdant 0 balanced
+(planet reference build: payload 80 kg, stages 420/260/200 kg)
+=== Verdant · planet reference · balanced profile · C 20 km · g 9.81 m/s² · 1.225 kg/m³ · 120 fps x1 ===
+directed route               km    result    time  peak alt   peak v  dry mass     peak Q    Q alt   AoA@Qpk      AoAmax/Q  peak T/m  applied   limit s Q/A/α  fuel left
+Homeport → Eastport         5.0 delivered   44.9s      406m   250m/s     666kg    23.3kPa     400m     36.0°     90.0/16.4      24.0     21.3     3.7/0.0/0.0    512.6kg
+Homeport → Farport         10.0 delivered   63.2s      803m   330m/s     666kg    24.5kPa     802m     31.9°     89.6/18.1      25.1     22.0    11.9/3.9/0.0    420.5kg
+Homeport → Westport         5.0 delivered   44.9s      406m   250m/s     666kg    23.3kPa     400m     36.0°     90.0/16.4      24.0     21.3     3.7/0.0/0.0    512.6kg
+Eastport → Homeport         5.0 delivered   44.9s      406m   250m/s     666kg    23.3kPa     400m     36.0°     90.0/16.4      24.0     21.3     3.7/0.0/0.0    512.6kg
+Eastport → Farport          5.0 delivered   44.9s      406m   250m/s     666kg    23.3kPa     400m     36.0°     90.0/16.4      24.0     21.3     3.7/0.0/0.0    512.6kg
+Eastport → Westport        10.0 delivered   63.2s      803m   330m/s     666kg    24.5kPa     802m     31.9°     89.6/18.1      25.1     22.0    11.9/3.9/0.0    420.5kg
+Farport → Homeport         10.0 delivered   63.2s      803m   330m/s     666kg    24.5kPa     802m     31.9°     89.6/18.1      25.1     22.0    11.9/3.9/0.0    420.5kg
+Farport → Eastport          5.0 delivered   44.9s      406m   250m/s     666kg    23.3kPa     400m     36.0°     90.0/16.4      24.0     21.3     3.7/0.0/0.0    512.6kg
+Farport → Westport          5.0 delivered   44.9s      406m   250m/s     666kg    23.3kPa     400m     36.0°     90.0/16.4      24.0     21.3     3.7/0.0/0.0    512.6kg
+Westport → Homeport         5.0 delivered   44.9s      406m   250m/s     666kg    23.3kPa     400m     36.0°     90.0/16.4      24.0     21.3     3.7/0.0/0.0    512.6kg
+Westport → Eastport        10.0 delivered   63.2s      803m   330m/s     666kg    24.5kPa     802m     31.9°     89.6/18.1      25.1     22.0    11.9/3.9/0.0    420.5kg
+Westport → Farport          5.0 delivered   44.9s      406m   250m/s     666kg    23.3kPa     400m     36.0°     90.0/16.4      24.0     21.3     3.7/0.0/0.0    512.6kg
+routes delivered: 12/12 · envelope maxima: Q 24.5 kPa at AoA 31.9° · max AoA 90.0° at Q 16.4 kPa · thrust acceleration 22.0 applied / 25.1 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js tinmoon 0 balanced
+(planet reference build: payload 80 kg, stages 200/140/100 kg)
+=== Tinmoon · planet reference · balanced profile · C 16 km · g 1.62 m/s² · 0 kg/m³ · 120 fps x1 ===
+directed route               km    result    time  peak alt   peak v  dry mass     peak Q    Q alt   AoA@Qpk      AoAmax/Q  peak T/m  applied   limit s Q/A/α  fuel left
+Anchor → Dustfield          2.6 delivered   45.9s      238m   180m/s     423kg     0.0kPa       0m       n/a           n/a      17.3     15.7     0.0/0.0/0.0    330.1kg
+Anchor → Rim Relay          8.0 delivered   84.5s      678m   331m/s     423kg     0.0kPa       0m       n/a           n/a      19.1     16.0     0.0/3.4/0.0    251.0kg
+Anchor → Tinstack           5.1 delivered   65.4s      446m   261m/s     423kg     0.0kPa       0m       n/a           n/a      18.2     16.0     0.0/3.4/0.0    286.7kg
+Dustfield → Anchor          2.6 delivered   46.0s      238m   180m/s     423kg     0.0kPa       0m       n/a           n/a      17.3     15.7     0.0/0.0/0.0    330.1kg
+Dustfield → Rim Relay       5.4 delivered   67.4s      471m   269m/s     423kg     0.0kPa       0m       n/a           n/a      18.3     16.0     0.0/3.4/0.0    282.2kg
+Dustfield → Tinstack        7.7 delivered   82.4s      652m   323m/s     423kg     0.0kPa       0m       n/a           n/a      19.0     16.0     0.0/3.5/0.0    254.5kg
+Rim Relay → Anchor          8.0 delivered   84.5s      678m   331m/s     423kg     0.0kPa       0m       n/a           n/a      19.1     16.0     0.0/3.4/0.0    251.0kg
+Rim Relay → Dustfield       5.4 delivered   67.7s      471m   269m/s     423kg     0.0kPa       0m       n/a           n/a      18.3     16.0     0.0/3.4/0.0    282.2kg
+Rim Relay → Tinstack        2.9 delivered   48.5s      264m   192m/s     423kg     0.0kPa       0m       n/a           n/a      17.4     15.8     0.0/0.0/0.0    323.6kg
+Tinstack → Anchor           5.1 delivered   65.2s      446m   261m/s     423kg     0.0kPa       0m       n/a           n/a      18.2     16.0     0.0/3.4/0.0    286.7kg
+Tinstack → Dustfield        7.7 delivered   82.1s      652m   323m/s     423kg     0.0kPa       0m       n/a           n/a      19.0     16.0     0.0/3.5/0.0    254.5kg
+Tinstack → Rim Relay        2.9 delivered   48.7s      264m   192m/s     423kg     0.0kPa       0m       n/a           n/a      17.4     15.8     0.0/0.0/0.0    323.7kg
+routes delivered: 12/12 · envelope maxima: Q 0.0 kPa at AoA n/a · max AoA n/a · thrust acceleration 16.0 applied / 19.1 available m/s² · worst re-climb 14 m · most axis flips 1
+
+$ node experiments/envelope.js cinder 0 balanced
+(planet reference build: payload 60 kg, stages 1500/900/400 kg)
+=== Cinder · planet reference · balanced profile · C 24 km · g 16.5 m/s² · 1.9 kg/m³ · 120 fps x1 ===
+directed route               km    result    time  peak alt   peak v  dry mass     peak Q    Q alt   AoA@Qpk      AoAmax/Q  peak T/m  applied   limit s Q/A/α  fuel left
+Bastion → Forge             6.0 delivered   48.9s      496m   321m/s    1725kg    57.5kPa     480m     47.1°     89.9/50.6      35.0     30.4     2.6/0.0/0.0   1303.0kg
+Bastion → Slagworks        12.0 delivered   67.9s      967m   435m/s    1725kg    61.9kPa     960m     40.4°     90.0/54.2      35.0     32.2    10.0/0.0/0.0   1032.2kg
+Bastion → Anvil             6.0 delivered   48.9s      496m   321m/s    1725kg    57.5kPa     480m     47.1°     89.9/50.6      35.0     30.4     2.6/0.0/0.0   1303.0kg
+Forge → Bastion             6.0 delivered   48.9s      496m   321m/s    1725kg    57.5kPa     480m     47.1°     89.9/50.6      35.0     30.4     2.6/0.0/0.0   1303.0kg
+Forge → Slagworks           6.0 delivered   48.9s      496m   321m/s    1725kg    57.5kPa     480m     47.1°     89.9/50.6      35.0     30.4     2.6/0.0/0.0   1303.0kg
+Forge → Anvil              12.0 delivered   67.9s      967m   435m/s    1725kg    61.9kPa     960m     40.4°     90.0/54.2      35.0     32.2    10.0/0.0/0.0   1032.2kg
+Slagworks → Bastion        12.0 delivered   67.9s      967m   435m/s    1725kg    61.9kPa     960m     40.4°     90.0/54.2      35.0     32.2    10.0/0.0/0.0   1032.2kg
+Slagworks → Forge           6.0 delivered   48.9s      496m   321m/s    1725kg    57.5kPa     480m     47.1°     89.9/50.6      35.0     30.4     2.6/0.0/0.0   1303.0kg
+Slagworks → Anvil           6.0 delivered   48.9s      496m   321m/s    1725kg    57.5kPa     480m     47.1°     89.9/50.6      35.0     30.4     2.6/0.0/0.0   1303.0kg
+Anvil → Bastion             6.0 delivered   48.9s      496m   321m/s    1725kg    57.5kPa     480m     47.1°     89.9/50.6      35.0     30.4     2.6/0.0/0.0   1303.0kg
+Anvil → Forge              12.0 delivered   67.9s      967m   435m/s    1725kg    61.9kPa     960m     40.4°     90.0/54.2      35.0     32.2    10.0/0.0/0.0   1032.2kg
+Anvil → Slagworks           6.0 delivered   48.9s      496m   321m/s    1725kg    57.5kPa     480m     47.1°     89.9/50.6      35.0     30.4     2.6/0.0/0.0   1303.0kg
+routes delivered: 12/12 · envelope maxima: Q 61.9 kPa at AoA 40.4° · max AoA 90.0° at Q 54.2 kPa · thrust acceleration 32.2 applied / 35.0 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js gossamer 0 balanced
+(planet reference build: payload 80 kg, stages 380/240/180 kg)
+=== Gossamer · planet reference · balanced profile · C 26 km · g 5.4 m/s² · 3.4 kg/m³ · 120 fps x1 ===
+directed route               km    result    time  peak alt   peak v  dry mass     peak Q    Q alt   AoA@Qpk      AoAmax/Q  peak T/m  applied   limit s Q/A/α  fuel left
+Canopy → Drift              5.2 delivered   53.8s      418m   187m/s     621kg    49.2kPa     418m      8.3°     90.0/23.5      23.6     20.4    13.6/0.0/0.0    456.4kg
+Canopy → Halcyon           11.7 delivered   97.8s      937m   211m/s     621kg    49.4kPa     937m      6.0°      90.0/2.2      24.4     20.2    31.5/3.3/0.0    299.9kg
+Canopy → Zephyr             6.5 delivered   61.3s      522m   192m/s     621kg    49.3kPa     522m      7.1°     89.5/20.5      24.4     21.0    19.8/0.0/0.0    413.4kg
+Drift → Canopy              5.2 delivered   52.9s      418m   187m/s     621kg    49.2kPa     418m      8.3°     89.8/23.2      23.6     20.3    13.6/0.0/0.0    457.7kg
+Drift → Halcyon             6.5 delivered   62.1s      522m   192m/s     621kg    49.3kPa     522m      7.1°     89.9/20.9      24.4     20.4    19.8/0.0/0.0    415.2kg
+Drift → Zephyr             11.7 delivered   93.9s      937m   211m/s     621kg    49.4kPa     937m      6.0°      89.9/2.8      24.4     20.2    31.5/3.3/0.0    301.2kg
+Halcyon → Canopy           11.7 delivered   93.9s      937m   211m/s     621kg    49.4kPa     937m      6.0°      89.9/2.8      24.4     20.2    31.5/3.3/0.0    301.2kg
+Halcyon → Drift             6.5 delivered   61.3s      522m   192m/s     621kg    49.3kPa     522m      7.1°     89.5/20.5      24.4     21.0    19.8/0.0/0.0    413.4kg
+Halcyon → Zephyr            7.8 delivered   71.0s      626m   196m/s     621kg    49.3kPa     626m      6.7°     89.9/18.3      24.4     20.5    25.7/0.0/0.0    384.9kg
+Zephyr → Canopy             6.5 delivered   62.1s      522m   192m/s     621kg    49.3kPa     522m      7.1°     89.9/20.9      24.4     20.4    19.8/0.0/0.0    415.2kg
+Zephyr → Drift             11.7 delivered   97.8s      937m   211m/s     621kg    49.4kPa     937m      6.0°      90.0/2.2      24.4     20.2    31.5/3.3/0.0    299.9kg
+Zephyr → Halcyon            7.8 delivered   70.5s      626m   196m/s     621kg    49.3kPa     626m      6.7°     89.4/19.2      24.4     21.5    25.7/0.0/0.0    382.7kg
+routes delivered: 12/12 · envelope maxima: Q 49.4 kPa at AoA 6.0° · max AoA 90.0° at Q 2.2 kPa · thrust acceleration 21.5 applied / 24.4 available m/s² · worst re-climb 0 m · most axis flips 3
+
+$ node experiments/envelope.js verdant 0 gentle
+(planet reference build: payload 80 kg, stages 420/260/200 kg)
+=== Verdant · planet reference · gentle profile · C 20 km · g 9.81 m/s² · 1.225 kg/m³ · 120 fps x1 ===
+directed route               km    result    time  peak alt   peak v  dry mass     peak Q    Q alt   AoA@Qpk      AoAmax/Q  peak T/m  applied   limit s Q/A/α  fuel left
+Homeport → Eastport         5.0 delivered   48.9s      407m   214m/s     666kg    17.0kPa     400m     42.0°     90.0/13.9      24.0     17.6    9.1/25.0/0.0    514.5kg
+Homeport → Farport         10.0 delivered   67.4s      803m   281m/s     666kg    17.7kPa     803m     29.7°     89.7/14.9      25.1     17.6   19.2/38.5/0.0    437.3kg
+Homeport → Westport         5.0 delivered   48.9s      407m   214m/s     666kg    17.0kPa     400m     42.0°     90.0/13.9      24.0     17.6    9.1/25.0/0.0    514.5kg
+Eastport → Homeport         5.0 delivered   48.9s      407m   214m/s     666kg    17.0kPa     400m     42.0°     90.0/13.9      24.0     17.6    9.1/25.0/0.0    514.5kg
+Eastport → Farport          5.0 delivered   48.9s      407m   214m/s     666kg    17.0kPa     400m     42.0°     90.0/13.9      24.0     17.6    9.1/25.0/0.0    514.5kg
+Eastport → Westport        10.0 delivered   67.4s      803m   281m/s     666kg    17.7kPa     803m     29.7°     89.7/14.9      25.1     17.6   19.2/38.5/0.0    437.3kg
+Farport → Homeport         10.0 delivered   67.4s      803m   281m/s     666kg    17.7kPa     803m     29.7°     89.7/14.9      25.1     17.6   19.2/38.5/0.0    437.3kg
+Farport → Eastport          5.0 delivered   48.9s      407m   214m/s     666kg    17.0kPa     400m     42.0°     90.0/13.9      24.0     17.6    9.1/25.0/0.0    514.5kg
+Farport → Westport          5.0 delivered   48.9s      407m   214m/s     666kg    17.0kPa     400m     42.0°     90.0/13.9      24.0     17.6    9.1/25.0/0.0    514.5kg
+Westport → Homeport         5.0 delivered   48.9s      407m   214m/s     666kg    17.0kPa     400m     42.0°     90.0/13.9      24.0     17.6    9.1/25.0/0.0    514.5kg
+Westport → Eastport        10.0 delivered   67.4s      803m   281m/s     666kg    17.7kPa     803m     29.7°     89.7/14.9      25.1     17.6   19.2/38.5/0.0    437.3kg
+Westport → Farport          5.0 delivered   48.9s      407m   214m/s     666kg    17.0kPa     400m     42.0°     90.0/13.9      24.0     17.6    9.1/25.0/0.0    514.5kg
+routes delivered: 12/12 · envelope maxima: Q 17.7 kPa at AoA 29.7° · max AoA 90.0° at Q 13.9 kPa · thrust acceleration 17.6 applied / 25.1 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js tinmoon 0 gentle
+(planet reference build: payload 80 kg, stages 200/140/100 kg)
+=== Tinmoon · planet reference · gentle profile · C 16 km · g 1.62 m/s² · 0 kg/m³ · 120 fps x1 ===
+directed route               km    result    time  peak alt   peak v  dry mass     peak Q    Q alt   AoA@Qpk      AoAmax/Q  peak T/m  applied   limit s Q/A/α  fuel left
+Anchor → Dustfield          2.6 delivered   45.6s      230m   168m/s     423kg     0.0kPa       0m       n/a           n/a      17.2     12.8    0.0/16.9/0.0    336.2kg
+Anchor → Rim Relay          8.0 delivered   84.1s      659m   302m/s     423kg     0.0kPa       0m       n/a           n/a      18.8     12.8    0.0/27.7/0.0    264.2kg
+Anchor → Tinstack           5.1 delivered   65.2s      433m   241m/s     423kg     0.0kPa       0m       n/a           n/a      18.0     12.8    0.0/22.8/0.0    296.5kg
+Dustfield → Anchor          2.6 delivered   45.7s      230m   168m/s     423kg     0.0kPa       0m       n/a           n/a      17.2     12.8    0.0/16.9/0.0    336.3kg
+Dustfield → Rim Relay       5.4 delivered   67.3s      458m   248m/s     423kg     0.0kPa       0m       n/a           n/a      18.1     12.8    0.0/23.4/0.0    292.4kg
+Dustfield → Tinstack        7.7 delivered   82.1s      634m   296m/s     423kg     0.0kPa       0m       n/a           n/a      18.7     12.8    0.0/27.2/0.0    267.4kg
+Rim Relay → Anchor          8.0 delivered   84.1s      659m   302m/s     423kg     0.0kPa       0m       n/a           n/a      18.8     12.8    0.0/27.7/0.0    264.2kg
+Rim Relay → Dustfield       5.4 delivered   67.5s      458m   248m/s     423kg     0.0kPa       0m       n/a           n/a      18.1     12.8    0.0/23.4/0.0    292.4kg
+Rim Relay → Tinstack        2.9 delivered   48.3s      255m   179m/s     423kg     0.0kPa       0m       n/a           n/a      17.3     12.8    0.0/17.8/0.0    330.3kg
+Tinstack → Anchor           5.1 delivered   65.1s      433m   241m/s     423kg     0.0kPa       0m       n/a           n/a      18.0     12.8    0.0/22.8/0.0    296.4kg
+Tinstack → Dustfield        7.7 delivered   81.9s      634m   296m/s     423kg     0.0kPa       0m       n/a           n/a      18.7     12.8    0.0/27.2/0.0    267.3kg
+Tinstack → Rim Relay        2.9 delivered   48.4s      255m   179m/s     423kg     0.0kPa       0m       n/a           n/a      17.3     12.8    0.0/17.8/0.0    330.4kg
+routes delivered: 12/12 · envelope maxima: Q 0.0 kPa at AoA n/a · max AoA n/a · thrust acceleration 12.8 applied / 18.8 available m/s² · worst re-climb 6 m · most axis flips 1
+
+$ node experiments/envelope.js cinder 0 gentle
+(planet reference build: payload 60 kg, stages 1500/900/400 kg)
+=== Cinder · planet reference · gentle profile · C 24 km · g 16.5 m/s² · 1.9 kg/m³ · 120 fps x1 ===
+directed route               km    result    time  peak alt   peak v  dry mass     peak Q    Q alt   AoA@Qpk      AoAmax/Q  peak T/m  applied   limit s Q/A/α  fuel left
+Bastion → Forge             6.0 delivered   51.3s      496m   280m/s    1725kg    43.7kPa     480m     52.1°     90.0/39.9      35.0     28.1     8.4/5.4/0.0   1292.1kg
+Bastion → Slagworks        12.0 delivered   67.5s      967m   368m/s    1725kg    44.4kPa     960m     47.0°     89.8/41.0      35.0     28.1   17.6/10.1/0.0   1093.7kg
+Bastion → Anvil             6.0 delivered   51.3s      496m   280m/s    1725kg    43.7kPa     480m     52.1°     90.0/39.9      35.0     28.1     8.4/5.4/0.0   1292.1kg
+Forge → Bastion             6.0 delivered   51.3s      496m   280m/s    1725kg    43.7kPa     480m     52.1°     90.0/39.9      35.0     28.1     8.4/5.4/0.0   1292.1kg
+Forge → Slagworks           6.0 delivered   51.3s      496m   280m/s    1725kg    43.7kPa     480m     52.1°     90.0/39.9      35.0     28.1     8.4/5.4/0.0   1292.1kg
+Forge → Anvil              12.0 delivered   67.5s      967m   368m/s    1725kg    44.4kPa     960m     47.0°     89.8/41.0      35.0     28.1   17.6/10.1/0.0   1093.7kg
+Slagworks → Bastion        12.0 delivered   67.5s      967m   368m/s    1725kg    44.4kPa     960m     47.0°     89.8/41.0      35.0     28.1   17.6/10.1/0.0   1093.7kg
+Slagworks → Forge           6.0 delivered   51.3s      496m   280m/s    1725kg    43.7kPa     480m     52.1°     90.0/39.9      35.0     28.1     8.4/5.4/0.0   1292.1kg
+Slagworks → Anvil           6.0 delivered   51.3s      496m   280m/s    1725kg    43.7kPa     480m     52.1°     90.0/39.9      35.0     28.1     8.4/5.4/0.0   1292.1kg
+Anvil → Bastion             6.0 delivered   51.3s      496m   280m/s    1725kg    43.7kPa     480m     52.1°     90.0/39.9      35.0     28.1     8.4/5.4/0.0   1292.1kg
+Anvil → Forge              12.0 delivered   67.5s      967m   368m/s    1725kg    44.4kPa     960m     47.0°     89.8/41.0      35.0     28.1   17.6/10.1/0.0   1093.7kg
+Anvil → Slagworks           6.0 delivered   51.3s      496m   280m/s    1725kg    43.7kPa     480m     52.1°     90.0/39.9      35.0     28.1     8.4/5.4/0.0   1292.1kg
+routes delivered: 12/12 · envelope maxima: Q 44.4 kPa at AoA 47.0° · max AoA 90.0° at Q 39.9 kPa · thrust acceleration 28.1 applied / 35.0 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js gossamer 0 gentle
+(planet reference build: payload 80 kg, stages 380/240/180 kg)
+=== Gossamer · planet reference · gentle profile · C 26 km · g 5.4 m/s² · 3.4 kg/m³ · 120 fps x1 ===
+directed route               km    result    time  peak alt   peak v  dry mass     peak Q    Q alt   AoA@Qpk      AoAmax/Q  peak T/m  applied   limit s Q/A/α  fuel left
+Canopy → Drift              5.2 delivered   57.3s      418m   160m/s     621kg    36.0kPa     418m      8.4°     90.0/21.7      23.3     17.6   21.6/26.0/0.0    472.5kg
+Canopy → Halcyon           11.7 delivered  103.5s      937m   180m/s     621kg    35.8kPa     937m      7.0°      89.9/2.6      24.4     17.6   55.2/60.2/0.0    330.5kg
+Canopy → Zephyr             6.5 delivered   66.2s      522m   164m/s     621kg    36.0kPa     522m      8.1°     89.8/17.8      24.1     17.6   28.8/33.3/0.0    434.6kg
+Drift → Canopy              5.2 delivered   56.4s      418m   160m/s     621kg    36.0kPa     418m      8.4°     89.9/20.3      23.3     17.6   21.6/25.8/0.0    474.1kg
+Drift → Halcyon             6.5 delivered   66.8s      522m   164m/s     621kg    36.0kPa     522m      8.1°     90.0/15.4      24.1     17.6   28.8/33.4/0.0    433.5kg
+Drift → Zephyr             11.7 delivered  102.8s      937m   180m/s     621kg    35.8kPa     937m      7.0°     89.9/10.6      24.4     17.6   55.2/60.2/0.0    329.5kg
+Halcyon → Canopy           11.7 delivered  102.8s      937m   180m/s     621kg    35.8kPa     937m      7.0°     89.9/10.6      24.4     17.6   55.2/60.2/0.0    329.5kg
+Halcyon → Drift             6.5 delivered   66.2s      522m   164m/s     621kg    36.0kPa     522m      8.1°     89.8/17.8      24.1     17.6   28.8/33.3/0.0    434.6kg
+Halcyon → Zephyr            7.8 delivered   76.0s      626m   168m/s     621kg    35.9kPa     626m      7.7°     90.0/15.3      24.4     17.6   35.9/40.6/0.0    401.8kg
+Zephyr → Canopy             6.5 delivered   66.8s      522m   164m/s     621kg    36.0kPa     522m      8.1°     90.0/15.4      24.1     17.6   28.8/33.4/0.0    433.5kg
+Zephyr → Drift             11.7 delivered  103.5s      937m   180m/s     621kg    35.8kPa     937m      7.0°      89.9/2.6      24.4     17.6   55.2/60.2/0.0    330.5kg
+Zephyr → Halcyon            7.8 delivered   75.5s      626m   168m/s     621kg    35.9kPa     626m      7.7°     89.6/15.1      24.4     17.6   35.9/40.6/0.0    402.3kg
+routes delivered: 12/12 · envelope maxima: Q 36.0 kPa at AoA 8.4° · max AoA 90.0° at Q 15.4 kPa · thrust acceleration 17.6 applied / 24.4 available m/s² · worst re-climb 0 m · most axis flips 1

@@ -1,0 +1,162 @@
+# Frame rate and time scale: node experiments/envelope.js <world> 0 <profile> <fps> <timeScale> (summary lines)
+# One control update per frame, then the frame's physics budget; 30 fps x4 is a 0.133 s guidance step.
+
+$ node experiments/envelope.js verdant 0 balanced 120 1
+=== Verdant · planet reference · balanced profile · C 20 km · g 9.81 m/s² · 1.225 kg/m³ · 120 fps x1 ===
+routes delivered: 12/12 · envelope maxima: Q 24.5 kPa at AoA 31.9° · max AoA 90.0° at Q 16.4 kPa · thrust acceleration 22.0 applied / 25.1 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js verdant 0 balanced 60 0.5
+=== Verdant · planet reference · balanced profile · C 20 km · g 9.81 m/s² · 1.225 kg/m³ · 60 fps x0.5 ===
+routes delivered: 12/12 · envelope maxima: Q 24.5 kPa at AoA 31.9° · max AoA 90.0° at Q 16.4 kPa · thrust acceleration 22.0 applied / 25.1 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js verdant 0 balanced 60 2
+=== Verdant · planet reference · balanced profile · C 20 km · g 9.81 m/s² · 1.225 kg/m³ · 60 fps x2 ===
+routes delivered: 12/12 · envelope maxima: Q 24.5 kPa at AoA 32.1° · max AoA 89.9° at Q 16.4 kPa · thrust acceleration 22.0 applied / 25.1 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js verdant 0 balanced 30 4
+=== Verdant · planet reference · balanced profile · C 20 km · g 9.81 m/s² · 1.225 kg/m³ · 30 fps x4 ===
+routes delivered: 12/12 · envelope maxima: Q 24.5 kPa at AoA 31.7° · max AoA 89.4° at Q 16.1 kPa · thrust acceleration 22.0 applied / 25.1 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js verdant 0 balanced 144 4
+=== Verdant · planet reference · balanced profile · C 20 km · g 9.81 m/s² · 1.225 kg/m³ · 144 fps x4 ===
+routes delivered: 12/12 · envelope maxima: Q 24.5 kPa at AoA 32.0° · max AoA 89.9° at Q 16.4 kPa · thrust acceleration 22.0 applied / 25.1 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js tinmoon 0 balanced 120 1
+=== Tinmoon · planet reference · balanced profile · C 16 km · g 1.62 m/s² · 0 kg/m³ · 120 fps x1 ===
+routes delivered: 12/12 · envelope maxima: Q 0.0 kPa at AoA n/a · max AoA n/a · thrust acceleration 16.0 applied / 19.1 available m/s² · worst re-climb 14 m · most axis flips 1
+
+$ node experiments/envelope.js tinmoon 0 balanced 60 0.5
+=== Tinmoon · planet reference · balanced profile · C 16 km · g 1.62 m/s² · 0 kg/m³ · 60 fps x0.5 ===
+routes delivered: 12/12 · envelope maxima: Q 0.0 kPa at AoA n/a · max AoA n/a · thrust acceleration 16.0 applied / 19.1 available m/s² · worst re-climb 14 m · most axis flips 1
+
+$ node experiments/envelope.js tinmoon 0 balanced 60 2
+=== Tinmoon · planet reference · balanced profile · C 16 km · g 1.62 m/s² · 0 kg/m³ · 60 fps x2 ===
+routes delivered: 12/12 · envelope maxima: Q 0.0 kPa at AoA n/a · max AoA n/a · thrust acceleration 16.0 applied / 19.1 available m/s² · worst re-climb 15 m · most axis flips 1
+
+$ node experiments/envelope.js tinmoon 0 balanced 30 4
+=== Tinmoon · planet reference · balanced profile · C 16 km · g 1.62 m/s² · 0 kg/m³ · 30 fps x4 ===
+routes delivered: 12/12 · envelope maxima: Q 0.0 kPa at AoA n/a · max AoA n/a · thrust acceleration 16.0 applied / 19.1 available m/s² · worst re-climb 16 m · most axis flips 1
+
+$ node experiments/envelope.js tinmoon 0 balanced 144 4
+=== Tinmoon · planet reference · balanced profile · C 16 km · g 1.62 m/s² · 0 kg/m³ · 144 fps x4 ===
+routes delivered: 12/12 · envelope maxima: Q 0.0 kPa at AoA n/a · max AoA n/a · thrust acceleration 16.0 applied / 19.1 available m/s² · worst re-climb 15 m · most axis flips 1
+
+$ node experiments/envelope.js cinder 0 balanced 120 1
+=== Cinder · planet reference · balanced profile · C 24 km · g 16.5 m/s² · 1.9 kg/m³ · 120 fps x1 ===
+routes delivered: 12/12 · envelope maxima: Q 61.9 kPa at AoA 40.4° · max AoA 90.0° at Q 54.2 kPa · thrust acceleration 32.2 applied / 35.0 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js cinder 0 balanced 60 0.5
+=== Cinder · planet reference · balanced profile · C 24 km · g 16.5 m/s² · 1.9 kg/m³ · 60 fps x0.5 ===
+routes delivered: 12/12 · envelope maxima: Q 61.9 kPa at AoA 40.4° · max AoA 90.0° at Q 54.2 kPa · thrust acceleration 32.2 applied / 35.0 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js cinder 0 balanced 60 2
+=== Cinder · planet reference · balanced profile · C 24 km · g 16.5 m/s² · 1.9 kg/m³ · 60 fps x2 ===
+routes delivered: 12/12 · envelope maxima: Q 61.9 kPa at AoA 41.1° · max AoA 89.9° at Q 50.5 kPa · thrust acceleration 32.2 applied / 35.0 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js cinder 0 balanced 30 4
+=== Cinder · planet reference · balanced profile · C 24 km · g 16.5 m/s² · 1.9 kg/m³ · 30 fps x4 ===
+routes delivered: 12/12 · envelope maxima: Q 61.9 kPa at AoA 42.1° · max AoA 89.9° at Q 51.1 kPa · thrust acceleration 32.2 applied / 35.0 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js cinder 0 balanced 144 4
+=== Cinder · planet reference · balanced profile · C 24 km · g 16.5 m/s² · 1.9 kg/m³ · 144 fps x4 ===
+routes delivered: 12/12 · envelope maxima: Q 61.9 kPa at AoA 40.7° · max AoA 89.9° at Q 50.7 kPa · thrust acceleration 32.2 applied / 35.0 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js gossamer 0 balanced 120 1
+=== Gossamer · planet reference · balanced profile · C 26 km · g 5.4 m/s² · 3.4 kg/m³ · 120 fps x1 ===
+routes delivered: 12/12 · envelope maxima: Q 49.4 kPa at AoA 6.0° · max AoA 90.0° at Q 2.2 kPa · thrust acceleration 21.5 applied / 24.4 available m/s² · worst re-climb 0 m · most axis flips 3
+
+$ node experiments/envelope.js gossamer 0 balanced 60 0.5
+=== Gossamer · planet reference · balanced profile · C 26 km · g 5.4 m/s² · 3.4 kg/m³ · 60 fps x0.5 ===
+routes delivered: 12/12 · envelope maxima: Q 49.4 kPa at AoA 6.0° · max AoA 90.0° at Q 2.2 kPa · thrust acceleration 21.5 applied / 24.4 available m/s² · worst re-climb 0 m · most axis flips 3
+
+$ node experiments/envelope.js gossamer 0 balanced 60 2
+=== Gossamer · planet reference · balanced profile · C 26 km · g 5.4 m/s² · 3.4 kg/m³ · 60 fps x2 ===
+routes delivered: 12/12 · envelope maxima: Q 49.4 kPa at AoA 6.0° · max AoA 90.0° at Q 2.3 kPa · thrust acceleration 21.5 applied / 24.4 available m/s² · worst re-climb 0 m · most axis flips 5
+
+$ node experiments/envelope.js gossamer 0 balanced 30 4
+=== Gossamer · planet reference · balanced profile · C 26 km · g 5.4 m/s² · 3.4 kg/m³ · 30 fps x4 ===
+routes delivered: 12/12 · envelope maxima: Q 49.4 kPa at AoA 6.4° · max AoA 90.0° at Q 2.7 kPa · thrust acceleration 22.0 applied / 24.4 available m/s² · worst re-climb 0 m · most axis flips 3
+
+$ node experiments/envelope.js gossamer 0 balanced 144 4
+=== Gossamer · planet reference · balanced profile · C 26 km · g 5.4 m/s² · 3.4 kg/m³ · 144 fps x4 ===
+routes delivered: 12/12 · envelope maxima: Q 49.4 kPa at AoA 6.1° · max AoA 90.0° at Q 2.3 kPa · thrust acceleration 21.5 applied / 24.4 available m/s² · worst re-climb 0 m · most axis flips 5
+
+$ node experiments/envelope.js verdant 0 gentle 120 1
+=== Verdant · planet reference · gentle profile · C 20 km · g 9.81 m/s² · 1.225 kg/m³ · 120 fps x1 ===
+routes delivered: 12/12 · envelope maxima: Q 17.7 kPa at AoA 29.7° · max AoA 90.0° at Q 13.9 kPa · thrust acceleration 17.6 applied / 25.1 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js verdant 0 gentle 60 0.5
+=== Verdant · planet reference · gentle profile · C 20 km · g 9.81 m/s² · 1.225 kg/m³ · 60 fps x0.5 ===
+routes delivered: 12/12 · envelope maxima: Q 17.7 kPa at AoA 29.7° · max AoA 90.0° at Q 13.9 kPa · thrust acceleration 17.6 applied / 25.1 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js verdant 0 gentle 60 2
+=== Verdant · planet reference · gentle profile · C 20 km · g 9.81 m/s² · 1.225 kg/m³ · 60 fps x2 ===
+routes delivered: 12/12 · envelope maxima: Q 17.7 kPa at AoA 30.0° · max AoA 90.0° at Q 13.9 kPa · thrust acceleration 17.6 applied / 25.1 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js verdant 0 gentle 30 4
+=== Verdant · planet reference · gentle profile · C 20 km · g 9.81 m/s² · 1.225 kg/m³ · 30 fps x4 ===
+routes delivered: 12/12 · envelope maxima: Q 17.7 kPa at AoA 32.5° · max AoA 89.1° at Q 14.2 kPa · thrust acceleration 17.6 applied / 25.1 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js verdant 0 gentle 144 4
+=== Verdant · planet reference · gentle profile · C 20 km · g 9.81 m/s² · 1.225 kg/m³ · 144 fps x4 ===
+routes delivered: 12/12 · envelope maxima: Q 17.7 kPa at AoA 30.2° · max AoA 89.8° at Q 14.0 kPa · thrust acceleration 17.6 applied / 25.1 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js tinmoon 0 gentle 120 1
+=== Tinmoon · planet reference · gentle profile · C 16 km · g 1.62 m/s² · 0 kg/m³ · 120 fps x1 ===
+routes delivered: 12/12 · envelope maxima: Q 0.0 kPa at AoA n/a · max AoA n/a · thrust acceleration 12.8 applied / 18.8 available m/s² · worst re-climb 6 m · most axis flips 1
+
+$ node experiments/envelope.js tinmoon 0 gentle 60 0.5
+=== Tinmoon · planet reference · gentle profile · C 16 km · g 1.62 m/s² · 0 kg/m³ · 60 fps x0.5 ===
+routes delivered: 12/12 · envelope maxima: Q 0.0 kPa at AoA n/a · max AoA n/a · thrust acceleration 12.8 applied / 18.8 available m/s² · worst re-climb 6 m · most axis flips 1
+
+$ node experiments/envelope.js tinmoon 0 gentle 60 2
+=== Tinmoon · planet reference · gentle profile · C 16 km · g 1.62 m/s² · 0 kg/m³ · 60 fps x2 ===
+routes delivered: 12/12 · envelope maxima: Q 0.0 kPa at AoA n/a · max AoA n/a · thrust acceleration 12.8 applied / 18.8 available m/s² · worst re-climb 7 m · most axis flips 1
+
+$ node experiments/envelope.js tinmoon 0 gentle 30 4
+=== Tinmoon · planet reference · gentle profile · C 16 km · g 1.62 m/s² · 0 kg/m³ · 30 fps x4 ===
+routes delivered: 12/12 · envelope maxima: Q 0.0 kPa at AoA n/a · max AoA n/a · thrust acceleration 12.8 applied / 18.8 available m/s² · worst re-climb 7 m · most axis flips 1
+
+$ node experiments/envelope.js tinmoon 0 gentle 144 4
+=== Tinmoon · planet reference · gentle profile · C 16 km · g 1.62 m/s² · 0 kg/m³ · 144 fps x4 ===
+routes delivered: 12/12 · envelope maxima: Q 0.0 kPa at AoA n/a · max AoA n/a · thrust acceleration 12.8 applied / 18.8 available m/s² · worst re-climb 7 m · most axis flips 1
+
+$ node experiments/envelope.js cinder 0 gentle 120 1
+=== Cinder · planet reference · gentle profile · C 24 km · g 16.5 m/s² · 1.9 kg/m³ · 120 fps x1 ===
+routes delivered: 12/12 · envelope maxima: Q 44.4 kPa at AoA 47.0° · max AoA 90.0° at Q 39.9 kPa · thrust acceleration 28.1 applied / 35.0 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js cinder 0 gentle 60 0.5
+=== Cinder · planet reference · gentle profile · C 24 km · g 16.5 m/s² · 1.9 kg/m³ · 60 fps x0.5 ===
+routes delivered: 12/12 · envelope maxima: Q 44.4 kPa at AoA 47.0° · max AoA 90.0° at Q 39.9 kPa · thrust acceleration 28.1 applied / 35.0 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js cinder 0 gentle 60 2
+=== Cinder · planet reference · gentle profile · C 24 km · g 16.5 m/s² · 1.9 kg/m³ · 60 fps x2 ===
+routes delivered: 12/12 · envelope maxima: Q 44.4 kPa at AoA 47.0° · max AoA 89.7° at Q 41.0 kPa · thrust acceleration 28.1 applied / 35.0 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js cinder 0 gentle 30 4
+=== Cinder · planet reference · gentle profile · C 24 km · g 16.5 m/s² · 1.9 kg/m³ · 30 fps x4 ===
+routes delivered: 12/12 · envelope maxima: Q 44.4 kPa at AoA 47.0° · max AoA 88.1° at Q 40.0 kPa · thrust acceleration 28.1 applied / 35.0 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js cinder 0 gentle 144 4
+=== Cinder · planet reference · gentle profile · C 24 km · g 16.5 m/s² · 1.9 kg/m³ · 144 fps x4 ===
+routes delivered: 12/12 · envelope maxima: Q 44.4 kPa at AoA 47.0° · max AoA 89.7° at Q 41.0 kPa · thrust acceleration 28.1 applied / 35.0 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js gossamer 0 gentle 120 1
+=== Gossamer · planet reference · gentle profile · C 26 km · g 5.4 m/s² · 3.4 kg/m³ · 120 fps x1 ===
+routes delivered: 12/12 · envelope maxima: Q 36.0 kPa at AoA 8.4° · max AoA 90.0° at Q 15.4 kPa · thrust acceleration 17.6 applied / 24.4 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js gossamer 0 gentle 60 0.5
+=== Gossamer · planet reference · gentle profile · C 26 km · g 5.4 m/s² · 3.4 kg/m³ · 60 fps x0.5 ===
+routes delivered: 12/12 · envelope maxima: Q 36.0 kPa at AoA 8.4° · max AoA 90.0° at Q 15.4 kPa · thrust acceleration 17.6 applied / 24.4 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js gossamer 0 gentle 60 2
+=== Gossamer · planet reference · gentle profile · C 26 km · g 5.4 m/s² · 3.4 kg/m³ · 60 fps x2 ===
+routes delivered: 12/12 · envelope maxima: Q 36.0 kPa at AoA 8.3° · max AoA 89.8° at Q 2.7 kPa · thrust acceleration 17.6 applied / 24.4 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js gossamer 0 gentle 30 4
+=== Gossamer · planet reference · gentle profile · C 26 km · g 5.4 m/s² · 3.4 kg/m³ · 30 fps x4 ===
+routes delivered: 12/12 · envelope maxima: Q 36.0 kPa at AoA 10.3° · max AoA 89.8° at Q 2.7 kPa · thrust acceleration 17.6 applied / 24.4 available m/s² · worst re-climb 0 m · most axis flips 1
+
+$ node experiments/envelope.js gossamer 0 gentle 144 4
+=== Gossamer · planet reference · gentle profile · C 26 km · g 5.4 m/s² · 3.4 kg/m³ · 144 fps x4 ===
+routes delivered: 12/12 · envelope maxima: Q 36.0 kPa at AoA 8.4° · max AoA 90.0° at Q 10.7 kPa · thrust acceleration 17.6 applied / 24.4 available m/s² · worst re-climb 0 m · most axis flips 1

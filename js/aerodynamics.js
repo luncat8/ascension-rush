@@ -9,6 +9,10 @@
 	aerodynamics.CdAlpha = 0.5;
 	aerodynamics.speedEpsilon = 1e-6;
 
+	aerodynamics.dynamicPressure = function(density, speed) {
+		return 0.5 * Math.max(0, density) * speed * speed;
+	};
+
 	aerodynamics.calculate = function(density, relativeVx, relativeVy, heading, mass, out) {
 		var speed = Math.sqrt(relativeVx * relativeVx + relativeVy * relativeVy);
 		var axisDot;
@@ -24,7 +28,7 @@
 			out.angleOfAttack = 0;
 		}
 
-		dynamicPressure = 0.5 * Math.max(0, density) * speed * speed;
+		dynamicPressure = aerodynamics.dynamicPressure(density, speed);
 		sineAlpha = Math.sin(out.angleOfAttack);
 		out.speed = speed;
 		out.dynamicPressure = dynamicPressure;

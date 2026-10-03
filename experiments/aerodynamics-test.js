@@ -18,6 +18,9 @@ var speed = 100;
 var aligned;
 var broadside;
 
+assert.equal(R.aerodynamics.dynamicPressure(atmosphereDensity, speed), 0.5 * atmosphereDensity * speed * speed, 'the shared helper is half rho v squared');
+assert.equal(R.aerodynamics.dynamicPressure(0, speed), 0, 'vacuum has no dynamic pressure');
+
 aligned = R.aerodynamics.calculate(atmosphereDensity, 0, speed, 0, 1000, result);
 assert.equal(aligned, result, 'calculation mutates caller-owned telemetry');
 assert.equal(aligned.dynamicPressure, 0.5 * atmosphereDensity * speed * speed);
