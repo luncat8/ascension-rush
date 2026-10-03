@@ -1,0 +1,33 @@
+
+make plans according this draft 0.1 ... 0.5
+separate by files to easy manage
+
+planet wrap-x map of soil 10% of screen bottom
+lunch-pads
+player build rocket with stages, change size, strength, payload
+
+lunch, control with mouse heading, space - stages. ctr/shift engine power
+
+goal is fly from one pad to another. 
+scale is small, rocket is just triangle with heading direction. Y has log scale 
+
+calculate cost of fuel, hull and delivered payload mass
+
+make autopilot to fly to target and safe land
+
+add planet presets (atmosphere, gravity, size )
+
+calculate good balance of cost fuel, hull
+
+market prices:
+	pay for delivery
+	fuel
+	steel
+
+
+improve parts (virtual): think main parts, cost, srvice cost, repair cost
+
+
+improve damage and failures: low build strength (quality), too fast landing. repair cost.
+
+add competitor company who also build and lunch 
