@@ -67,7 +67,13 @@
 		var i;
 
 		for (i = 0; i < type.stageCount; i += 1) {
-			stages.push({ fuelMass: type.stages[i].fuelMass, strength: type.stages[i].strength });
+			stages.push({
+				fuelMass: type.stages[i].fuelMass,
+				strength: type.stages[i].strength,
+				engineId: type.stages[i].engineId,
+				tankId: type.stages[i].tankId,
+				fairingId: type.stages[i].fairingId
+			});
 		}
 		return {
 			id: type.id,
@@ -184,7 +190,7 @@
 		var i;
 
 		for (i = 0; i < spec.stageCount; i += 1) {
-			type.stages.push({ fuelMass: spec.stages[i].fuelMass, strength: spec.stages[i].strength });
+			type.stages.push(R.parts.sanitizeStage(spec.stages[i]));
 		}
 		operations.typeStats(type);
 		type.nominalPayload = Math.min(type.nominalPayload, Math.floor(type.payloadLimit));
@@ -216,7 +222,7 @@
 		// stages than it had must grow.
 		type.stages.length = 0;
 		for (i = 0; i < spec.stageCount; i += 1) {
-			type.stages.push({ fuelMass: spec.stages[i].fuelMass, strength: spec.stages[i].strength });
+			type.stages.push(R.parts.sanitizeStage(spec.stages[i]));
 		}
 		operations.typeStats(type);
 		type.nominalPayload = Math.min(type.nominalPayload, Math.floor(type.payloadLimit));
@@ -416,7 +422,7 @@
 
 		for (i = 0; i < type.stageCount; i += 1) {
 			launchStats.dryMass += rocket.stageState[i].alive ?
-				R.rocket.stageDryMass(type.stages[i].fuelMass, R.rocket.stageThrust(type.stages[i].fuelMass), type.stages[i].strength) :
+				R.rocket.stageDryMass(type.stages[i]) :
 				0;
 		}
 		quote = R.market.quote(leg.fromPadId, leg.toPadId, leg.payloadMass, leg.contractId);
@@ -424,6 +430,9 @@
 			structureMass: launchStats.dryMass,
 			// Capital the leg puts in the air, recorded for later depreciation.
 			structureCost: launchStats.dryMass * R.economy.priceSteel(leg.fromPadId),
+			// A turnaround rebuilds the structure a leg replaced. preparation.dryMass
+			// is 0 for a no-refuel leg, so nothing is charged then; for a refuel it
+			// is the mass of the stages the instance lost, spent at steel price.
 			turnaroundCost: R.economy.turnaround(game, preparation.dryMass, leg.fromPadId),
 			fuelCost: R.economy.refuel(game, preparation.fuelMass, leg.fromPadId),
 			// The payout is quoted now and paid on delivery: a price that moves

@@ -64,6 +64,16 @@
 			);
 		}
 
+		// A fairing is shed once the rocket is above the jettison altitude; its
+		// mass leaves the top stage and drag returns to the bare reference area.
+		if (state.fairingAttached && oldWy >= R.constants.parts.fairingAltitude) {
+			state.fairingAttached = false;
+			if (state.fairingMass > 0) {
+				state.stages[state.stageCount - 1].dryMass -= state.fairingMass;
+				state.fairingMass = 0;
+			}
+		}
+
 		if (stage && stage.fuelMass > 0 && state.throttle > 0) {
 			// Vacuum engines on an airless world, sea-level interpolation only
 			// where there is an atmosphere to interpolate against.
@@ -88,7 +98,11 @@
 		massAfter = R.rocket.totalMass(state);
 		mass = Math.max(1, (massBefore + massAfter) * 0.5);
 		game.flight.peakAppliedThrustAcceleration = Math.max(game.flight.peakAppliedThrustAcceleration, thrust / Math.max(1, massBefore));
-		R.aerodynamics.calculate(density, oldVx, oldVy, state.heading, mass, aeroSample);
+		var referenceArea = R.constants.rocket.referenceArea;
+		if (state.fairingAttached) {
+			referenceArea *= state.fairingDragFraction;
+		}
+		R.aerodynamics.calculate(density, oldVx, oldVy, state.heading, mass, aeroSample, referenceArea);
 		game.flight.currentDynamicPressure = aeroSample.dynamicPressure;
 		game.flight.currentAngleOfAttack = aeroSample.angleOfAttack;
 		if (aeroSample.dynamicPressure > game.flight.peakDynamicPressure) {

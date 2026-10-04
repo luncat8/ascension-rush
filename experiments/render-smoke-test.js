@@ -87,6 +87,7 @@ fixture.createElement = function(tagName) {
 global.document = fixture;
 
 var R = require('../js/namespaces.js');
+require('../js/parts.js');
 require('../js/util.js');
 require('../js/constants.js');
 require('../js/planets.js');

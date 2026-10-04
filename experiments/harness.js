@@ -6,6 +6,7 @@
 // one update per physics step.
 
 var R = require('../js/namespaces.js');
+require('../js/parts.js');
 
 require('../js/util.js');
 require('../js/constants.js');

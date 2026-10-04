@@ -7,6 +7,7 @@
 
 var assert = require('node:assert/strict');
 var R = require('../js/namespaces.js');
+require('../js/parts.js');
 
 require('../js/util.js');
 require('../js/constants.js');

@@ -31,13 +31,11 @@
 		};
 	};
 
-	rocket.stageDryMass = function(fuelMax, thrustMax, strength) {
-		var settings = R.constants.rocket;
-		var structureFactor = 0.65 + 0.35 * R.util.clamp(strength, 0.5, 1);
-		var tankMass = fuelMax * settings.tankMassPerFuelMass * structureFactor;
-		var engineMass = settings.engineBaseMass + thrustMax / settings.engineThrustToMass;
-
-		return tankMass + engineMass;
+	// Mass of one stage, read from its parts. A missing engine/tank id resolves
+	// to the default catalog entry, so a stage with only { fuelMass, strength }
+	// still builds and flies. The default engine and tank carry the 0.3 numbers.
+	rocket.stageDryMass = function(stage) {
+		return R.parts.stageBreakdown(stage).dryMass;
 	};
 
 	rocket.evaluateBuild = function(config, out) {
@@ -50,10 +48,9 @@
 		var initialMassWithoutPayload = 0;
 		var stage;
 		var fuel;
-		var thrust;
-		var dryMass;
+		var breakdown;
+		var engine;
 		var finalMass;
-		var averageIsp = (settings.ispSeaLevel + settings.ispVacuum) * 0.5;
 		var i;
 
 		result.totalMass = payload;
@@ -69,16 +66,15 @@
 
 		for (i = 0; i < count; i += 1) {
 			stage = config.stages[i];
+			breakdown = R.parts.stageBreakdown(stage);
 			fuel = Math.max(0, stage.fuelMass);
-			thrust = fuel * settings.thrustPerFuelMass;
-			dryMass = rocket.stageDryMass(fuel, thrust, stage.strength);
-			result.stageDryMass[i] = dryMass;
+			result.stageDryMass[i] = breakdown.dryMass;
 			result.fuelMass += fuel;
-			result.dryMass += dryMass;
-			result.totalMass += fuel + dryMass;
-			initialMassWithoutPayload += fuel + dryMass;
+			result.dryMass += breakdown.dryMass;
+			result.totalMass += fuel + breakdown.dryMass;
+			initialMassWithoutPayload += fuel + breakdown.dryMass;
 			if (i === 0) {
-				result.thrustMax = thrust;
+				result.thrustMax = breakdown.thrust;
 			}
 		}
 
@@ -92,9 +88,12 @@
 		for (i = 0; i < count; i += 1) {
 			stage = config.stages[i];
 			fuel = Math.max(0, stage.fuelMass);
+			breakdown = R.parts.stageBreakdown(stage);
+			engine = R.parts.engine(stage.engineId);
 			finalMass = mass - fuel;
 			if (fuel > 0 && finalMass > 0) {
-				result.deltaV += settings.standardGravity * averageIsp * Math.log(mass / finalMass);
+				result.deltaV += settings.standardGravity *
+					(engine.ispSea + engine.ispVac) * 0.5 * Math.log(mass / finalMass);
 			}
 			mass = finalMass - result.stageDryMass[i];
 			if (mass <= 0) {
@@ -125,8 +124,8 @@
 		return out;
 	};
 
-	rocket.stageThrust = function(fuelMax) {
-		return fuelMax * R.constants.rocket.thrustPerFuelMass;
+	rocket.stageThrust = function(stage) {
+		return R.parts.stageThrust(stage);
 	};
 
 	// The stack a fleet instance would launch with: the type's stages, kept only
@@ -139,8 +138,7 @@
 			if (!stageState[i].alive) {
 				continue;
 			}
-			mass += rocket.stageDryMass(type.stages[i].fuelMass, rocket.stageThrust(type.stages[i].fuelMass), type.stages[i].strength) +
-				stageState[i].fuelMass;
+			mass += rocket.stageDryMass(type.stages[i]) + stageState[i].fuelMass;
 		}
 		return mass;
 	};
@@ -151,7 +149,7 @@
 
 		for (i = 0; i < type.stageCount; i += 1) {
 			if (stageState[i].alive) {
-				return rocket.stageThrust(type.stages[i].fuelMass);
+				return rocket.stageThrust(type.stages[i]);
 			}
 		}
 		return 0;
@@ -174,11 +172,7 @@
 		plan.dryMass = 0;
 		for (i = 0; i < type.stageCount; i += 1) {
 			if (!stageState[i].alive) {
-				plan.dryMass += rocket.stageDryMass(
-					type.stages[i].fuelMass,
-					rocket.stageThrust(type.stages[i].fuelMass),
-					type.stages[i].strength
-				);
+				plan.dryMass += rocket.stageDryMass(type.stages[i]);
 				plan.fuelMass += type.stages[i].fuelMass;
 				continue;
 			}
@@ -225,12 +219,12 @@
 			}
 
 			fuelMax = type.stages[i].fuelMass;
-			thrust = rocket.stageThrust(fuelMax);
+			thrust = rocket.stageThrust(type.stages[i]);
 			stage.fuelMax = fuelMax;
-			stage.dryMass = rocket.stageDryMass(fuelMax, thrust, type.stages[i].strength);
+			stage.dryMass = rocket.stageDryMass(type.stages[i]);
 			stage.thrustMax = thrust;
-			stage.ispSea = settings.ispSeaLevel;
-			stage.ispVac = settings.ispVacuum;
+			stage.ispSea = R.parts.engine(type.stages[i].engineId).ispSea;
+			stage.ispVac = R.parts.engine(type.stages[i].engineId).ispVac;
 			stage.strength = type.stages[i].strength;
 			stage.alive = stageState[i].alive;
 			stage.fuelMass = stage.alive ? stageState[i].fuelMass : 0;
@@ -239,6 +233,13 @@
 			}
 		}
 		state.currentStage = firstAlive < 0 ? count : firstAlive;
+		// A fairing rides the top stage only; it shrinks drag until it is dropped
+		// and adds its mass once at build. A type without one keeps these neutral.
+		var topStage = type.stages[count - 1];
+		var fairing = R.parts.fairing(topStage.fairingId);
+		state.fairingAttached = !!fairing;
+		state.fairingMass = fairing ? fairing.mass : 0;
+		state.fairingDragFraction = fairing ? fairing.dragFraction : 1;
 		return state;
 	};
 
@@ -258,7 +259,10 @@
 			payloadMass: 0,
 			launched: false,
 			landed: false,
-			crashed: false
+			crashed: false,
+			fairingAttached: false,
+			fairingMass: 0,
+			fairingDragFraction: 1
 		};
 	};
 
@@ -277,9 +281,9 @@
 		return mass;
 	};
 
-// The first stage at or after `from` that is still attached, or -1. A
-// separation leaves the spent stage behind, so never assume currentStage + 1
-// is the one that burns next.
+	// The first stage at or after `from` that is still attached, or -1. A
+	// separation leaves the spent stage behind, so never assume currentStage + 1
+	// is the one that burns next.
 	rocket.nextAliveStageIndex = function(state, from) {
 		var i;
 
@@ -318,20 +322,20 @@
 
 	// The next stage ignites at `ignitionThrottle`; a player's staging lights it
 	// at full throttle.
-rocket.separateStage = function(state, ignitionThrottle = 1) {
-	var stage = rocket.activeStage(state);
-	var next;
+	rocket.separateStage = function(state, ignitionThrottle = 1) {
+		var stage = rocket.activeStage(state);
+		var next;
 
-	if (!stage) {
-		return false;
-	}
+		if (!stage) {
+			return false;
+		}
 
-	stage.alive = false;
-	next = rocket.nextAliveStageIndex(state, state.currentStage + 1);
-	state.currentStage = next < 0 ? state.stageCount : next;
-	state.throttle = next < 0 ? 0 : ignitionThrottle;
-	return true;
-};
+		stage.alive = false;
+		next = rocket.nextAliveStageIndex(state, state.currentStage + 1);
+		state.currentStage = next < 0 ? state.stageCount : next;
+		state.throttle = next < 0 ? 0 : ignitionThrottle;
+		return true;
+	};
 
 	rocket.draw = function(context, sx, sy, heading, throttle) {
 		var flameLength;

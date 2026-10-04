@@ -35,6 +35,33 @@
 		defaultStageStrength: [0.85, 0.9, 0.9]
 	};
 
+// Parts catalog: the 0.3 mass/thrust model is the first entry in each list, so
+// a reference build with the default engine and tank reproduces the old numbers
+// exactly (the envelope tables are the proof). Alternatives are data only.
+constants.parts = {
+	// A fairing is jettisoned above this altitude; until then it shrinks the
+	// whole rocket's drag reference area.
+	fairingAltitude: 400,
+	// Dry mass = fuel * massPerFuelMass * (structureLow + structureHigh * strength).
+	structureLow: 0.65,
+	structureHigh: 0.35,
+	defaultEngineId: 'e-standard',
+	defaultTankId: 't-standard',
+	engines: [
+		{ id: 'e-standard', label: 'Standard engine', thrustPerFuelMass: 72, ispSea: 265, ispVac: 330, baseMass: 60, thrustToMass: 150, costPerMass: 1, maxThrottleSeconds: Infinity, reliability: 1 },
+		{ id: 'e-boost', label: 'Booster engine', thrustPerFuelMass: 88, ispSea: 255, ispVac: 310, baseMass: 80, thrustToMass: 145, costPerMass: 1.2, maxThrottleSeconds: Infinity, reliability: 1 },
+		{ id: 'e-vac', label: 'Vacuum engine', thrustPerFuelMass: 58, ispSea: 235, ispVac: 355, baseMass: 52, thrustToMass: 165, costPerMass: 1.4, maxThrottleSeconds: Infinity, reliability: 1 }
+	],
+	tanks: [
+		{ id: 't-standard', label: 'Standard tank', massPerFuelMass: 0.075, costPerMass: 1 },
+		{ id: 't-light', label: 'Light tank', massPerFuelMass: 0.06, costPerMass: 1.1 },
+		{ id: 't-heavy', label: 'Reinforced tank', massPerFuelMass: 0.09, costPerMass: 0.9 }
+	],
+	fairings: [
+		{ id: 'f-standard', label: 'Standard fairing', mass: 40, costPerMass: 1, dragFraction: 0.6 }
+	]
+};
+
 constants.economy = {
 	startingCash: 30000
 };

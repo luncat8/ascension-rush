@@ -20,6 +20,7 @@
 	R.autopilot = R.autopilot || {};
 	R.menu = R.menu || {};
 	R.builder = R.builder || {};
+	R.parts = R.parts || {};
 	R.deck = R.deck || {};
 	R.controls = R.controls || {};
 	R.input = R.input || {};

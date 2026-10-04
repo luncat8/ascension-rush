@@ -118,6 +118,14 @@ body {
 	font: 11px ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+.part-label {
+	margin-top: 8px;
+}
+
+.part-picker {
+	width: 100%;
+}
+
 .builder-control select {
 	width: 100%;
 }

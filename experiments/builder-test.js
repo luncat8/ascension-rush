@@ -5,6 +5,7 @@ var fs = require('node:fs');
 var path = require('node:path');
 var dom = require('./dom.js');
 var R = require('../js/namespaces.js');
+require('../js/parts.js');
 
 var fixture = dom.createDocument(fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8'));
 

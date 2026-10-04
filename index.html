@@ -180,6 +180,12 @@
         <input id="builder-fuel-0" type="range" min="100" max="1500" step="10" value="420">
         <label for="builder-strength-0">Structure strength <output id="builder-strength-value-0">85%</output></label>
         <input id="builder-strength-0" type="range" min="0.5" max="1" step="0.05" value="0.85">
+        <label class="part-label" for="builder-engine-0">Engine</label>
+        <select id="builder-engine-0" class="part-picker"></select>
+        <label class="part-label" for="builder-tank-0">Tank</label>
+        <select id="builder-tank-0" class="part-picker"></select>
+        <label class="part-label" for="builder-fairing-0">Fairing</label>
+        <select id="builder-fairing-0" class="part-picker"></select>
       </section>
 
       <section class="stage-card" id="builder-stage-1">
@@ -188,6 +194,12 @@
         <input id="builder-fuel-1" type="range" min="100" max="1500" step="10" value="260">
         <label for="builder-strength-1">Structure strength <output id="builder-strength-value-1">90%</output></label>
         <input id="builder-strength-1" type="range" min="0.5" max="1" step="0.05" value="0.9">
+        <label class="part-label" for="builder-engine-1">Engine</label>
+        <select id="builder-engine-1" class="part-picker"></select>
+        <label class="part-label" for="builder-tank-1">Tank</label>
+        <select id="builder-tank-1" class="part-picker"></select>
+        <label class="part-label" for="builder-fairing-1">Fairing</label>
+        <select id="builder-fairing-1" class="part-picker"></select>
       </section>
 
       <section class="stage-card" id="builder-stage-2">
@@ -196,6 +208,12 @@
         <input id="builder-fuel-2" type="range" min="100" max="1500" step="10" value="200">
         <label for="builder-strength-2">Structure strength <output id="builder-strength-value-2">90%</output></label>
         <input id="builder-strength-2" type="range" min="0.5" max="1" step="0.05" value="0.9">
+        <label class="part-label" for="builder-engine-2">Engine</label>
+        <select id="builder-engine-2" class="part-picker"></select>
+        <label class="part-label" for="builder-tank-2">Tank</label>
+        <select id="builder-tank-2" class="part-picker"></select>
+        <label class="part-label" for="builder-fairing-2">Fairing</label>
+        <select id="builder-fairing-2" class="part-picker"></select>
       </section>
 
       <div class="builder-control payload-control">
@@ -211,6 +229,7 @@
         <div><span>Launch TWR</span><strong><b id="workshop-twr">—</b></strong></div>
         <div><span>Payload capacity</span><strong><b id="workshop-capacity">—</b> kg</strong></div>
         <div class="summary-cost"><span>Price of a new rocket</span><strong>$<b id="workshop-cost">—</b></strong></div>
+        <p id="workshop-structure-detail" class="builder-hint"></p>
       </section>
 
       <p id="workshop-fleet" class="builder-hint"></p>
@@ -307,6 +326,7 @@
 <script src="js/camera.js"></script>
 <script src="js/world.js"></script>
 <script src="js/rocket.js"></script>
+<script src="js/parts.js"></script>
 <script src="js/market.js"></script>
 <script src="js/economy.js"></script>
 <script src="js/flight-log.js"></script>

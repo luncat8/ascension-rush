@@ -13,7 +13,7 @@
 		return 0.5 * Math.max(0, density) * speed * speed;
 	};
 
-	aerodynamics.calculate = function(density, relativeVx, relativeVy, heading, mass, out) {
+	aerodynamics.calculate = function(density, relativeVx, relativeVy, heading, mass, out, referenceArea) {
 		var speed = Math.sqrt(relativeVx * relativeVx + relativeVy * relativeVy);
 		var axisDot;
 		var sineAlpha;
@@ -39,7 +39,10 @@
 			return out;
 		}
 
-		dragScale = dynamicPressure * out.dragCoefficient * R.constants.rocket.referenceArea /
+		// The whole-rocket reference area, optionally shrunk by an attached
+		// fairing. Callers without a fairing pass nothing and get the constant.
+		var area = referenceArea == null ? R.constants.rocket.referenceArea : referenceArea;
+		dragScale = dynamicPressure * out.dragCoefficient * area /
 			Math.max(1, mass) / speed;
 		out.dragAccelX = -dragScale * relativeVx;
 		out.dragAccelY = -dragScale * relativeVy;
