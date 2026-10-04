@@ -35,9 +35,30 @@
 		defaultStageStrength: [0.85, 0.9, 0.9]
 	};
 
-	constants.economy = {
-		startingCash: 30000
-	};
+constants.economy = {
+	startingCash: 30000
+};
+
+// Pad markets: prices live on each pad and drift one step per finished leg.
+// The board pays a premium over the destination's standing price for urgency
+// and for cargo that will not survive a hard touchdown.
+constants.market = {
+	seed: 20261003,
+	contractSlots: 3,
+	padSpread: 0.12,
+	driftPerTurn: 0.03,
+	meanReversion: 0.1,
+	// Delivery volume nudges a pad's price down a little per delivery.
+	servedPressure: 0.01,
+	urgencyBonus: 0.25,
+	fragileBonus: 0.35,
+	fragileChance: 0.25,
+	fragileSpeedFactor: 0.6,
+	maxContractTurns: 4,
+	minContractTurns: 2,
+	payloadLadder: [0.5, 1, 1.5],
+	distanceBonus: 0.5
+};
 
 	// Operations deck: bounded in-session history and the visible window an
 	// auto-launch can be cancelled in.

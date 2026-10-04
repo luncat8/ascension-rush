@@ -125,7 +125,7 @@
 			stageStrengthValues[j].textContent = Math.round(stage.strength * 100) + '%';
 		}
 
-		estimatedCost = R.economy.estimateBuildCost(stats);
+		estimatedCost = R.economy.estimateBuildCost(stats, builder.padId);
 		ui.mass.textContent = formatMass(stats.totalMass);
 		ui.steel.textContent = formatMass(stats.dryMass);
 		ui.fuel.textContent = formatMass(stats.fuelMass);
@@ -164,19 +164,16 @@
 
 	function onSave() {
 		var type;
+		var result;
 
 		readInputs();
 		if (builder.draft.id) {
-			type = R.operations.findType(builder.draft.id);
-			type.name = builder.draft.name;
-			type.stageCount = builder.draft.stageCount;
-			type.nominalPayload = builder.draft.nominalPayload;
-			for (i = 0; i < builder.draft.stageCount; i += 1) {
-				type.stages[i].fuelMass = builder.draft.stages[i].fuelMass;
-				type.stages[i].strength = builder.draft.stages[i].strength;
+			result = R.operations.saveType(builder.draft.id, builder.draft);
+			if (!result.ok) {
+				ui.warning.textContent = result.reason;
+				return false;
 			}
-			R.operations.typeStats(type);
-			R.operations.touch();
+			type = result.type;
 			R.deck.announce('Rocket type ' + type.name + ' updated.');
 		} else {
 			type = R.operations.addType({
@@ -190,6 +187,7 @@
 			R.deck.announce('Rocket type ' + type.name + ' saved.');
 		}
 		update();
+		return true;
 	}
 
 	function onBuild() {
@@ -198,7 +196,9 @@
 		if (!builder.padId) {
 			return;
 		}
-		onSave();
+		if (!onSave()) {
+			return;
+		}
 		result = R.operations.buildRocket(builder.draft.id, builder.padId);
 		if (!result.ok) {
 			ui.warning.textContent = result.reason;

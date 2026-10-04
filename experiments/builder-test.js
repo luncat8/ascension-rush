@@ -18,6 +18,7 @@ require('../js/coords.js');
 require('../js/camera.js');
 require('../js/world.js');
 require('../js/rocket.js');
+require('../js/market.js');
 require('../js/economy.js');
 require('../js/flight-log.js');
 require('../js/mission.js');
@@ -126,6 +127,16 @@ var secondType = R.operations.state.types[1];
 assert.equal(secondType.stageCount, 2);
 assert.equal(secondType.stages.length, 2, 'the snapshot keeps only the stages the type has');
 
+// A type can grow: saving it with more stages than it had must add them, not
+// write past the end of a shorter template.
+R.builder.open(game, { typeId: secondType.id, padId: R.world.pads[0].id });
+byId('workshop-stage-count').value = '3';
+byId('workshop-stage-count').dispatch('change');
+byId('workshop-save').dispatch('click');
+assert.equal(secondType.stageCount, 3, 'a type saved with more stages grows');
+assert.equal(secondType.stages.length, 3);
+assert.equal(secondType.stages[2].fuelMass, R.constants.rocket.minFuelMass, 'the new stage starts at the minimum tank');
+
 // Buying an instance is explicit and priced.
 var cashBefore = game.cash;
 var ledgerBefore = game.ledger.length;
@@ -199,6 +210,19 @@ assert.equal(dispatched.ok, true, 'the reference type lifts the route payload');
 assert.equal(game.phase, 'flying');
 assert.equal(R.operations.changeRouteType(route.id, smallType.id).reason, R.operations.reasons.BUSY,
 	'a route with a leg in the air keeps its type');
+
+// The same rule protects the template itself: a type with an instance in the
+// air cannot be edited under it. The mission was dispatched against this build
+// and its return leg is priced from it.
+var saveWhileFlying = R.operations.saveType(referenceType.id, {
+	name: 'Edited in flight',
+	stageCount: referenceType.stageCount,
+	stages: referenceType.stages,
+	nominalPayload: referenceType.nominalPayload
+});
+assert.equal(saveWhileFlying.ok, false, 'editing a type whose rocket is flying is refused');
+assert.equal(saveWhileFlying.reason, R.operations.reasons.TYPE_FLYING);
+assert.equal(referenceType.name, 'Test hauler', 'and the template is left as it was');
 
 // Deleting a type leaves the log's own snapshot able to rebuild it.
 var typeIdBefore = R.operations.state.types.length;

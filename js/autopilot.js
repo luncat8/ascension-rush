@@ -216,8 +216,15 @@
 		}
 	};
 
+	// A leg is an autopilot delivery only while the autopilot flies it. The
+	// player who takes over with A flies the rocket; the fee is for the
+	// guidance, not for the launch. Programmatic enable/disable (mission
+	// start and end) leaves the flag alone.
 	autopilot.toggle = function() {
 		autopilot.setEnabled(!autopilot.enabled);
+		if (!autopilot.enabled && R.game && R.game.flight) {
+			R.game.flight.usedAutopilot = false;
+		}
 		return autopilot.enabled;
 	};
 

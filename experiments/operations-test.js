@@ -15,6 +15,7 @@ require('../js/coords.js');
 require('../js/camera.js');
 require('../js/world.js');
 require('../js/rocket.js');
+require('../js/market.js');
 require('../js/economy.js');
 require('../js/flight-log.js');
 require('../js/mission.js');
@@ -190,8 +191,9 @@ assert.ok(legTwo.fuelMass > 0, 'and the tanks are filled');
 
 var preparationCash = game.cash;
 assert.equal(send({ source: far.id, destination: home.id }).ok, true);
-assert.equal(game.flight.turnaroundCost, legTwo.dryMass * R.economy.priceSteel(), 'the leg records the structure it bought');
-assert.equal(game.flight.fuelCost, legTwo.fuelMass * R.economy.priceFuel(), 'and the fuel it loaded');
+assert.equal(game.flight.turnaroundCost, legTwo.dryMass * R.economy.priceSteel(far.id),
+	'the leg records the structure it bought at the pad it bought it');
+assert.equal(game.flight.fuelCost, legTwo.fuelMass * R.economy.priceFuel(far.id), 'and the fuel it loaded');
 assert.ok(Math.abs(game.cash - (preparationCash - legTwo.cost)) < 1e-9, 'charged once, at launch');
 assert.equal(firstRocket.status, 'flying');
 land(game, home);
@@ -270,8 +272,8 @@ assert.equal(game.flight.payloadMass, 45, 'the return payload is loaded, not the
 assert.equal(game.rocket.payloadMass, 45, 'and it is what the rocket carries');
 assert.equal(game.currentPadId, far.id);
 assert.equal(game.targetPadId, home.id);
-assert.equal(game.flight.fuelCost, returnPlan.fuelMass * R.economy.priceFuel(), 'charged for the fuel loaded');
-assert.equal(game.flight.turnaroundCost, returnPlan.dryMass * R.economy.priceSteel(), 'and the structure replaced');
+assert.equal(game.flight.fuelCost, returnPlan.fuelMass * R.economy.priceFuel(far.id), 'charged for the fuel loaded');
+assert.equal(game.flight.turnaroundCost, returnPlan.dryMass * R.economy.priceSteel(far.id), 'and the structure replaced');
 assert.ok(Math.abs(game.cash - (returnCash - returnPlan.cost)) < 1e-9, 'once, at the return launch');
 assert.ok(game.flight.fuelAboard > fuelLeftAfterOutbound, 'the refuel really filled the tanks');
 assert.equal(aliveCount(rocketOf(game)), 3, 'and the refuel policy restores the launch configuration');

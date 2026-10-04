@@ -10,6 +10,7 @@ require('../js/coords.js');
 require('../js/camera.js');
 require('../js/world.js');
 require('../js/rocket.js');
+require('../js/market.js');
 require('../js/economy.js');
 require('../js/flight-log.js');
 require('../js/mission.js');
@@ -314,6 +315,9 @@ assert.equal(R.physics.step(collisionGame, R.constants.rocket.fixedStep), false)
 assert.equal(collisionGame.lastReport, collisionReport);
 
 var deliveredGame = launch(defaultConfig);
+// The payout is quoted at dispatch: read it before the landing advances the
+// market a turn and drifts the pad prices.
+var deliveredQuote = R.market.quote(home.id, target.id, defaultConfig.payloadMass, null).reward;
 deliveredGame.rocket.wx = target.wx + 100;
 deliveredGame.rocket.wy = 0;
 deliveredGame.rocket.vx = 10;
@@ -352,8 +356,10 @@ assert.equal(deliveredGame.ledger[deliveredGame.ledger.length - 2].type, 'delive
 assert.equal(deliveredGame.ledger[deliveredGame.ledger.length - 1].type, 'autopilot');
 var deliveredEntry = R.flightLog.entries[0];
 assert.equal(deliveredEntry.status, 'delivered', 'the delivered leg is logged');
-assert.equal(deliveredEntry.revenue, 80 * R.economy.priceDelivery());
-assert.equal(deliveredEntry.autopilotFee, 80 * R.economy.priceDelivery() * R.autopilot.feeFraction);
+assert.equal(deliveredEntry.revenue, deliveredQuote, 'the log pays the reward quoted at dispatch');
+assert.ok(deliveredEntry.rewardPerKg > R.economy.priceDelivery(target.id),
+	'a delivered leg pays the destination price plus the distance factor');
+assert.equal(deliveredEntry.autopilotFee, deliveredQuote * R.autopilot.feeFraction);
 assert.equal(deliveredEntry.cashDelta, deliveredEntry.revenue - deliveredEntry.autopilotFee -
 	deliveredEntry.fuelCost - deliveredEntry.turnaroundCost, 'the itemized cash adds up to the net delta');
 assert.equal(deliveredEntry.landingPadId, target.id);
@@ -363,13 +369,33 @@ assert.ok(deliveredEntry.rocketTypeSnapshot.stageCount === 3, 'the log keeps its
 
 // An autopilot delivery keeps a tenth of the reward as its fee.
 var autopilotGame = launch(defaultConfig);
+var autopilotQuote = R.market.quote(home.id, target.id, defaultConfig.payloadMass, null).reward;
+
 autopilotGame.rocket.wx = target.wx;
 autopilotGame.rocket.vy = -3;
 startingBalance = autopilotGame.cash;
 report = R.mission.touchdown(autopilotGame);
 assert.equal(report.status, 'delivered');
-assert.ok(Math.abs(autopilotGame.cash - (startingBalance + 80 * R.economy.priceDelivery() * 0.9)) < 1e-6, 'autopilot fee is deducted');
+assert.ok(Math.abs(autopilotGame.cash - (startingBalance + autopilotQuote * 0.9)) < 1e-6, 'autopilot fee is deducted');
 assert.match(report.detail, /Autopilot fee \$\d+ \(Balanced profile\)\./, 'the debrief names the profile that flew');
+R.autopilot.setEnabled(false);
+
+// Taking over with A makes it the pilot's leg: the autopilot is not paid for a
+// flight it did not fly.
+var manualGame = launch(defaultConfig);
+var manualQuote = R.market.quote(home.id, target.id, defaultConfig.payloadMass, null).reward;
+
+R.autopilot.toggle();
+assert.equal(manualGame.flight.usedAutopilot, false, 'a manual takeover marks the leg as hand-flown');
+manualGame.rocket.wx = target.wx;
+manualGame.rocket.vy = -3;
+startingBalance = manualGame.cash;
+report = R.mission.touchdown(manualGame);
+assert.equal(report.status, 'delivered');
+assert.ok(Math.abs(manualGame.cash - (startingBalance + manualQuote)) < 1e-6,
+	'a hand-flown delivery pays no autopilot fee');
+assert.equal(R.flightLog.entries[0].autopilotFee, 0, 'and the log records no fee');
+assert.doesNotMatch(report.detail, /Autopilot fee/, 'and the debrief does not claim one');
 R.autopilot.setEnabled(false);
 
 var elsewhereGame = launch(defaultConfig);

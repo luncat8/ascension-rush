@@ -38,6 +38,8 @@
     <nav class="deck-tabs" role="tablist" aria-label="Operations views">
       <button id="tab-dispatch" class="deck-tab" role="tab" type="button"
         aria-controls="view-dispatch" aria-selected="true">Dispatch</button>
+      <button id="tab-market" class="deck-tab" role="tab" type="button"
+        aria-controls="view-market" aria-selected="false" tabindex="-1">Market</button>
       <button id="tab-routes" class="deck-tab" role="tab" type="button"
         aria-controls="view-routes" aria-selected="false" tabindex="-1">Routes</button>
       <button id="tab-log" class="deck-tab" role="tab" type="button"
@@ -62,6 +64,11 @@
         <p id="dispatch-return-text"></p>
         <p class="offer-cost" id="dispatch-return-cost"></p>
         <button id="dispatch-return-send" class="ghost-button" type="button">Send return leg</button>
+      </section>
+
+      <section id="dispatch-contract" class="offer-card" aria-live="polite" hidden>
+        <p id="dispatch-contract-text"></p>
+        <button id="dispatch-contract-clear" class="ghost-button" type="button">Clear contract</button>
       </section>
 
       <div class="pad-row">
@@ -123,6 +130,12 @@
         <button id="dispatch-workshop" class="ghost-button" type="button">Rocket workshop…</button>
       </div>
       <p class="builder-help">Mouse aims · Shift/Ctrl throttle · Space stages · A autopilot · [ ] time scale</p>
+    </section>
+
+    <section id="view-market" class="deck-view" role="tabpanel" aria-labelledby="tab-market" tabindex="0" hidden>
+      <p class="builder-hint">Prices drift with every finished leg. A contract pays its posted rate per kg
+        wherever it is flown; a standing service sells at the destination's current price.</p>
+      <div id="market-list" class="card-list"></div>
     </section>
 
     <section id="view-routes" class="deck-view" role="tabpanel" aria-labelledby="tab-routes" tabindex="0" hidden>
@@ -294,6 +307,7 @@
 <script src="js/camera.js"></script>
 <script src="js/world.js"></script>
 <script src="js/rocket.js"></script>
+<script src="js/market.js"></script>
 <script src="js/economy.js"></script>
 <script src="js/flight-log.js"></script>
 <script src="js/mission.js"></script>

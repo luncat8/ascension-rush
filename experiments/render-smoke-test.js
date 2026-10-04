@@ -94,6 +94,7 @@ require('../js/coords.js');
 require('../js/camera.js');
 require('../js/world.js');
 require('../js/rocket.js');
+require('../js/market.js');
 require('../js/economy.js');
 require('../js/flight-log.js');
 require('../js/mission.js');
@@ -313,6 +314,28 @@ fourTimes = game.flight.elapsed - elapsedBefore;
 assert.equal(game.timeScale, R.constants.time.scales[6], 'time scale index selects the multiplier');
 assert.ok(fourTimes > 0 && fourTimes > twoTimes, 'a higher time scale buys more simulated time per frame');
 assert.ok(R.util.mod(game.rocket.wx - pads[0].wx, R.world.planet.circumference) > 0, 'the frame loop flies downrange');
+
+// The market tab renders the board the project ships with, and a contract can
+// be loaded straight into the dispatch card.
+R.deck.setTab('market');
+R.deck.sync(game);
+var marketList = fixture.getElementById('market-list');
+var contractLoads = marketList.querySelectorAll('.contract-load');
+
+assert.ok(marketList.textContent.indexOf('DELIVERY') >= 0, 'the market tab quotes every pad');
+assert.ok(marketList.textContent.indexOf('/kg') >= 0, 'in money per kilogram');
+assert.ok(marketList.textContent.indexOf('served') >= 0, 'and how much each pad has been served');
+assert.ok(contractLoads.length > 0, 'every pad board offers contracts to load');
+contractLoads[0].click();
+R.deck.sync(game);
+assert.equal(R.deck.tab, 'dispatch', 'loading a contract moves to the dispatch card');
+assert.equal(fixture.getElementById('dispatch-contract').hidden, false, 'which quotes the contract');
+assert.equal(fixture.getElementById('dispatch-outbound').disabled, true, 'with the payload pinned to the posting');
+assert.ok(fixture.getElementById('dispatch-summary').textContent.indexOf('PAYS') >= 0,
+	'and the card quotes what the leg pays');
+fixture.getElementById('dispatch-contract-clear').click();
+R.deck.sync(game);
+assert.equal(fixture.getElementById('dispatch-contract').hidden, true, 'clearing it drops back to a standing service');
 
 delete global.document;
 console.log('Render and app startup smoke test passed.');

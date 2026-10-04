@@ -42,10 +42,28 @@ alongside peak Q and peak thrust acceleration.
 time at the default `2x`. Economy is still prototype balance; parts, wear and
 failures are not implemented yet.
 
+The **0.4.1** market gives every pad its own prices: fuel, steel and delivery
+drift a bounded step per finished leg, from a seed each world reproduces, and
+the deck's **Market** tab shows all four pad tables and their contract boards.
+A contract names the destination, the payload, a rate per kg, a deadline in
+finished legs and sometimes a **fragile** flag (a stricter touchdown limit; the
+cargo is lost above it, and the log says so). A dispatch or route without a
+contract is a standing service that sells at the destination's current price
+plus a distance factor. Either way the payout is quoted at dispatch and paid on
+delivery, so a price that drifts mid-flight cannot change what the deck
+promised, and fuel and structure are charged at the pad the leg leaves from —
+tanking up where it is cheap is real money. Loading a contract into dispatch
+pins its pads and payload; the flight log records the rate it was paid, the
+contract it flew and whether the cargo was lost.
+
 ## Plans (subject-numbered, not version sequence)
 Active:
 - [`0.4-plan.md`](./0.4-plan.md) — Economy balance, parts catalog with service/repair, market prices & contract board.
 - [`0.5-plan.md`](./0.5-plan.md) — Damage/failures mid-flight and landing, competitor company AI.
+
+Increments of the active 0.4 plan, recorded in `archive/` as they land:
+- [`archive/0.4.1-worklog.md`](./archive/0.4.1-worklog.md) — Pad markets & contract board (0.4.1).
+- [`archive/0.3.6-worklog.md`](./archive/0.3.6-worklog.md) — Operations deck review fixes (0.3.6).
 
 Implemented, kept in `archive/` next to their worklogs (the completed 0.3.x
 umbrella plan remains at the repository root):
@@ -74,6 +92,7 @@ node experiments/render-smoke-test.js       # app startup against the real index
 node experiments/autopilot-test.js          # envelope limits, profiles, staging, frame rates
 node experiments/trajectory-test.js         # coast predictor: integrator equivalence, edges
 node experiments/operations-test.js         # fleet, wait reasons, legs, routes, log, offers
+node experiments/market-test.js             # pad prices, contracts, quotes, fragile cargo
 node experiments/envelope.js verdant 0      # flight envelope per planet/build
 node experiments/envelope.js cinder 0 gentle 30 4   # profile (or `off`), fps, time scale
 node experiments/build-sweep.js 300 1       # random builds: dry baseline vs limits off and profiles

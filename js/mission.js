@@ -76,6 +76,12 @@
 			targetPadId: leg.toPadId,
 			payloadMass: leg.payloadMass,
 			refuel: leg.refuel,
+			contractId: charges.contractId,
+			// Quoted at dispatch and paid on delivery; a fragile cargo has a
+			// lower touchdown limit and is lost above it.
+			rewardQuote: charges.rewardQuote,
+			rewardPerKg: charges.rewardPerKg,
+			fragileSpeed: charges.fragileSpeed,
 			launchMass: R.rocket.totalMass(state),
 			dryMass: charges.structureMass,
 			fuelAboard: fuelAboard(state),
@@ -126,8 +132,12 @@
 		// crossing, so these are the speeds the rocket actually arrived with.
 		var targetError = targetPad ? R.util.wrapDelta(state.wx - targetPad.wx, planet.circumference) : 0;
 		var safe = !!pad && Math.abs(state.vy) <= planet.landingVerticalSpeed && Math.abs(state.vx) <= planet.landingHorizontalSpeed;
-		var delivered = safe && pad.id === flight.targetPadId;
-		var reward = delivered ? flight.payloadMass * R.economy.priceDelivery() : 0;
+		var onTarget = safe && pad.id === flight.targetPadId;
+		// Fragile cargo has a stricter touchdown limit than the rocket does:
+		// arriving over the right pad still loses it above that speed.
+		var cargoLost = onTarget && flight.fragileSpeed > 0 && Math.abs(state.vy) > flight.fragileSpeed;
+		var delivered = onTarget && !cargoLost;
+		var reward = delivered ? flight.rewardQuote : 0;
 		var fee = delivered && flight.usedAutopilot ? reward * R.autopilot.feeFraction : 0;
 		var cashDelta = R.economy.finishFlight(game, reward, fee);
 		var landedPad = safe ? pad : departurePad;
@@ -140,6 +150,9 @@
 			targetPadId: flight.targetPadId,
 			landingPadId: safe ? pad.id : null,
 			payloadMass: flight.payloadMass,
+			contractId: flight.contractId,
+			rewardPerKg: flight.rewardPerKg,
+			cargoLost: cargoLost,
 			elapsed: flight.elapsed,
 			fuelStart: flight.fuelAboard,
 			fuelUsed: flight.fuelUsed,
@@ -202,6 +215,9 @@
 			targetPadId: leg.toPadId,
 			landingPadId: leg.fromPadId,
 			payloadMass: leg.payloadMass,
+			contractId: null,
+			rewardPerKg: 0,
+			cargoLost: false,
 			elapsed: 0,
 			fuelStart: 0,
 			fuelUsed: 0,
@@ -245,10 +261,17 @@
 		var detail;
 
 		detail = copy.lead + padName(result.status === 'crashed' ? result.departedPadId : (result.landingPadId || result.departedPadId)) + '. ';
+		if (result.cargoLost) {
+			detail += 'The fragile cargo was destroyed on touchdown.';
+		}
 		if (result.status === 'return-blocked') {
 			detail += 'The outbound leg landed safely; no fuel or structure was added for the return.';
 		} else {
 			detail += 'Flight cash flow ' + formatCash(result.cashDelta) + ' · Balance $' + Math.round(game.cash) + '.';
+		}
+		if (result.status === 'delivered' && result.contractId) {
+			detail += ' Contract delivered: ' + Math.round(result.payloadMass) + ' kg at $' +
+				result.rewardPerKg.toFixed(2) + '/kg.';
 		}
 		if (profile) {
 			detail += ' Autopilot fee $' + Math.round(result.autopilotFee) + ' (' + profile.label + ' profile).';
@@ -266,10 +289,14 @@
 
 		return {
 			status: result.status,
-			title: copy.title,
+			title: result.cargoLost ? 'CARGO DESTROYED' : copy.title,
 			detail: detail,
 			leg: result.leg,
 			legCount: result.legCount,
+			contractId: result.contractId,
+			cargoLost: result.cargoLost,
+			reward: result.revenue,
+			rewardPerKg: result.rewardPerKg,
 			cashDelta: result.cashDelta,
 			elapsed: result.elapsed,
 			landingPadId: result.landingPadId,

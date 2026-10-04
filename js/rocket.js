@@ -280,44 +280,44 @@
 // The first stage at or after `from` that is still attached, or -1. A
 // separation leaves the spent stage behind, so never assume currentStage + 1
 // is the one that burns next.
-rocket.nextAliveStageIndex = function(state, from) {
-	var i;
+	rocket.nextAliveStageIndex = function(state, from) {
+		var i;
 
-	for (i = from; i < state.stageCount; i += 1) {
-		if (state.stages[i].alive) {
-			return i;
+		for (i = from; i < state.stageCount; i += 1) {
+			if (state.stages[i].alive) {
+				return i;
+			}
 		}
-	}
-	return -1;
-};
+		return -1;
+	};
 
-rocket.activeStage = function(state) {
-	var index = rocket.nextAliveStageIndex(state, state.currentStage);
+	rocket.activeStage = function(state) {
+		var index = rocket.nextAliveStageIndex(state, state.currentStage);
 
-	return index < 0 ? null : state.stages[index];
-};
+		return index < 0 ? null : state.stages[index];
+	};
 
-// Thrust acceleration the stack would have with the stage at `index` burning
-// and every stage below it gone, with `fuel` of that stage still aboard.
-// Staging sheds dry mass and unburned fuel, so the same engine can hold a much
-// lighter rocket than it does right now — which is what an early separation is
-// judged on. Burning only ever sheds mass too, so a stage is weakest at
-// light-off and strongest at burnout.
-rocket.stackThrustAcceleration = function(state, index, fuel) {
-	var stage = state.stages[index];
-	var mass = state.payloadMass + stage.dryMass + fuel;
-	var i;
+	// Thrust acceleration the stack would have with the stage at `index` burning
+	// and every stage below it gone, with `fuel` of that stage still aboard.
+	// Staging sheds dry mass and unburned fuel, so the same engine can hold a much
+	// lighter rocket than it does right now — which is what an early separation is
+	// judged on. Burning only ever sheds mass too, so a stage is weakest at
+	// light-off and strongest at burnout.
+	rocket.stackThrustAcceleration = function(state, index, fuel) {
+		var stage = state.stages[index];
+		var mass = state.payloadMass + stage.dryMass + fuel;
+		var i;
 
-	for (i = index + 1; i < state.stageCount; i += 1) {
-		if (state.stages[i].alive) {
-			mass += state.stages[i].dryMass + state.stages[i].fuelMass;
+		for (i = index + 1; i < state.stageCount; i += 1) {
+			if (state.stages[i].alive) {
+				mass += state.stages[i].dryMass + state.stages[i].fuelMass;
+			}
 		}
-	}
-	return stage.thrustMax / Math.max(1, mass);
-};
+		return stage.thrustMax / Math.max(1, mass);
+	};
 
-// The next stage ignites at `ignitionThrottle`; a player's staging lights it
-// at full throttle.
+	// The next stage ignites at `ignitionThrottle`; a player's staging lights it
+	// at full throttle.
 rocket.separateStage = function(state, ignitionThrottle = 1) {
 	var stage = rocket.activeStage(state);
 	var next;

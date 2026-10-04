@@ -664,11 +664,78 @@ input[type="range"] {
 }
 
 .route-card,
-.log-card {
+.log-card,
+.market-card {
 	padding: 11px;
 	border: 1px solid rgba(150, 180, 194, 0.18);
 	border-radius: 10px;
 	background: rgba(18, 39, 53, 0.7);
+}
+
+.market-card header {
+	display: flex;
+	align-items: baseline;
+	gap: 6px;
+	margin-bottom: 8px;
+}
+
+.market-card header strong {
+	color: #e2edf1;
+	font-size: 13px;
+}
+
+.market-served {
+	flex: 1;
+	color: #83a1af;
+	font: 9px ui-monospace, SFMono-Regular, Menlo, monospace;
+	text-align: right;
+}
+
+.market-card .route-detail {
+	margin-bottom: 10px;
+}
+
+.contract-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	padding: 7px 0 0;
+	border-top: 1px solid rgba(150, 180, 194, 0.14);
+}
+
+.contract-detail {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.contract-detail strong {
+	color: #dbe7ec;
+	font-size: 11px;
+}
+
+.contract-detail span {
+	color: #9fb6c1;
+	font: 10px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.contract-turns {
+	color: #7f97a3;
+}
+
+.contract-turns.urgent {
+	color: #f28b82;
+}
+
+.contract-tag {
+	flex: none;
+	padding: 3px 7px;
+	border: 1px solid rgba(100, 213, 194, 0.4);
+	border-radius: 999px;
+	color: #64d5c2;
+	font: 9px ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .route-card header,

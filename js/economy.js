@@ -6,21 +6,27 @@
 
 	economy.startingCash = R.constants.economy.startingCash;
 
-	// Prices live on the active planet so each world can have its own market.
-	economy.priceFuel = function() {
-		return R.world.planet.prices.fuel;
+	// Prices live on the pad (js/market.js): each pad drifts its own fuel,
+	// steel and delivery numbers, so where a rocket is bought and fuelled
+	// matters. Without a pad the current one is the one being priced.
+	function padOf(padId) {
+		return padId || R.world.currentPadId;
+	}
+
+	economy.priceFuel = function(padId) {
+		return R.market.price(padOf(padId), 'fuel');
 	};
 
-	economy.priceSteel = function() {
-		return R.world.planet.prices.steel;
+	economy.priceSteel = function(padId) {
+		return R.market.price(padOf(padId), 'steel');
 	};
 
-	economy.priceDelivery = function() {
-		return R.world.planet.prices.delivery;
+	economy.priceDelivery = function(padId) {
+		return R.market.price(padOf(padId), 'delivery');
 	};
 
-	economy.estimateBuildCost = function(stats) {
-		return stats.dryMass * economy.priceSteel() + stats.fuelMass * economy.priceFuel();
+	economy.estimateBuildCost = function(stats, padId) {
+		return stats.dryMass * economy.priceSteel(padId) + stats.fuelMass * economy.priceFuel(padId);
 	};
 
 	// Every cash movement goes through these two, so the ledger and the balance
@@ -45,9 +51,9 @@
 
 	// Buying a fleet instance: the whole structure and a full fuel load. The
 	// rocket that starts a run is granted, not bought.
-	economy.buyRocket = function(game, stats) {
-		var structure = stats.dryMass * economy.priceSteel();
-		var fuel = stats.fuelMass * economy.priceFuel();
+	economy.buyRocket = function(game, stats, padId) {
+		var structure = stats.dryMass * economy.priceSteel(padId);
+		var fuel = stats.fuelMass * economy.priceFuel(padId);
 
 		economy.spend(game, 'structure', structure);
 		economy.spend(game, 'fuel', fuel);
@@ -57,13 +63,13 @@
 	// Fuel is paid for when it is loaded, not as it burns: a landed rocket keeps
 	// whatever is left aboard, and charging the burn as well would bill the same
 	// kilogram twice.
-	economy.refuel = function(game, fuelMass) {
-		return economy.spend(game, 'fuel', fuelMass * economy.priceFuel());
+	economy.refuel = function(game, fuelMass, padId) {
+		return economy.spend(game, 'fuel', fuelMass * economy.priceFuel(padId));
 	};
 
 	// 0.3.5 turnaround: replace the separated stages outright, at steel price.
-	economy.turnaround = function(game, dryMass) {
-		return economy.spend(game, 'turnaround', dryMass * economy.priceSteel());
+	economy.turnaround = function(game, dryMass, padId) {
+		return economy.spend(game, 'turnaround', dryMass * economy.priceSteel(padId));
 	};
 
 	// Metering only. The propellant was bought at load time.

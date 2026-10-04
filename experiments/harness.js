@@ -14,6 +14,7 @@ require('../js/coords.js');
 require('../js/camera.js');
 require('../js/world.js');
 require('../js/rocket.js');
+require('../js/market.js');
 require('../js/economy.js');
 require('../js/flight-log.js');
 require('../js/mission.js');

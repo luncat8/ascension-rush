@@ -14,7 +14,8 @@
 		returnPayload: 0,
 		typeId: null,
 		rocketId: null,
-		profileId: R.constants.autopilotProfiles[0].id
+		profileId: R.constants.autopilotProfiles[0].id,
+		contractId: null
 	};
 	var review = { routeId: null, logId: null, spec: null };
 	var typePickerRouteId = null;
@@ -261,8 +262,16 @@
 		var offer = state.offer ? R.operations.findRoute(state.offer.routeId) : null;
 		var returnCost = 0;
 		var returnEvaluation = null;
+		var contract = form.contractId ? R.market.find(form.contractId) : null;
+		var quote = null;
 		var blocked = '';
 		var rocket;
+
+		// A contract that expired or flew while the form held it is not a
+		// pending decision: drop the stale pointer instead of failing on send.
+		if (form.contractId && !contract) {
+			form.contractId = null;
+		}
 
 		ui.report.hidden = !game.lastReport;
 		if (game.lastReport) {
@@ -277,6 +286,16 @@
 				offer.name + ' · ' + padName(offer.source) + ' → ' + padName(offer.destination);
 			ui.offerSend.textContent = state.offer.autoLaunch ?
 				'Launch now (' + Math.max(0, Math.ceil(state.countdown)) + 's)' : 'Send now';
+		}
+
+		ui.contract.hidden = !contract;
+		if (contract) {
+			ui.contractText.textContent = 'Contract · ' + padName(contract.fromPadId) + ' → ' + padName(contract.toPadId) + ' · ' +
+				mass(contract.payloadMass) + ' at $' + contract.perKg.toFixed(2) + '/kg · pays ' +
+				money(R.market.contractReward(contract)) + ' · ' + contract.turnsLeft + ' turn' +
+				(contract.turnsLeft === 1 ? '' : 's') + ' left' +
+				(contract.fragile ? ' · FRAGILE · land under ' +
+					(R.world.planet.landingVerticalSpeed * R.constants.market.fragileSpeedFactor).toFixed(1) + ' m/s' : '');
 		}
 
 		ui.returnCard.hidden = !mission || mission.status !== 'awaiting-return';
@@ -305,9 +324,15 @@
 		if (type) {
 			ui.outbound.max = String(capacity);
 			ui.returnPayload.max = String(capacity);
-			form.outboundPayload = Math.min(form.outboundPayload, capacity);
+			// A contracted payload is what the board offers: it is not clamped
+			// to this rocket's capacity, it fails the evaluation if it does not
+			// fit, and the player picks another rocket or type.
+			if (!contract) {
+				form.outboundPayload = Math.min(form.outboundPayload, capacity);
+			}
 			form.returnPayload = Math.min(form.returnPayload, capacity);
 		}
+		ui.outbound.disabled = !!contract;
 		ui.outbound.value = String(form.outboundPayload);
 		ui.returnPayload.value = String(form.returnPayload);
 		ui.outboundValue.textContent = mass(form.outboundPayload);
@@ -334,8 +359,11 @@
 			'#' + rocket.id + ' ' + type.name + ' · ' + padName(rocket.padId) + ' · ' + rocket.status :
 			'none of this type at ' + padName(form.sourcePadId)));
 		ui.summary.appendChild(summaryRow('THIS LEG', evaluation.ready || evaluation.reason === R.operations.reasons.INSUFFICIENT_FUNDS ?
-			'up to ' + money(evaluation.cost) + ' (fuel ' + money(evaluation.fuelMass * R.economy.priceFuel()) +
-			' · structure ' + money(evaluation.dryMass * R.economy.priceSteel()) + ')' : '—'));
+			'up to ' + money(evaluation.cost) + ' (fuel ' + money(evaluation.fuelMass * R.economy.priceFuel(form.sourcePadId)) +
+			' · structure ' + money(evaluation.dryMass * R.economy.priceSteel(form.sourcePadId)) + ')' : '—'));
+		quote = R.market.quote(form.sourcePadId, form.targetPadId, form.outboundPayload, form.contractId);
+		ui.summary.appendChild(summaryRow('PAYS', money(quote.reward) + ' at $' + quote.pricePerKg.toFixed(2) + '/kg' +
+			(form.contractId ? ' · contract' : '')));
 
 		if (game.phase !== 'deck') {
 			blocked = R.operations.reasons.BUSY;
@@ -362,13 +390,16 @@
 			returnPayload: form.returnPayload,
 			typeId: form.typeId,
 			rocketId: form.rocketId,
-			profileId: form.profileId
+			profileId: form.profileId,
+			contractId: form.contractId
 		});
 
 		if (!result.ok) {
 			deck.announce(result.reason);
 			return;
 		}
+		// The contract is flying with the rocket now; the form starts clean.
+		form.contractId = null;
 		deck.openOverride = false;
 		deck.announce('Mission ' + padName(form.sourcePadId) + ' to ' + padName(form.targetPadId) + ' launched on autopilot.');
 		ui.send.blur();
@@ -384,7 +415,88 @@
 		form.outboundPayload = form.returnPayload;
 		form.returnPayload = payload;
 		form.rocketId = null;
+		clearStaleContract();
 		R.operations.touch();
+	}
+
+	// ----------------------------------------------------------------- market
+
+	// Loading a contract pins the pads and the payload; the dispatch card then
+	// quotes its posted rate. Changing any of those drops it back to a standing
+	// service rather than silently flying someone else's cargo.
+	function clearStaleContract() {
+		var contract = form.contractId ? R.market.find(form.contractId) : null;
+
+		if (contract && (contract.status !== 'open' || contract.fromPadId !== form.sourcePadId ||
+			contract.toPadId !== form.targetPadId || contract.payloadMass !== form.outboundPayload)) {
+			form.contractId = null;
+		}
+	}
+
+	function loadContract(contract) {
+		form.sourcePadId = contract.fromPadId;
+		form.targetPadId = contract.toPadId;
+		form.mode = 'oneway';
+		form.fuelPolicy = 'refuel';
+		form.outboundPayload = contract.payloadMass;
+		form.rocketId = null;
+		form.contractId = contract.id;
+		deck.setTab('dispatch');
+		deck.announce('Contract loaded: ' + padName(contract.fromPadId) + ' to ' + padName(contract.toPadId) +
+			', ' + mass(contract.payloadMass) + ' at $' + contract.perKg.toFixed(2) + '/kg.');
+	}
+
+	function contractRow(contract) {
+		var row = el('div', 'contract-row');
+		var detail = el('div', 'contract-detail');
+		var load = cardButton('Load into dispatch', function() {
+			loadContract(contract);
+		});
+
+		load.className = 'ghost-button contract-load';
+
+		detail.appendChild(el('strong', null, '→ ' + padName(contract.toPadId)));
+		detail.appendChild(el('span', null, mass(contract.payloadMass) + ' at $' + contract.perKg.toFixed(2) + '/kg · ' +
+			money(R.market.contractReward(contract)) + (contract.fragile ? ' · FRAGILE' : '')));
+		detail.appendChild(el('span', contract.turnsLeft <= 1 ? 'contract-turns urgent' : 'contract-turns',
+			contract.turnsLeft + ' turn' + (contract.turnsLeft === 1 ? '' : 's') + ' left'));
+		row.appendChild(detail);
+		if (contract.status === 'assigned') {
+			row.appendChild(el('span', 'contract-tag', 'IN FLIGHT'));
+		} else {
+			row.appendChild(load);
+		}
+		return row;
+	}
+
+	function marketCard(pad) {
+		var card = el('article', 'market-card');
+		var head = el('header');
+		var prices = el('dl', 'route-detail');
+		var contracts = R.market.contractsAt(pad.id);
+		var i;
+
+		head.appendChild(el('strong', null, pad.name));
+		head.appendChild(el('span', 'market-served', R.market.servedAt(pad.id) + ' served'));
+		card.appendChild(head);
+		prices.appendChild(summaryRow('FUEL', '$' + R.market.price(pad.id, 'fuel').toFixed(2) + '/kg'));
+		prices.appendChild(summaryRow('STEEL', '$' + R.market.price(pad.id, 'steel').toFixed(2) + '/kg'));
+		prices.appendChild(summaryRow('DELIVERY', '$' + R.market.price(pad.id, 'delivery').toFixed(2) + '/kg'));
+		card.appendChild(prices);
+		for (i = 0; i < contracts.length; i += 1) {
+			card.appendChild(contractRow(contracts[i]));
+		}
+		return card;
+	}
+
+	function renderMarket() {
+		var pads = R.world.pads;
+		var i;
+
+		ui.marketList.innerHTML = '';
+		for (i = 0; i < pads.length; i += 1) {
+			ui.marketList.appendChild(marketCard(pads[i]));
+		}
 	}
 
 	// ----------------------------------------------------------------- routes
@@ -476,7 +588,7 @@
 		var type = R.operations.findType(entry.rocketTypeId);
 		var actions = el('div', 'route-actions');
 
-		head.appendChild(el('strong', null, statusLabel(entry.status)));
+		head.appendChild(el('strong', null, entry.cargoLost ? 'CARGO LOST' : statusLabel(entry.status)));
 		head.appendChild(el('span', 'log-when', clockAt(entry.completedAt) +
 			(entry.legCount === 2 ? ' · LEG ' + entry.leg + ' OF 2' : '')));
 		card.appendChild(head);
@@ -490,8 +602,10 @@
 		detail.appendChild(summaryRow('TOUCHDOWN', Math.abs(entry.touchdownVerticalSpeed).toFixed(1) + ' m/s down · ' +
 			Math.abs(entry.touchdownHorizontalSpeed).toFixed(1) + ' m/s across · ' +
 			distance(Math.abs(entry.targetError)) + ' off target'));
-		detail.appendChild(summaryRow('CASH', 'revenue ' + money(entry.revenue) + ' · fuel ' + money(entry.fuelCost) +
-			' · turnaround ' + money(entry.turnaroundCost) + ' · fee ' + money(entry.autopilotFee)));
+		detail.appendChild(summaryRow('CASH', 'revenue ' + money(entry.revenue) +
+			(entry.rewardPerKg > 0 ? ' ($' + entry.rewardPerKg.toFixed(2) + '/kg' + (entry.contractId ? ' · contract' : '') + ')' : '') +
+			' · fuel ' + money(entry.fuelCost) + ' · turnaround ' + money(entry.turnaroundCost) +
+			' · fee ' + money(entry.autopilotFee)));
 		detail.appendChild(summaryRow('NET', (entry.cashDelta < 0 ? '−' : '+') + money(Math.abs(entry.cashDelta))));
 		card.appendChild(detail);
 
@@ -707,13 +821,17 @@
 		renderFlightStrip(game);
 		ui.panel.hidden = game.phase === 'flying' && !deck.openOverride;
 		ui.viewDispatch.hidden = deck.tab !== 'dispatch';
+		ui.viewMarket.hidden = deck.tab !== 'market';
 		ui.viewRoutes.hidden = deck.tab !== 'routes';
 		ui.viewLog.hidden = deck.tab !== 'log';
 		ui.tabDispatch.setAttribute('aria-selected', String(deck.tab === 'dispatch'));
+		ui.tabMarket.setAttribute('aria-selected', String(deck.tab === 'market'));
 		ui.tabRoutes.setAttribute('aria-selected', String(deck.tab === 'routes'));
 		ui.tabLog.setAttribute('aria-selected', String(deck.tab === 'log'));
 		if (deck.tab === 'dispatch') {
 			renderDispatch(game);
+		} else if (deck.tab === 'market') {
+			renderMarket();
 		} else if (deck.tab === 'routes') {
 			renderRoutes();
 		} else {
@@ -758,6 +876,7 @@
 		form.fuelPolicy = 'refuel';
 		form.typeId = type.id;
 		form.rocketId = null;
+		form.contractId = null;
 		form.profileId = type.defaultProfileId;
 		form.outboundPayload = type.nominalPayload;
 		form.returnPayload = type.nominalPayload;
@@ -782,9 +901,12 @@
 		ui.fleetCount = doc.getElementById('deck-fleet');
 		ui.planetButton = doc.getElementById('deck-planet-button');
 		ui.tabDispatch = doc.getElementById('tab-dispatch');
+		ui.tabMarket = doc.getElementById('tab-market');
 		ui.tabRoutes = doc.getElementById('tab-routes');
 		ui.tabLog = doc.getElementById('tab-log');
 		ui.viewDispatch = doc.getElementById('view-dispatch');
+		ui.viewMarket = doc.getElementById('view-market');
+		ui.marketList = doc.getElementById('market-list');
 		ui.viewRoutes = doc.getElementById('view-routes');
 		ui.viewLog = doc.getElementById('view-log');
 		ui.report = doc.getElementById('dispatch-report');
@@ -798,6 +920,9 @@
 		ui.returnText = doc.getElementById('dispatch-return-text');
 		ui.returnCost = doc.getElementById('dispatch-return-cost');
 		ui.returnSend = doc.getElementById('dispatch-return-send');
+		ui.contract = doc.getElementById('dispatch-contract');
+		ui.contractText = doc.getElementById('dispatch-contract-text');
+		ui.contractClear = doc.getElementById('dispatch-contract-clear');
 		ui.from = doc.getElementById('dispatch-from');
 		ui.swap = doc.getElementById('dispatch-swap');
 		ui.to = doc.getElementById('dispatch-to');
@@ -860,6 +985,9 @@
 		on(ui.tabDispatch, 'click', function() {
 			deck.setTab('dispatch');
 		});
+		on(ui.tabMarket, 'click', function() {
+			deck.setTab('market');
+		});
 		on(ui.tabRoutes, 'click', function() {
 			deck.setTab('routes');
 		});
@@ -872,10 +1000,16 @@
 			if (form.targetPadId === form.sourcePadId) {
 				form.targetPadId = R.world.pads[(R.world.padIndex(form.sourcePadId) + 1) % R.world.pads.length].id;
 			}
+			clearStaleContract();
 			R.operations.touch();
 		});
 		on(ui.to, 'change', function() {
 			form.targetPadId = ui.to.value;
+			clearStaleContract();
+			R.operations.touch();
+		});
+		on(ui.contractClear, 'click', function() {
+			form.contractId = null;
 			R.operations.touch();
 		});
 		on(ui.swap, 'click', onSwap);
@@ -897,6 +1031,7 @@
 		});
 		on(ui.outbound, 'input', function() {
 			form.outboundPayload = Number(ui.outbound.value);
+			clearStaleContract();
 			R.operations.touch();
 		});
 		on(ui.returnPayload, 'input', function() {

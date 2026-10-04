@@ -32,7 +32,10 @@
 		INSUFFICIENT_FUNDS: 'INSUFFICIENT FUNDS',
 		SAME_PAD: 'CHOOSE TWO DIFFERENT PADS',
 		BUSY: 'SIMULATOR BUSY',
-		RETURN_BLOCKED: 'RETURN BLOCKED'
+		RETURN_BLOCKED: 'RETURN BLOCKED',
+		TYPE_FLYING: 'A ROCKET OF THIS TYPE IS FLYING',
+		CONTRACT_GONE: 'CONTRACT IS NO LONGER ON THE BOARD',
+		CONTRACT_MISMATCH: 'CONTRACT NEEDS ITS OWN PADS AND PAYLOAD'
 	};
 	operations.autoLaunchSeconds = R.constants.operations.autoLaunchSeconds;
 	// Set while a dialog or the workshop is open: automation must never pull the
@@ -190,6 +193,38 @@
 		return type;
 	};
 
+	// The one validated write to an existing type. A template whose instance is
+	// in the air is frozen: the mission was dispatched against this build, the
+	// rocket is flying it and the return leg is priced from it.
+	operations.saveType = function(typeId, spec) {
+		var type = operations.findType(typeId);
+		var fleet = operations.state.fleet;
+		var i;
+
+		if (!type) {
+			return { ok: false, reason: operations.reasons.NO_TYPE };
+		}
+		for (i = 0; i < fleet.length; i += 1) {
+			if (fleet[i].typeId === typeId && fleet[i].status === 'flying') {
+				return { ok: false, reason: operations.reasons.TYPE_FLYING };
+			}
+		}
+		type.name = spec.name;
+		type.stageCount = spec.stageCount;
+		type.nominalPayload = spec.nominalPayload;
+		// Rebuilt rather than overwritten in place: a type saved with more
+		// stages than it had must grow.
+		type.stages.length = 0;
+		for (i = 0; i < spec.stageCount; i += 1) {
+			type.stages.push({ fuelMass: spec.stages[i].fuelMass, strength: spec.stages[i].strength });
+		}
+		operations.typeStats(type);
+		type.nominalPayload = Math.min(type.nominalPayload, Math.floor(type.payloadLimit));
+		operations.forgetDismissal();
+		operations.touch();
+		return { ok: true, type: type };
+	};
+
 	operations.referenceType = function() {
 		var planet = R.world.planet;
 		var fuel = planet.defaultFuel;
@@ -235,11 +270,11 @@
 		if (!type || !pad || !game) {
 			return { ok: false, reason: operations.reasons.NO_TYPE };
 		}
-		cost = R.economy.estimateBuildCost(operations.typeStats(type));
+		cost = R.economy.estimateBuildCost(operations.typeStats(type), pad.id);
 		if (game.cash < cost) {
 			return { ok: false, reason: operations.reasons.INSUFFICIENT_FUNDS, cost: cost };
 		}
-		R.economy.buyRocket(game, stats);
+		R.economy.buyRocket(game, stats, pad.id);
 		rocketId = operations.createRocket(type, pad).id;
 		operations.forgetDismissal();
 		operations.touch();
@@ -291,8 +326,8 @@
 		return R.rocket.restorePlan(type, rocket.stageState, plan);
 	};
 
-	operations.planCost = function(preparation) {
-		return preparation.fuelMass * R.economy.priceFuel() + preparation.dryMass * R.economy.priceSteel();
+	operations.planCost = function(preparation, padId) {
+		return preparation.fuelMass * R.economy.priceFuel(padId) + preparation.dryMass * R.economy.priceSteel(padId);
 	};
 
 	// The one place that decides whether a leg can fly. The dispatch card, the
@@ -327,7 +362,7 @@
 		result.rocket = rocket;
 		result.fuelMass = preparation.fuelMass;
 		result.dryMass = preparation.dryMass;
-		result.cost = operations.planCost(preparation);
+		result.cost = operations.planCost(preparation, fromPadId);
 		result.twr = R.rocket.launchTwr(type, rocket.stageState, payloadMass);
 		if (result.twr < R.constants.rocket.minimumLaunchTwr) {
 			result.reason = refuel ? operations.reasons.PAYLOAD_OVER : operations.reasons.NEEDS_REFUEL;
@@ -350,7 +385,10 @@
 			fromPadId: outbound ? order.source : order.destination,
 			toPadId: outbound ? order.destination : order.source,
 			payloadMass: outbound ? order.outboundPayload : order.returnPayload,
-			refuel: outbound || order.fuelPolicy === 'refuel'
+			refuel: outbound || order.fuelPolicy === 'refuel',
+			// A contract is carried out, and is delivered (or lost) there: the
+			// leg back is an ordinary standing service.
+			contractId: outbound ? order.contractId || null : null
 		};
 	};
 
@@ -373,6 +411,7 @@
 		var preparation = operations.preparePlan(type, rocket, leg.refuel);
 		var launchStats = { dryMass: 0 };
 		var charges;
+		var quote;
 		var i;
 
 		for (i = 0; i < type.stageCount; i += 1) {
@@ -380,12 +419,19 @@
 				R.rocket.stageDryMass(type.stages[i].fuelMass, R.rocket.stageThrust(type.stages[i].fuelMass), type.stages[i].strength) :
 				0;
 		}
+		quote = R.market.quote(leg.fromPadId, leg.toPadId, leg.payloadMass, leg.contractId);
 		charges = {
 			structureMass: launchStats.dryMass,
 			// Capital the leg puts in the air, recorded for later depreciation.
-			structureCost: launchStats.dryMass * R.economy.priceSteel(),
-			turnaroundCost: R.economy.turnaround(game, preparation.dryMass),
-			fuelCost: R.economy.refuel(game, preparation.fuelMass)
+			structureCost: launchStats.dryMass * R.economy.priceSteel(leg.fromPadId),
+			turnaroundCost: R.economy.turnaround(game, preparation.dryMass, leg.fromPadId),
+			fuelCost: R.economy.refuel(game, preparation.fuelMass, leg.fromPadId),
+			// The payout is quoted now and paid on delivery: a price that moves
+			// while the rocket is in the air cannot change the promise.
+			rewardQuote: quote.reward,
+			rewardPerKg: quote.pricePerKg,
+			fragileSpeed: quote.fragileSpeed,
+			contractId: quote.contractId
 		};
 		if (leg.refuel) {
 			fullStageState(type, rocket.stageState);
@@ -406,6 +452,7 @@
 		var game = R.game;
 		var order;
 		var evaluation;
+		var contract = spec.contractId ? R.market.find(spec.contractId) : null;
 		var leg;
 
 		if (!game || game.phase !== 'deck') {
@@ -416,6 +463,13 @@
 		}
 		if (operations.state.mission) {
 			return { ok: false, reason: operations.reasons.BUSY };
+		}
+		if (spec.contractId && (!contract || contract.status !== 'open')) {
+			return { ok: false, reason: operations.reasons.CONTRACT_GONE };
+		}
+		if (contract && (contract.fromPadId !== spec.source || contract.toPadId !== spec.destination ||
+			contract.payloadMass !== spec.outboundPayload)) {
+			return { ok: false, reason: operations.reasons.CONTRACT_MISMATCH };
 		}
 		operations.forgetDismissal();
 		evaluation = operations.evaluateLeg(spec.typeId, spec.source, spec.outboundPayload, true, spec.rocketId);
@@ -441,6 +495,7 @@
 			type: snapshotType(operations.findType(spec.typeId)),
 			rocketId: evaluation.rocket.id,
 			profileId: spec.profileId,
+			contractId: contract ? contract.id : null,
 			currentLeg: 0,
 			status: 'active',
 			createdAt: operations.now()
@@ -449,6 +504,9 @@
 		game.mission = order;
 		if (order.routeId) {
 			evaluation.rocket.assignedRouteId = order.routeId;
+		}
+		if (contract) {
+			R.market.assign(contract.id);
 		}
 		leg = operations.legOf(order, 1);
 		operations.beginLeg(game, order, leg);
@@ -471,6 +529,9 @@
 			rocketTypeSnapshot: order.type,
 			payloadMass: result.payloadMass,
 			profileId: order.profileId,
+			contractId: result.contractId,
+			rewardPerKg: result.rewardPerKg,
+			cargoLost: result.cargoLost,
 			elapsed: result.elapsed,
 			fuelStart: result.fuelStart,
 			fuelUsed: result.fuelUsed,
@@ -534,6 +595,18 @@
 
 		operations.logEntry(order, result);
 		operations.countRouteLeg(order, result);
+		// A finished leg is one dispatch turn: prices drift, open contracts
+		// age and expire, boards refill. Then the leg settles the contract it
+		// carried: delivered fulfils it, anything else puts it back on the
+		// board with the turns it has left.
+		R.market.advance();
+		if (result.contractId) {
+			if (result.status === 'delivered') {
+				R.market.fulfil(result.contractId);
+			} else {
+				R.market.release(result.contractId);
+			}
+		}
 		operations.touch();
 		rocket.padId = result.landingPadId || rocket.padId;
 		copyStageState(result.stageState, rocket.stageState);
@@ -898,8 +971,9 @@
 	};
 
 	operations.initialize = function() {
+		var planetId = R.world.planet.id;
 		var state = {
-			planetId: R.world.planet.id,
+			planetId: planetId,
 			nextId: 1,
 			types: [],
 			fleet: [],
@@ -914,6 +988,9 @@
 
 		operations.state = state;
 		R.flightLog.reset();
+		// Prices and contracts are part of the per-world reset: a market never
+		// crosses a planet switch.
+		R.market.initialize(R.market.seedFor(planetId));
 		operations.referenceType();
 		operations.createRocket(state.types[0], R.world.pads[0]);
 		return state;
