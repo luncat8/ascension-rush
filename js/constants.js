@@ -35,57 +35,61 @@
 		defaultStageStrength: [0.85, 0.9, 0.9]
 	};
 
-// Parts catalog: the 0.3 mass/thrust model is the first entry in each list, so
-// a reference build with the default engine and tank reproduces the old numbers
-// exactly (the envelope tables are the proof). Alternatives are data only.
-constants.parts = {
-	// A fairing is jettisoned above this altitude; until then it shrinks the
-	// whole rocket's drag reference area.
-	fairingAltitude: 400,
-	// Dry mass = fuel * massPerFuelMass * (structureLow + structureHigh * strength).
-	structureLow: 0.65,
-	structureHigh: 0.35,
-	defaultEngineId: 'e-standard',
-	defaultTankId: 't-standard',
-	engines: [
-		{ id: 'e-standard', label: 'Standard engine', thrustPerFuelMass: 72, ispSea: 265, ispVac: 330, baseMass: 60, thrustToMass: 150, costPerMass: 1, maxThrottleSeconds: Infinity, reliability: 1 },
-		{ id: 'e-boost', label: 'Booster engine', thrustPerFuelMass: 88, ispSea: 255, ispVac: 310, baseMass: 80, thrustToMass: 145, costPerMass: 1.2, maxThrottleSeconds: Infinity, reliability: 1 },
-		{ id: 'e-vac', label: 'Vacuum engine', thrustPerFuelMass: 58, ispSea: 235, ispVac: 355, baseMass: 52, thrustToMass: 165, costPerMass: 1.4, maxThrottleSeconds: Infinity, reliability: 1 }
-	],
-	tanks: [
-		{ id: 't-standard', label: 'Standard tank', massPerFuelMass: 0.075, costPerMass: 1 },
-		{ id: 't-light', label: 'Light tank', massPerFuelMass: 0.06, costPerMass: 1.1 },
-		{ id: 't-heavy', label: 'Reinforced tank', massPerFuelMass: 0.09, costPerMass: 0.9 }
-	],
-	fairings: [
-		{ id: 'f-standard', label: 'Standard fairing', mass: 40, costPerMass: 1, dragFraction: 0.6 }
-	]
-};
+	// Parts catalog: the 0.3 mass/thrust model is the first entry in each list, so
+	// a reference build with the default engine and tank reproduces the old numbers
+	// exactly (the envelope tables are the proof). Alternatives are data only.
+	constants.parts = {
+		// A fairing is jettisoned above this altitude; until then it shrinks the
+		// whole rocket's drag reference area.
+		fairingAltitude: 400,
+		// Dry mass = fuel * massPerFuelMass * (structureLow + structureHigh * strength).
+		structureLow: 0.65,
+		structureHigh: 0.35,
+		// Service: an engine is rated in seconds at throttle and an overhaul costs
+		// this fraction of a new one; a tank is rated in legs flown and is simply
+		// replaced by the turnaround that follows its last one.
+		overhaulFactor: 0.35,
+		defaultEngineId: 'e-standard',
+		defaultTankId: 't-standard',
+		engines: [
+			{ id: 'e-standard', label: 'Standard engine', thrustPerFuelMass: 72, ispSea: 265, ispVac: 330, baseMass: 60, thrustToMass: 150, costPerMass: 1, maxThrottleSeconds: 900, reliability: 1, repairPerKg: 0 },
+			{ id: 'e-boost', label: 'Booster engine', thrustPerFuelMass: 88, ispSea: 255, ispVac: 310, baseMass: 80, thrustToMass: 145, costPerMass: 1.2, maxThrottleSeconds: 600, reliability: 1, repairPerKg: 0 },
+			{ id: 'e-vac', label: 'Vacuum engine', thrustPerFuelMass: 58, ispSea: 235, ispVac: 355, baseMass: 52, thrustToMass: 165, costPerMass: 1.4, maxThrottleSeconds: 1200, reliability: 1, repairPerKg: 0 }
+		],
+		tanks: [
+			{ id: 't-standard', label: 'Standard tank', massPerFuelMass: 0.075, costPerMass: 1, maxFlights: 12, repairPerKg: 0 },
+			{ id: 't-light', label: 'Light tank', massPerFuelMass: 0.06, costPerMass: 1.1, maxFlights: 6, repairPerKg: 0 },
+			{ id: 't-heavy', label: 'Reinforced tank', massPerFuelMass: 0.09, costPerMass: 0.9, maxFlights: 24, repairPerKg: 0 }
+		],
+		fairings: [
+			{ id: 'f-standard', label: 'Standard fairing', mass: 40, costPerMass: 1, dragFraction: 0.6, repairPerKg: 0 }
+		]
+	};
 
-constants.economy = {
-	startingCash: 30000
-};
+	constants.economy = {
+		startingCash: 30000
+	};
 
-// Pad markets: prices live on each pad and drift one step per finished leg.
-// The board pays a premium over the destination's standing price for urgency
-// and for cargo that will not survive a hard touchdown.
-constants.market = {
-	seed: 20261003,
-	contractSlots: 3,
-	padSpread: 0.12,
-	driftPerTurn: 0.03,
-	meanReversion: 0.1,
-	// Delivery volume nudges a pad's price down a little per delivery.
-	servedPressure: 0.01,
-	urgencyBonus: 0.25,
-	fragileBonus: 0.35,
-	fragileChance: 0.25,
-	fragileSpeedFactor: 0.6,
-	maxContractTurns: 4,
-	minContractTurns: 2,
-	payloadLadder: [0.5, 1, 1.5],
-	distanceBonus: 0.5
-};
+	// Pad markets: prices live on each pad and drift one step per finished leg.
+	// The board pays a premium over the destination's standing price for urgency
+	// and for cargo that will not survive a hard touchdown.
+	constants.market = {
+		seed: 20261003,
+		contractSlots: 3,
+		padSpread: 0.12,
+		driftPerTurn: 0.03,
+		meanReversion: 0.1,
+		// Delivery volume nudges a pad's price down a little per delivery.
+		servedPressure: 0.01,
+		urgencyBonus: 0.25,
+		fragileBonus: 0.35,
+		fragileChance: 0.25,
+		fragileSpeedFactor: 0.6,
+		maxContractTurns: 4,
+		minContractTurns: 2,
+		payloadLadder: [0.5, 1, 1.5],
+		distanceBonus: 0.5
+	};
 
 	// Operations deck: bounded in-session history and the visible window an
 	// auto-launch can be cancelled in.

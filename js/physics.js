@@ -45,6 +45,7 @@
 		var massFlow;
 		var burn = 0;
 		var thrustFraction = 0;
+		var referenceArea;
 		var accelerationX;
 		var accelerationY;
 		var acceleration;
@@ -53,6 +54,7 @@
 		var newWx;
 		var newWy;
 		var crossingFraction;
+		var topStage;
 
 		if (game.phase !== 'flying') {
 			return false;
@@ -64,12 +66,17 @@
 			);
 		}
 
-		// A fairing is shed once the rocket is above the jettison altitude; its
-		// mass leaves the top stage and drag returns to the bare reference area.
-		if (state.fairingAttached && oldWy >= R.constants.parts.fairingAltitude) {
-			state.fairingAttached = false;
-			if (state.fairingMass > 0) {
-				state.stages[state.stageCount - 1].dryMass -= state.fairingMass;
+		// A fairing rides the top stage: it is shed at the jettison altitude, or
+		// goes with the stage if that stage separates first. Either way its mass
+		// stops counting and drag returns to the bare reference area.
+		if (state.fairingAttached) {
+			topStage = state.stages[state.stageCount - 1];
+			if (!topStage.alive) {
+				state.fairingAttached = false;
+				state.fairingMass = 0;
+			} else if (oldWy >= R.constants.parts.fairingAltitude) {
+				state.fairingAttached = false;
+				topStage.dryMass -= state.fairingMass;
 				state.fairingMass = 0;
 			}
 		}
@@ -87,6 +94,9 @@
 			massFlow = thrust / (isp * settings.standardGravity);
 			burn = Math.min(stage.fuelMass, massFlow * dt);
 			stage.fuelMass -= burn;
+			// Service wear: an engine is rated in seconds at throttle, so the burn
+			// is where the seconds are counted. A number, not an allocation.
+			stage.engineBurnTimeUsed += dt;
 			if (stage.fuelMass < 1e-9) {
 				stage.fuelMass = 0;
 			}
@@ -98,10 +108,9 @@
 		massAfter = R.rocket.totalMass(state);
 		mass = Math.max(1, (massBefore + massAfter) * 0.5);
 		game.flight.peakAppliedThrustAcceleration = Math.max(game.flight.peakAppliedThrustAcceleration, thrust / Math.max(1, massBefore));
-		var referenceArea = R.constants.rocket.referenceArea;
-		if (state.fairingAttached) {
-			referenceArea *= state.fairingDragFraction;
-		}
+		referenceArea = state.fairingAttached ?
+			settings.referenceArea * state.fairingDragFraction :
+			settings.referenceArea;
 		R.aerodynamics.calculate(density, oldVx, oldVy, state.heading, mass, aeroSample, referenceArea);
 		game.flight.currentDynamicPressure = aeroSample.dynamicPressure;
 		game.flight.currentAngleOfAttack = aeroSample.angleOfAttack;

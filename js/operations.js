@@ -5,17 +5,19 @@
 	var operations = R.operations || (R.operations = {});
 	var stageSlots = 3;
 	var stats = R.rocket.createStats();
-	var plan = { fuelMass: 0, dryMass: 0 };
+	var plan = { fuelMass: 0, dryMass: 0, structureValue: 0 };
 	var scratchStageState = R.rocket.createStageState();
 	// A rocket type is measured with no payload aboard so `payloadLimit` is the
 	// most it can lift; the payload it is displayed with is a separate number.
+	// The part ids travel with the stage: a build is measured with the engine and
+	// tank it actually carries, not with the catalog defaults.
 	var scratchConfig = {
 		stageCount: stageSlots,
 		payloadMass: 0,
 		stages: [
-			{ fuelMass: 0, strength: 1 },
-			{ fuelMass: 0, strength: 1 },
-			{ fuelMass: 0, strength: 1 }
+			{ fuelMass: 0, strength: 1, engineId: null, tankId: null, fairingId: null },
+			{ fuelMass: 0, strength: 1, engineId: null, tankId: null, fairingId: null },
+			{ fuelMass: 0, strength: 1, engineId: null, tankId: null, fairingId: null }
 		]
 	};
 
@@ -29,6 +31,7 @@
 		ROCKET_BUSY: 'ROCKET BUSY',
 		PAYLOAD_OVER: 'PAYLOAD EXCEEDS CAPACITY',
 		NEEDS_REFUEL: 'NEEDS REFUEL',
+		NEEDS_OVERHAUL: 'NEEDS OVERHAUL',
 		INSUFFICIENT_FUNDS: 'INSUFFICIENT FUNDS',
 		SAME_PAD: 'CHOOSE TWO DIFFERENT PADS',
 		BUSY: 'SIMULATOR BUSY',
@@ -92,16 +95,27 @@
 		for (i = 0; i < stageSlots; i += 1) {
 			to[i].alive = from[i].alive;
 			to[i].fuelMass = from[i].fuelMass;
+			to[i].engineBurnTimeUsed = from[i].engineBurnTimeUsed;
+			to[i].lifeFlights = from[i].lifeFlights;
+			to[i].stress = from[i].stress;
 		}
 		return to;
 	}
 
+	// The stack a refuel leg launches with: every stage of the type, alive and
+	// full. A stage that was lost, or whose tank had flown out its rating, is a
+	// new one and starts with no wear; the others keep the wear they have.
 	function fullStageState(type, out) {
+		var replaced;
 		var i;
 
 		for (i = 0; i < stageSlots; i += 1) {
+			replaced = i >= type.stageCount || !out[i].alive || R.parts.wornOut(type.stages[i], out[i]);
 			out[i].alive = i < type.stageCount;
 			out[i].fuelMass = out[i].alive ? type.stages[i].fuelMass : 0;
+			if (replaced) {
+				R.rocket.resetStageWear(out[i]);
+			}
 		}
 		return out;
 	}
@@ -164,6 +178,9 @@
 		for (i = 0; i < type.stageCount; i += 1) {
 			scratchConfig.stages[i].fuelMass = type.stages[i].fuelMass;
 			scratchConfig.stages[i].strength = type.stages[i].strength;
+			scratchConfig.stages[i].engineId = type.stages[i].engineId;
+			scratchConfig.stages[i].tankId = type.stages[i].tankId;
+			scratchConfig.stages[i].fairingId = type.stages[i].fairingId;
 		}
 		R.rocket.evaluateBuild(scratchConfig, stats);
 		type.payloadLimit = stats.payloadLimit;
@@ -265,7 +282,9 @@
 		return rocket;
 	};
 
-	// Explicit and priced: a route never creates a rocket as a side effect.
+	// Explicit and priced: a route never creates a rocket as a side effect. The
+	// price is the parts' — each part's mass at its own costPerMass, plus a full
+	// fuel load at the pad's fuel price.
 	operations.buildRocket = function(typeId, padId) {
 		var type = operations.findType(typeId);
 		var pad = R.world.findPadById(padId);
@@ -276,11 +295,11 @@
 		if (!type || !pad || !game) {
 			return { ok: false, reason: operations.reasons.NO_TYPE };
 		}
-		cost = R.economy.estimateBuildCost(operations.typeStats(type), pad.id);
+		cost = R.parts.typeBuildCost(type, pad.id);
 		if (game.cash < cost) {
 			return { ok: false, reason: operations.reasons.INSUFFICIENT_FUNDS, cost: cost };
 		}
-		R.economy.buyRocket(game, stats, pad.id);
+		cost = R.economy.buyRocket(game, R.parts.typeStructureValue(type), R.parts.typeFuelMass(type), pad.id);
 		rocketId = operations.createRocket(type, pad).id;
 		operations.forgetDismissal();
 		operations.touch();
@@ -327,24 +346,31 @@
 		if (!refuel) {
 			plan.fuelMass = 0;
 			plan.dryMass = 0;
+			plan.structureValue = 0;
 			return plan;
 		}
 		return R.rocket.restorePlan(type, rocket.stageState, plan);
 	};
 
+	// Fuel at the pad's fuel price, and the structure a leg replaces at the
+	// parts' value (structureValue, not dry mass: a part can cost more or less
+	// per kg than plain steel).
 	operations.planCost = function(preparation, padId) {
-		return preparation.fuelMass * R.economy.priceFuel(padId) + preparation.dryMass * R.economy.priceSteel(padId);
+		return preparation.fuelMass * R.economy.priceFuel(padId) +
+			preparation.structureValue * R.economy.priceSteel(padId);
 	};
 
 	// The one place that decides whether a leg can fly. The dispatch card, the
 	// route cards and the scheduler all quote this, so a reason is never
-	// invented twice.
-	operations.evaluateLeg = function(typeId, fromPadId, payloadMass, refuel, rocketId) {
+	// invented twice. `overhaul` is the authorization to buy the service the
+	// stack needs on this leg: without it an engine past its rating holds the
+	// launch with NEEDS OVERHAUL and quotes what paying would cost.
+	operations.evaluateLeg = function(typeId, fromPadId, payloadMass, refuel, rocketId, overhaul) {
 		var type = operations.findType(typeId);
 		var pad = R.world.findPadById(fromPadId);
 		var rocket = rocketId ? operations.findRocket(rocketId) : null;
 		var preparation;
-		var result = { ready: false, reason: '', rocket: null, cost: 0, fuelMass: 0, dryMass: 0, twr: 0 };
+		var result = { ready: false, reason: '', rocket: null, cost: 0, fuelMass: 0, dryMass: 0, structureValue: 0, overhaulValue: 0, overhaulCost: 0, twr: 0 };
 
 		if (!type || type.archived) {
 			result.reason = operations.reasons.NO_TYPE;
@@ -368,7 +394,14 @@
 		result.rocket = rocket;
 		result.fuelMass = preparation.fuelMass;
 		result.dryMass = preparation.dryMass;
-		result.cost = operations.planCost(preparation, fromPadId);
+		result.structureValue = preparation.structureValue;
+		result.overhaulValue = R.parts.overhaulValue(type, rocket.stageState);
+		result.overhaulCost = overhaul ? result.overhaulValue * R.economy.priceSteel(fromPadId) : 0;
+		if (result.overhaulValue > 0 && !overhaul) {
+			result.reason = operations.reasons.NEEDS_OVERHAUL;
+			return result;
+		}
+		result.cost = operations.planCost(preparation, fromPadId) + result.overhaulCost;
 		result.twr = R.rocket.launchTwr(type, rocket.stageState, payloadMass);
 		if (result.twr < R.constants.rocket.minimumLaunchTwr) {
 			result.reason = refuel ? operations.reasons.PAYLOAD_OVER : operations.reasons.NEEDS_REFUEL;
@@ -392,6 +425,8 @@
 			toPadId: outbound ? order.destination : order.source,
 			payloadMass: outbound ? order.outboundPayload : order.returnPayload,
 			refuel: outbound || order.fuelPolicy === 'refuel',
+			// Service is bought on the leg that needs it, by whoever authorized it.
+			overhaul: !!order.overhaul,
 			// A contract is carried out, and is delivered (or lost) there: the
 			// leg back is an ordinary standing service.
 			contractId: outbound ? order.contractId || null : null
@@ -415,25 +450,32 @@
 		var type = order.type;
 		var rocket = operations.findRocket(order.rocketId);
 		var preparation = operations.preparePlan(type, rocket, leg.refuel);
-		var launchStats = { dryMass: 0 };
+		var launch = { dryMass: 0, structureValue: 0 };
 		var charges;
 		var quote;
 		var i;
 
 		for (i = 0; i < type.stageCount; i += 1) {
-			launchStats.dryMass += rocket.stageState[i].alive ?
-				R.rocket.stageDryMass(type.stages[i]) :
-				0;
+			if (!rocket.stageState[i].alive) {
+				continue;
+			}
+			launch.dryMass += R.rocket.stageDryMass(type.stages[i]);
+			launch.structureValue += R.parts.stageStructureValue(type.stages[i]);
 		}
 		quote = R.market.quote(leg.fromPadId, leg.toPadId, leg.payloadMass, leg.contractId);
 		charges = {
-			structureMass: launchStats.dryMass,
-			// Capital the leg puts in the air, recorded for later depreciation.
-			structureCost: launchStats.dryMass * R.economy.priceSteel(leg.fromPadId),
-			// A turnaround rebuilds the structure a leg replaced. preparation.dryMass
-			// is 0 for a no-refuel leg, so nothing is charged then; for a refuel it
-			// is the mass of the stages the instance lost, spent at steel price.
-			turnaroundCost: R.economy.turnaround(game, preparation.dryMass, leg.fromPadId),
+			structureMass: launch.dryMass,
+			// Capital the leg puts in the air, recorded for later depreciation:
+			// what the stack that flew would cost to build again.
+			structureCost: launch.structureValue * R.economy.priceSteel(leg.fromPadId),
+			// A turnaround rebuilds the structure a leg replaced, priced through
+			// the parts those stages carry. preparation.structureValue is 0 for a
+			// no-refuel leg, so nothing is charged then.
+			turnaroundCost: R.economy.turnaround(game, preparation.structureValue, leg.fromPadId),
+			// An authorized leg buys the overhaul its engines need, and the seconds
+			// come off the clock.
+			overhaulCost: R.economy.overhaul(game, leg.overhaul ?
+				R.parts.overhaulValue(type, rocket.stageState) : 0, leg.fromPadId),
 			fuelCost: R.economy.refuel(game, preparation.fuelMass, leg.fromPadId),
 			// The payout is quoted now and paid on delivery: a price that moves
 			// while the rocket is in the air cannot change the promise.
@@ -442,6 +484,11 @@
 			fragileSpeed: quote.fragileSpeed,
 			contractId: quote.contractId
 		};
+		if (leg.overhaul) {
+			for (i = 0; i < type.stageCount; i += 1) {
+				rocket.stageState[i].engineBurnTimeUsed = 0;
+			}
+		}
 		if (leg.refuel) {
 			fullStageState(type, rocket.stageState);
 		}
@@ -481,7 +528,7 @@
 			return { ok: false, reason: operations.reasons.CONTRACT_MISMATCH };
 		}
 		operations.forgetDismissal();
-		evaluation = operations.evaluateLeg(spec.typeId, spec.source, spec.outboundPayload, true, spec.rocketId);
+		evaluation = operations.evaluateLeg(spec.typeId, spec.source, spec.outboundPayload, true, spec.rocketId, spec.overhaul);
 		if (!evaluation.ready) {
 			return { ok: false, reason: evaluation.reason };
 		}
@@ -504,6 +551,7 @@
 			type: snapshotType(operations.findType(spec.typeId)),
 			rocketId: evaluation.rocket.id,
 			profileId: spec.profileId,
+			overhaul: !!spec.overhaul,
 			contractId: contract ? contract.id : null,
 			currentLeg: 0,
 			status: 'active',
@@ -549,6 +597,8 @@
 			fuelCost: result.fuelCost,
 			structureCost: result.structureCost,
 			turnaroundCost: result.turnaroundCost,
+			overhaulCost: result.overhaulCost,
+			repairCost: result.repairCost,
 			autopilotFee: result.autopilotFee,
 			cashDelta: result.cashDelta,
 			touchdownVerticalSpeed: result.touchdownVerticalSpeed,
@@ -601,6 +651,7 @@
 		var lastLeg = result.leg >= result.legCount;
 		var complete = lastLeg || result.status !== 'delivered';
 		var returnLeg;
+		var i;
 
 		operations.logEntry(order, result);
 		operations.countRouteLeg(order, result);
@@ -619,6 +670,13 @@
 		operations.touch();
 		rocket.padId = result.landingPadId || rocket.padId;
 		copyStageState(result.stageState, rocket.stageState);
+		// A leg flown counts against the tank of every stage that came back
+		// attached; a stage left in the air is replaced and starts over.
+		for (i = 0; i < stageSlots; i += 1) {
+			if (rocket.stageState[i].alive) {
+				rocket.stageState[i].lifeFlights += 1;
+			}
+		}
 
 		if (result.status === 'crashed') {
 			rocket.status = 'lost';
@@ -666,7 +724,8 @@
 			return { ok: false, reason: operations.reasons.BUSY };
 		}
 		leg = operations.legOf(order, 2);
-		evaluation = operations.evaluateLeg(order.typeId, leg.fromPadId, leg.payloadMass, leg.refuel, order.rocketId);
+		evaluation = operations.evaluateLeg(order.typeId, leg.fromPadId, leg.payloadMass, leg.refuel,
+			order.rocketId, leg.overhaul);
 		if (!evaluation.ready) {
 			return { ok: false, reason: evaluation.reason };
 		}
@@ -725,7 +784,7 @@
 			(route.mode === 'return' && operations.payloadProvider(route.returnPayload, stats.payloadLimit))) {
 			return { ready: false, reason: operations.reasons.PAYLOAD_OVER };
 		}
-		return operations.evaluateLeg(route.typeId, route.source, route.outboundPayload, true, null);
+		return operations.evaluateLeg(route.typeId, route.source, route.outboundPayload, true, null, true);
 	};
 
 	// Refreshes every route's status and wait reason and returns the oldest ready
@@ -780,6 +839,9 @@
 			returnPayload: route.returnPayload,
 			typeId: route.typeId,
 			profileId: route.profileId,
+			// A standing service budgets its own maintenance: its legs buy the
+			// overhaul they need instead of stalling on the pad.
+			overhaul: true,
 			routeId: route.id
 		});
 		operations.touch();

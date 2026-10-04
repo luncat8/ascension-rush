@@ -288,6 +288,37 @@ assert.equal(fixture.getElementById('dispatch-send').disabled, false, 'a validat
 assert.equal(fixture.getElementById('dispatch-blocked').hidden, true, 'with no blocking reason to show');
 assert.ok(fixture.getElementById('dispatch-summary').textContent.indexOf('ROCKET') >= 0,
 	'the summary names the rocket it would use');
+assert.ok(fixture.getElementById('dispatch-summary').textContent.indexOf(R.constants.parts.engines[0].label) >= 0,
+	'and the parts the type is built from');
+
+// The service row reads the clock on the rocket at this pad.
+assert.equal(fixture.getElementById('dispatch-maintenance').hidden, false, 'the service row shows the rocket on the pad');
+assert.ok(fixture.getElementById('dispatch-maintenance-text').textContent.indexOf('S1 0/' +
+	R.constants.parts.engines[0].maxThrottleSeconds + ' s') >= 0, 'with the seconds on its engine');
+assert.equal(fixture.getElementById('dispatch-maintenance-buy').hidden, true, 'and nothing to buy yet');
+
+// A worn engine is a decision the card puts in front of the player: the reason,
+// the price, and the one button that authorizes this leg to buy it.
+var maintenanceRocket = R.operations.state.fleet[0];
+maintenanceRocket.stageState[0].engineBurnTimeUsed = R.constants.parts.engines[0].maxThrottleSeconds + 1;
+R.operations.touch();
+R.deck.sync(game);
+assert.equal(fixture.getElementById('dispatch-send').disabled, true, 'a worn engine holds the send button');
+assert.equal(fixture.getElementById('dispatch-blocked').textContent, R.operations.reasons.NEEDS_OVERHAUL,
+	'and says why');
+assert.ok(fixture.getElementById('dispatch-maintenance-text').textContent.indexOf('OVERHAUL DUE $') >= 0,
+	'the service row quotes the overhaul');
+assert.equal(fixture.getElementById('dispatch-maintenance-buy').hidden, false, 'with a way to buy it');
+fixture.getElementById('dispatch-maintenance-buy').click();
+R.deck.sync(game);
+assert.equal(fixture.getElementById('dispatch-send').disabled, false, 'authorizing it releases the leg');
+assert.equal(fixture.getElementById('dispatch-maintenance-buy').hidden, true, 'and the authorization is spent');
+assert.ok(fixture.getElementById('dispatch-summary').textContent.indexOf('overhaul $') >= 0,
+	'so the leg itemizes the service it will buy');
+maintenanceRocket.stageState[0].engineBurnTimeUsed = 0;
+R.operations.touch();
+R.deck.sync(game);
+assert.equal(fixture.getElementById('dispatch-send').disabled, false, 'a serviced rocket needs no authorization');
 fixture.getElementById('dispatch-send').click();
 assert.equal(game.phase, 'flying', 'one click sends the mission on autopilot');
 assert.equal(R.autopilot.enabled, true, 'and hands it to the autopilot');

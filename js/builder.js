@@ -43,6 +43,10 @@
 		return Math.round(value).toLocaleString('en-US');
 	}
 
+	function formatMoney(value) {
+		return '$' + Math.round(value).toLocaleString('en-US');
+	}
+
 	// Fill a part picker from a catalog table; fairings get a leading "None".
 	function populatePartSelect(select, list, includeNone) {
 		var option;
@@ -110,7 +114,9 @@
 			builder.draft.stages[j].strength = Number(stageStrengthInputs[j].value);
 			builder.draft.stages[j].engineId = stageEngineInputs[j].value;
 			builder.draft.stages[j].tankId = stageTankInputs[j].value;
-			builder.draft.stages[j].fairingId = stageFairingInputs[j].disabled ? null : stageFairingInputs[j].value;
+			// "None" and a barred stage are the same thing: no fairing at all.
+			builder.draft.stages[j].fairingId = stageFairingInputs[j].disabled ? null :
+				(stageFairingInputs[j].value || null);
 		}
 	}
 
@@ -137,6 +143,16 @@
 		var estimatedCost;
 		var warning = '';
 		var stage;
+		var breakdown;
+		var fairing;
+		var engineCost = 0;
+		var tankCost = 0;
+		var fairingCost = 0;
+		var fuelCost = 0;
+		var topStage;
+		var isTop;
+		var steel;
+		var fuelPrice;
 		var j;
 
 		if (!builder.initialized) {
@@ -151,11 +167,9 @@
 			stats = R.operations.typeStats(builder.draft);
 		}
 		ui.payloadValue.textContent = formatMass(builder.draft.nominalPayload) + ' kg';
-		var topStage = builder.draft.stageCount - 1;
-		var structureEngine = 0;
-		var structureTank = 0;
-		var structureFairing = 0;
-		var breakdown;
+		topStage = builder.draft.stageCount - 1;
+		steel = R.economy.priceSteel(builder.padId);
+		fuelPrice = R.economy.priceFuel(builder.padId);
 		for (j = 0; j < stageSlots; j += 1) {
 			stage = builder.draft.stages[j];
 			stageCards[j].hidden = j >= builder.draft.stageCount;
@@ -164,22 +178,30 @@
 			// A fairing rides the top stage only; every other stage is barred from
 			// carrying one, and any it had is cleared so it cannot hide a mass.
 			if (stageFairingInputs[j]) {
-				var isTop = j === topStage;
+				isTop = j === topStage;
 				stageFairingInputs[j].disabled = !isTop;
 				if (!isTop && stage.fairingId) {
 					stage.fairingId = null;
 					stageFairingInputs[j].value = '';
 				}
 			}
+			if (j >= builder.draft.stageCount) {
+				continue;
+			}
+			// The bill of materials: every part's mass at its own costPerMass, so
+			// the groups add up to the price the build button charges.
 			breakdown = R.parts.stageBreakdown(stage);
-			structureEngine += breakdown.engineMass;
-			structureTank += breakdown.tankMass;
-			structureFairing += breakdown.fairingMass;
+			fairing = R.parts.fairing(stage.fairingId);
+			engineCost += breakdown.engineMass * R.parts.engine(stage.engineId).costPerMass * steel;
+			tankCost += breakdown.tankMass * R.parts.tank(stage.tankId).costPerMass * steel;
+			fairingCost += breakdown.fairingMass * (fairing ? fairing.costPerMass : 0) * steel;
+			fuelCost += Math.max(0, stage.fuelMass) * fuelPrice;
 		}
 
 		estimatedCost = R.parts.typeBuildCost(builder.draft, builder.padId);
-		ui.structureDetail.textContent = 'Engines ' + formatMass(structureEngine) + ' kg · Tanks ' +
-			formatMass(structureTank) + ' kg' + (structureFairing > 0 ? ' · Fairing ' + formatMass(structureFairing) + ' kg' : '');
+		ui.structureDetail.textContent = 'Engines ' + formatMoney(engineCost) + ' · Tanks ' +
+			formatMoney(tankCost) + (fairingCost > 0 ? ' · Fairing ' + formatMoney(fairingCost) : '') +
+			' · Fuel ' + formatMoney(fuelCost);
 		ui.mass.textContent = formatMass(stats.totalMass);
 		ui.steel.textContent = formatMass(stats.dryMass);
 		ui.fuel.textContent = formatMass(stats.fuelMass);

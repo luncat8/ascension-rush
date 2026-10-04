@@ -104,6 +104,53 @@ assert.ok(number(byId('workshop-cost')) > costBefore, 'and the price of a new ro
 byId('builder-fuel-0').value = String(R.world.planet.defaultFuel[0]);
 byId('builder-fuel-0').dispatch('input');
 
+// ------------------------------------------------------------- part pickers
+
+assert.equal(byId('builder-engine-0').options.length, R.constants.parts.engines.length,
+	'the engine picker lists the catalog');
+assert.equal(byId('builder-tank-0').options.length, R.constants.parts.tanks.length, 'and so does the tank picker');
+assert.equal(byId('builder-fairing-0').options.length, R.constants.parts.fairings.length + 1,
+	'the fairing picker also offers none');
+assert.equal(byId('builder-fairing-2').disabled, false, 'the top stage may carry a fairing');
+assert.equal(byId('builder-fairing-1').disabled, true, 'a stage below the top may not');
+assert.equal(byId('builder-fairing-0').disabled, true, 'and neither may the booster');
+
+// A part is a price as well as a mass: the quoted mass, price and the bill of
+// materials all move with the picker.
+var partMassBefore = number(byId('workshop-mass'));
+var partCostBefore = number(byId('workshop-cost'));
+var detailBefore = byId('workshop-structure-detail').textContent;
+byId('builder-engine-0').value = 'e-boost';
+byId('builder-engine-0').dispatch('change');
+assert.equal(R.builder.draft.stages[0].engineId, 'e-boost', 'the picker writes the draft');
+assert.ok(number(byId('workshop-mass')) > partMassBefore, 'a booster engine is heavier');
+assert.ok(number(byId('workshop-cost')) > partCostBefore, 'and costs more than its weight in steel');
+assert.match(byId('workshop-structure-detail').textContent, /^Engines \$[\d,]+ · Tanks \$[\d,]+ · Fuel \$[\d,]+$/,
+	'the bill of materials prices engines, tanks and fuel');
+assert.notEqual(byId('workshop-structure-detail').textContent, detailBefore, 'and moves with the part chosen');
+byId('builder-engine-0').value = R.constants.parts.defaultEngineId;
+byId('builder-engine-0').dispatch('change');
+
+// A fairing shows up as mass and as a line of its own.
+byId('builder-fairing-2').value = R.constants.parts.fairings[0].id;
+byId('builder-fairing-2').dispatch('change');
+assert.equal(R.builder.draft.stages[2].fairingId, R.constants.parts.fairings[0].id, 'the top stage takes the fairing');
+assert.match(byId('workshop-structure-detail').textContent, /· Fairing \$[\d,]+ ·/, 'and it is priced separately');
+byId('builder-fairing-2').value = '';
+byId('builder-fairing-2').dispatch('change');
+assert.equal(R.builder.draft.stages[2].fairingId, null, 'and can be taken back off');
+
+// Dropping a stage drops the fairing it carried: it cannot hide on a stage that
+// is no longer part of the build.
+byId('builder-fairing-2').value = R.constants.parts.fairings[0].id;
+byId('builder-fairing-2').dispatch('change');
+byId('workshop-stage-count').value = '2';
+byId('workshop-stage-count').dispatch('change');
+assert.equal(R.builder.draft.stages[2].fairingId, null, 'a stage outside the build keeps no fairing');
+assert.equal(byId('builder-fairing-1').disabled, false, 'the new top stage may carry one');
+byId('workshop-stage-count').value = '3';
+byId('workshop-stage-count').dispatch('change');
+
 // The design payload can never exceed what the type can lift.
 byId('workshop-payload').value = '99999';
 byId('workshop-payload').dispatch('input');

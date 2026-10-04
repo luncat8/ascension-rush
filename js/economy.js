@@ -25,10 +25,6 @@
 		return R.market.price(padOf(padId), 'delivery');
 	};
 
-	economy.estimateBuildCost = function(stats, padId) {
-		return stats.dryMass * economy.priceSteel(padId) + stats.fuelMass * economy.priceFuel(padId);
-	};
-
 	// Every cash movement goes through these two, so the ledger and the balance
 	// cannot drift apart and a leg can itemize what it actually spent.
 	economy.spend = function(game, type, amount) {
@@ -49,11 +45,12 @@
 		return amount;
 	};
 
-	// Buying a fleet instance: the whole structure and a full fuel load. The
-	// rocket that starts a run is granted, not bought.
-	economy.buyRocket = function(game, stats, padId) {
-		var structure = stats.dryMass * economy.priceSteel(padId);
-		var fuel = stats.fuelMass * economy.priceFuel(padId);
+	// Buying a fleet instance: the whole structure, priced through the parts it
+	// is built from (`structureValue` is steel-kg, js/parts.js), and a full fuel
+	// load. The rocket that starts a run is granted, not bought.
+	economy.buyRocket = function(game, structureValue, fuelMass, padId) {
+		var structure = structureValue * economy.priceSteel(padId);
+		var fuel = fuelMass * economy.priceFuel(padId);
 
 		economy.spend(game, 'structure', structure);
 		economy.spend(game, 'fuel', fuel);
@@ -67,9 +64,16 @@
 		return economy.spend(game, 'fuel', fuelMass * economy.priceFuel(padId));
 	};
 
-	// 0.3.5 turnaround: replace the separated stages outright, at steel price.
-	economy.turnaround = function(game, dryMass, padId) {
-		return economy.spend(game, 'turnaround', dryMass * economy.priceSteel(padId));
+	// 0.3.5 turnaround: replace the separated stages outright, at the parts'
+	// value in steel (0.4.2).
+	economy.turnaround = function(game, structureValue, padId) {
+		return economy.spend(game, 'turnaround', structureValue * economy.priceSteel(padId));
+	};
+
+	// 0.4.3 overhaul: buy back the seconds an engine has burned past its rating.
+	// A fraction of a new engine, charged on the leg that needs it.
+	economy.overhaul = function(game, overhaulValue, padId) {
+		return economy.spend(game, 'overhaul', overhaulValue * economy.priceSteel(padId));
 	};
 
 	// Metering only. The propellant was bought at load time.
@@ -84,14 +88,17 @@
 
 	// Records what preparing the leg cost. `structureCost` is the steel value of
 	// the stack that flew — capital at risk for later depreciation, not a charge.
+	// `repairCost` is quoted from 0.4.3 and charged from 0.5.
 	economy.beginFlight = function(game, charges) {
 		var flight = game.flight;
 
 		flight.structureCost = charges.structureCost;
 		flight.turnaroundCost = charges.turnaroundCost;
+		flight.overhaulCost = charges.overhaulCost;
 		flight.fuelCost = charges.fuelCost;
+		flight.repairCost = 0;
 		flight.fuelUsed = 0;
-		flight.cashDelta = -(charges.turnaroundCost + charges.fuelCost);
+		flight.cashDelta = -(charges.turnaroundCost + charges.overhaulCost + charges.fuelCost);
 	};
 
 	economy.finishFlight = function(game, reward, fee) {

@@ -15,7 +15,10 @@
 		typeId: null,
 		rocketId: null,
 		profileId: R.constants.autopilotProfiles[0].id,
-		contractId: null
+		contractId: null,
+		// Buying the overhaul a worn engine needs is the player's call on a leg
+		// they are sending by hand; it is cleared whenever the rocket changes.
+		overhaul: false
 	};
 	var review = { routeId: null, logId: null, spec: null };
 	var typePickerRouteId = null;
@@ -249,13 +252,68 @@
 		return row;
 	}
 
+	function countStagesWith(type, field, id) {
+		var count = 0;
+		var i;
+
+		for (i = 0; i < type.stageCount; i += 1) {
+			if (type.stages[i][field] === id) {
+				count += 1;
+			}
+		}
+		return count;
+	}
+
+	function appendPartGroup(type, field, table, line) {
+		var count;
+		var i;
+
+		for (i = 0; i < table.length; i += 1) {
+			count = countStagesWith(type, field, table[i].id);
+			if (count > 0) {
+				line += (line ? ' · ' : '') + table[i].label + (count > 1 ? ' ×' + count : '');
+			}
+		}
+		return line;
+	}
+
+	// What the instance on the pad has on the clock: engine seconds against the
+	// rating, and legs flown against the tank's, one entry per stage attached.
+	function serviceLine(type, rocket) {
+		var line = '';
+		var slot;
+		var i;
+
+		for (i = 0; i < type.stageCount; i += 1) {
+			slot = rocket.stageState[i];
+			if (!slot.alive) {
+				continue;
+			}
+			line += (line ? ' · ' : '') + 'S' + (i + 1) + ' ' + Math.round(slot.engineBurnTimeUsed) + '/' +
+				R.parts.engine(type.stages[i].engineId).maxThrottleSeconds + ' s · ' + slot.lifeFlights + '/' +
+				R.parts.tank(type.stages[i].tankId).maxFlights + ' legs';
+		}
+		return line || 'no stages attached';
+	}
+
+	// What the selected type is built from, named from the catalog: the dispatch
+	// card shows the parts, so a build's price is legible before it is bought.
+	function partsLine(type) {
+		var catalog = R.constants.parts;
+		var line = appendPartGroup(type, 'engineId', catalog.engines, '');
+
+		line = appendPartGroup(type, 'tankId', catalog.tanks, line);
+		return appendPartGroup(type, 'fairingId', catalog.fairings, line);
+	}
+
 	// The dispatch card's read-only summary and the reason the send button is
 	// disabled come from the same evaluation the scheduler uses.
 	function renderDispatch(game) {
 		var state = R.operations.state;
 		var mission = state.mission;
 		var type = R.operations.findType(form.typeId);
-		var evaluation = R.operations.evaluateLeg(form.typeId, form.sourcePadId, form.outboundPayload, true, form.rocketId);
+		var evaluation = R.operations.evaluateLeg(form.typeId, form.sourcePadId, form.outboundPayload, true,
+			form.rocketId, form.overhaul);
 		var typeStats = type ? R.operations.typeStats(type) : null;
 		var capacity = typeStats ? Math.floor(typeStats.payloadLimit) : 0;
 		var legDistance = R.operations.legDistance(form.sourcePadId, form.targetPadId);
@@ -264,6 +322,8 @@
 		var returnEvaluation = null;
 		var contract = form.contractId ? R.market.find(form.contractId) : null;
 		var quote = null;
+		var buildCost = 0;
+		var overhaulPrice = 0;
 		var blocked = '';
 		var rocket;
 
@@ -301,7 +361,7 @@
 		ui.returnCard.hidden = !mission || mission.status !== 'awaiting-return';
 		if (mission && mission.status === 'awaiting-return') {
 			returnEvaluation = R.operations.evaluateLeg(mission.typeId, mission.destination, mission.returnPayload,
-				mission.fuelPolicy === 'refuel', mission.rocketId);
+				mission.fuelPolicy === 'refuel', mission.rocketId, mission.overhaul);
 			returnCost = returnEvaluation.cost;
 			ui.returnText.textContent = 'Return leg waiting · ' + padName(mission.destination) + ' → ' +
 				padName(mission.source) + ' · ' + mass(mission.returnPayload) +
@@ -345,8 +405,9 @@
 
 		ui.build.hidden = !type;
 		if (type) {
-			ui.buildLabel.textContent = 'Build rocket here · ' + money(R.economy.estimateBuildCost(typeStats));
-			ui.build.disabled = game.cash < R.economy.estimateBuildCost(typeStats) || game.phase !== 'deck';
+			buildCost = R.parts.typeBuildCost(type, form.sourcePadId);
+			ui.buildLabel.textContent = 'Build rocket here · ' + money(buildCost);
+			ui.build.disabled = game.cash < buildCost || game.phase !== 'deck';
 		}
 
 		ui.summary.innerHTML = '';
@@ -358,9 +419,25 @@
 		ui.summary.appendChild(summaryRow('ROCKET', rocket ?
 			'#' + rocket.id + ' ' + type.name + ' · ' + padName(rocket.padId) + ' · ' + rocket.status :
 			'none of this type at ' + padName(form.sourcePadId)));
+		if (type) {
+			ui.summary.appendChild(summaryRow('PARTS', partsLine(type)));
+		}
+
+		ui.maintenance.hidden = !rocket;
+		if (rocket) {
+			overhaulPrice = evaluation.overhaulValue * R.economy.priceSteel(form.sourcePadId);
+			ui.maintenanceText.textContent = 'Service · #' + rocket.id + ' · ' + serviceLine(type, rocket) +
+				(evaluation.overhaulValue > 0 ? (form.overhaul ?
+					' · OVERHAUL ON THIS LEG ' + money(evaluation.overhaulCost) :
+					' · OVERHAUL DUE ' + money(overhaulPrice)) : '');
+			ui.maintenanceBuy.hidden = evaluation.overhaulValue <= 0 || form.overhaul;
+			ui.maintenanceBuy.textContent = 'Add overhaul to this leg · ' + money(overhaulPrice);
+			ui.maintenanceBuy.disabled = game.cash < overhaulPrice;
+		}
 		ui.summary.appendChild(summaryRow('THIS LEG', evaluation.ready || evaluation.reason === R.operations.reasons.INSUFFICIENT_FUNDS ?
 			'up to ' + money(evaluation.cost) + ' (fuel ' + money(evaluation.fuelMass * R.economy.priceFuel(form.sourcePadId)) +
-			' · structure ' + money(evaluation.dryMass * R.economy.priceSteel(form.sourcePadId)) + ')' : '—'));
+			' · structure ' + money(evaluation.structureValue * R.economy.priceSteel(form.sourcePadId)) +
+			(evaluation.overhaulCost > 0 ? ' · overhaul ' + money(evaluation.overhaulCost) : '') + ')' : '—'));
 		quote = R.market.quote(form.sourcePadId, form.targetPadId, form.outboundPayload, form.contractId);
 		ui.summary.appendChild(summaryRow('PAYS', money(quote.reward) + ' at $' + quote.pricePerKg.toFixed(2) + '/kg' +
 			(form.contractId ? ' · contract' : '')));
@@ -391,7 +468,8 @@
 			typeId: form.typeId,
 			rocketId: form.rocketId,
 			profileId: form.profileId,
-			contractId: form.contractId
+			contractId: form.contractId,
+			overhaul: form.overhaul
 		});
 
 		if (!result.ok) {
@@ -400,6 +478,7 @@
 		}
 		// The contract is flying with the rocket now; the form starts clean.
 		form.contractId = null;
+		form.overhaul = false;
 		deck.openOverride = false;
 		deck.announce('Mission ' + padName(form.sourcePadId) + ' to ' + padName(form.targetPadId) + ' launched on autopilot.');
 		ui.send.blur();
@@ -605,6 +684,7 @@
 		detail.appendChild(summaryRow('CASH', 'revenue ' + money(entry.revenue) +
 			(entry.rewardPerKg > 0 ? ' ($' + entry.rewardPerKg.toFixed(2) + '/kg' + (entry.contractId ? ' · contract' : '') + ')' : '') +
 			' · fuel ' + money(entry.fuelCost) + ' · turnaround ' + money(entry.turnaroundCost) +
+			(entry.overhaulCost > 0 ? ' · overhaul ' + money(entry.overhaulCost) : '') +
 			' · fee ' + money(entry.autopilotFee)));
 		detail.appendChild(summaryRow('NET', (entry.cashDelta < 0 ? '−' : '+') + money(Math.abs(entry.cashDelta))));
 		card.appendChild(detail);
@@ -880,6 +960,7 @@
 		form.profileId = type.defaultProfileId;
 		form.outboundPayload = type.nominalPayload;
 		form.returnPayload = type.nominalPayload;
+		form.overhaul = false;
 		deck.tab = 'dispatch';
 		deck.openOverride = false;
 		deck.revision = -1;
@@ -939,6 +1020,9 @@
 		ui.type = doc.getElementById('dispatch-type');
 		ui.rocket = doc.getElementById('dispatch-rocket');
 		ui.build = doc.getElementById('dispatch-build');
+		ui.maintenance = doc.getElementById('dispatch-maintenance');
+		ui.maintenanceText = doc.getElementById('dispatch-maintenance-text');
+		ui.maintenanceBuy = doc.getElementById('dispatch-maintenance-buy');
 		ui.buildLabel = doc.getElementById('dispatch-build-label');
 		ui.profile = doc.getElementById('dispatch-profile');
 		ui.profileHint = doc.getElementById('dispatch-profile-hint');
@@ -1045,10 +1129,13 @@
 			form.outboundPayload = Math.min(form.outboundPayload, type.nominalPayload);
 			form.returnPayload = Math.min(form.returnPayload, type.nominalPayload);
 			form.rocketId = null;
+			form.overhaul = false;
 			R.operations.touch();
 		});
 		on(ui.rocket, 'change', function() {
 			form.rocketId = ui.rocket.value ? Number(ui.rocket.value) : null;
+			// The authorization was for the rocket it was quoted against.
+			form.overhaul = false;
 			R.operations.touch();
 		});
 		on(ui.profile, 'change', function() {
@@ -1057,6 +1144,10 @@
 		});
 		on(ui.build, 'click', function() {
 			R.builder.open(R.game, { typeId: form.typeId, padId: form.sourcePadId });
+		});
+		on(ui.maintenanceBuy, 'click', function() {
+			form.overhaul = true;
+			R.operations.touch();
 		});
 		on(ui.workshopButton, 'click', function() {
 			R.builder.open(R.game, { typeId: form.typeId, padId: form.sourcePadId });

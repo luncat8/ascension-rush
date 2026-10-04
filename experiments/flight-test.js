@@ -107,7 +107,8 @@ R.rocket.evaluateBuild(defaultConfig, stats);
 assert.ok(stats.twr > R.constants.rocket.minimumLaunchTwr, 'default rocket has enough lift');
 assert.equal(stats.totalMass, stats.dryMass + stats.fuelMass + defaultConfig.payloadMass);
 assert.ok(stats.deltaV > 3000 && stats.deltaV < 4000, 'staged rocket-equation estimate is plausible');
-assert.ok(R.economy.estimateBuildCost(stats) < R.economy.startingCash, 'default build is affordable');
+assert.ok(R.parts.typeBuildCost({ stageCount: defaultConfig.stageCount, stages: defaultConfig.stages }, home.id) <
+	R.economy.startingCash, 'default build is affordable');
 R.world.initialize('cinder');
 var cinderStats = R.rocket.createStats();
 R.rocket.evaluateBuild(defaultConfig, cinderStats);

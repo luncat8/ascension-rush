@@ -77,49 +77,133 @@
 		return Math.max(0, stage.fuelMass || 0) * parts.engine(stage.engineId).thrustPerFuelMass;
 	};
 
-	// Steel price of the structure a turnaround replaces, folded through each
-	// part's costPerMass. The default parts are 1, so this equals
-	// dryMass * priceSteel and the 0.4.1 money baseline is untouched.
-	parts.typeStructureCost = function(type, stageState, padId) {
-		var cost = 0;
+	// What a stage's structure is worth, in steel-kg: every part's mass at its
+	// own price. The default parts cost 1 per kg, so for a reference build this
+	// is exactly dryMass and the money 0.4.1 moved is unchanged — a part's
+	// costPerMass is the only thing that makes an alternative cost more or less
+	// than its weight.
+	parts.stageStructureValue = function(stage) {
+		var breakdown = parts.stageBreakdown(stage);
+		var fairing = parts.fairing(stage.fairingId);
+
+		return breakdown.engineMass * parts.engine(stage.engineId).costPerMass +
+			breakdown.tankMass * parts.tank(stage.tankId).costPerMass +
+			breakdown.fairingMass * (fairing ? fairing.costPerMass : 1);
+	};
+
+	parts.typeStructureValue = function(type) {
+		var value = 0;
 		var i;
-		var stage;
-		var breakdown;
-		var engine;
-		var tank;
-		var fairing;
 
 		for (i = 0; i < type.stageCount; i += 1) {
-			if (stageState[i].alive) {
-				continue;
-			}
-			stage = type.stages[i];
-			breakdown = parts.stageBreakdown(stage);
-			engine = parts.engine(stage.engineId);
-			tank = parts.tank(stage.tankId);
-			fairing = parts.fairing(stage.fairingId);
-			cost += breakdown.engineMass * engine.costPerMass;
-			cost += breakdown.tankMass * tank.costPerMass;
-			cost += breakdown.fairingMass * (fairing ? fairing.costPerMass : 1);
+			value += parts.stageStructureValue(type.stages[i]);
 		}
-		return cost * R.economy.priceSteel(padId);
+		return value;
+	};
+
+	// The structure a turnaround replaces: the stages the instance no longer has.
+	parts.restoreStructureValue = function(type, stageState) {
+		var value = 0;
+		var i;
+
+		for (i = 0; i < type.stageCount; i += 1) {
+			if (!stageState[i].alive) {
+				value += parts.stageStructureValue(type.stages[i]);
+			}
+		}
+		return value;
+	};
+
+	parts.typeFuelMass = function(type) {
+		var fuel = 0;
+		var i;
+
+		for (i = 0; i < type.stageCount; i += 1) {
+			fuel += Math.max(0, type.stages[i].fuelMass);
+		}
+		return fuel;
 	};
 
 	// The price of building a whole rocket of a type: every stage's structure at
 	// steel price plus a full load of fuel. (A turnaround only rebuilds the
-	// stages an instance lost, which is restorePlan's job, not this.)
+	// stages an instance lost, which is restoreStructureValue's job, not this.)
 	parts.typeBuildCost = function(type, padId) {
-		var structure = 0;
-		var fuel = 0;
+		return parts.typeStructureValue(type) * R.economy.priceSteel(padId) +
+			parts.typeFuelMass(type) * R.economy.priceFuel(padId);
+	};
+
+	parts.typeStructureCost = function(type, stageState, padId) {
+		return parts.restoreStructureValue(type, stageState) * R.economy.priceSteel(padId);
+	};
+
+	// ------------------------------------------------------------- service life
+
+	// Wear lives on the fleet instance's stage (`engineBurnTimeUsed` seconds at
+	// throttle, `lifeFlights` legs flown, `stress` from 0.5), and a stage the
+	// turnaround replaces comes back with none of it.
+
+	// A tank is flown out on the leg after its rating: the turnaround that
+	// follows replaces the stage, which is what a life limit costs.
+	parts.wornOut = function(stage, slot) {
+		return slot.lifeFlights >= parts.tank(stage.tankId).maxFlights;
+	};
+
+	parts.flightsLeft = function(stage, slot) {
+		return parts.tank(stage.tankId).maxFlights - slot.lifeFlights;
+	};
+
+	// An engine is overdue once it has burned longer than it is rated for, and
+	// stays overdue until an overhaul buys the seconds back.
+	parts.engineOverdue = function(stage, slot) {
+		return slot.engineBurnTimeUsed >= parts.engine(stage.engineId).maxThrottleSeconds;
+	};
+
+	parts.burnTimeLeft = function(stage, slot) {
+		return parts.engine(stage.engineId).maxThrottleSeconds - slot.engineBurnTimeUsed;
+	};
+
+	// An overhaul is a fraction of a new engine, in steel-kg.
+	parts.stageOverhaulValue = function(stage) {
+		return parts.stageBreakdown(stage).engineMass * parts.engine(stage.engineId).costPerMass *
+			R.constants.parts.overhaulFactor;
+	};
+
+	// What servicing the stack on the pad costs: every attached engine that is
+	// past its rating. A stage already being rebuilt is not charged twice.
+	parts.overhaulValue = function(type, stageState) {
+		var value = 0;
 		var i;
-		var breakdown;
 
 		for (i = 0; i < type.stageCount; i += 1) {
-			breakdown = parts.stageBreakdown(type.stages[i]);
-			structure += breakdown.dryMass;
-			fuel += Math.max(0, type.stages[i].fuelMass);
+			if (stageState[i].alive && parts.engineOverdue(type.stages[i], stageState[i])) {
+				value += parts.stageOverhaulValue(type.stages[i]);
+			}
 		}
-		return structure * R.economy.priceSteel(padId) + fuel * R.economy.priceFuel(padId);
+		return value;
+	};
+
+	// The repair bill 0.5 charges: the stress a stage arrived with times what its
+	// parts cost to put right per kg. Both are 0 until 0.5 measures touchdown
+	// hardness, so from 0.4.3 this is quoted in the log and never charged.
+	parts.stageRepairValue = function(stage, slot) {
+		var breakdown = parts.stageBreakdown(stage);
+		var fairing = parts.fairing(stage.fairingId);
+
+		return slot.stress * (breakdown.engineMass * parts.engine(stage.engineId).repairPerKg +
+			breakdown.tankMass * parts.tank(stage.tankId).repairPerKg +
+			breakdown.fairingMass * (fairing ? fairing.repairPerKg : 0));
+	};
+
+	parts.repairValue = function(type, stageState) {
+		var value = 0;
+		var i;
+
+		for (i = 0; i < type.stageCount; i += 1) {
+			if (stageState[i].alive) {
+				value += parts.stageRepairValue(type.stages[i], stageState[i]);
+			}
+		}
+		return value;
 	};
 
 	if (typeof module !== 'undefined' && module.exports) {

@@ -47,4 +47,17 @@ assert.equal(result.angleOfAttack, 0, 'zero speed has zero AoA');
 assert.equal(result.dragAccelX, 0);
 assert.equal(result.dragAccelY, 0);
 
+// The reference area is the fairing's lever: an explicit area scales drag by
+// exactly that ratio, and no area at all is the rocket constant.
+var bare = R.aerodynamics.calculate(atmosphereDensity, 0, speed, 0, 1000, result);
+var bareDrag = bare.dragAccelY;
+var fairingFraction = 0.6;
+var faired = R.aerodynamics.calculate(atmosphereDensity, 0, speed, 0, 1000, result,
+	R.constants.rocket.referenceArea * fairingFraction);
+var fairedDrag = faired.dragAccelY;
+R.aerodynamics.calculate(atmosphereDensity, 0, speed, 0, 1000, result, R.constants.rocket.referenceArea);
+assert.equal(result.dragAccelY, bareDrag, 'the explicit rocket area is the same as passing none');
+assert.ok(Math.abs(fairedDrag - bareDrag * fairingFraction) < 1e-15, 'a fairing scales drag by its fraction');
+assert.ok(Math.abs(fairedDrag) < Math.abs(bareDrag), 'a fairing reduces drag');
+
 console.log('Aerodynamics tests passed.');
