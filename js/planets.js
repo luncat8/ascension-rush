@@ -32,7 +32,7 @@
 				{ name: 'Farport', frac: 0.5 },
 				{ name: 'Westport', frac: 0.75 }
 			],
-			prices: { fuel: 1.4, steel: 2.5, delivery: 60 },
+			prices: { fuel: 4.1, steel: 2.5, delivery: 18 },
 			defaultFuel: [420, 260, 200],
 			defaultPayload: 80,
 			flight: { maxDynamicPressure: 28000, maxThrustAcceleration: 22, maxAngleOfAttackDeg: 55 }
@@ -56,7 +56,7 @@
 				{ name: 'Rim Relay', frac: 0.5 },
 				{ name: 'Tinstack', frac: 0.68 }
 			],
-			prices: { fuel: 0.9, steel: 2.0, delivery: 42 },
+			prices: { fuel: 2.6, steel: 2.0, delivery: 3.5 },
 			defaultFuel: [200, 140, 100],
 			defaultPayload: 80,
 			flight: { cruiseAltitudeMax: 1500, glideSlope: 0.5, climbVelocity: 70, maxThrustAcceleration: 16 }
@@ -80,7 +80,7 @@
 				{ name: 'Slagworks', frac: 0.5 },
 				{ name: 'Anvil', frac: 0.75 }
 			],
-			prices: { fuel: 2.6, steel: 3.6, delivery: 130 },
+			prices: { fuel: 5.5, steel: 3.6, delivery: 130 },
 			defaultFuel: [1500, 900, 400],
 			defaultPayload: 60,
 			flight: { cruiseAltitudeMax: 2500, climbVelocity: 120, maxDynamicPressure: 70000, maxThrustAcceleration: 34, maxAngleOfAttackDeg: 60 }
@@ -104,7 +104,7 @@
 				{ name: 'Halcyon', frac: 0.45 },
 				{ name: 'Zephyr', frac: 0.75 }
 			],
-			prices: { fuel: 1.1, steel: 2.2, delivery: 85 },
+			prices: { fuel: 5.0, steel: 2.2, delivery: 20 },
 			defaultFuel: [380, 240, 180],
 			defaultPayload: 80,
 			flight: { cruiseAltitudeMax: 2500, glideSlope: 0.55, climbVelocity: 80, maxDynamicPressure: 60000, maxThrustAcceleration: 22, maxAngleOfAttackDeg: 35 }

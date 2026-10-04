@@ -290,6 +290,8 @@ assert.ok(fixture.getElementById('dispatch-summary').textContent.indexOf('ROCKET
 	'the summary names the rocket it would use');
 assert.ok(fixture.getElementById('dispatch-summary').textContent.indexOf(R.constants.parts.engines[0].label) >= 0,
 	'and the parts the type is built from');
+assert.ok(/PROFIT[+-]/.test(fixture.getElementById('dispatch-summary').textContent),
+	'and the margin the leg books before it is sent');
 
 // The service row reads the clock on the rocket at this pad.
 assert.equal(fixture.getElementById('dispatch-maintenance').hidden, false, 'the service row shows the rocket on the pad');
@@ -319,6 +321,25 @@ maintenanceRocket.stageState[0].engineBurnTimeUsed = 0;
 R.operations.touch();
 R.deck.sync(game);
 assert.equal(fixture.getElementById('dispatch-send').disabled, false, 'a serviced rocket needs no authorization');
+
+// The authorization belongs to the pad it was quoted against: moving the leg to
+// another pad clears it, so the price is put in front of the player again
+// instead of being paid for a rocket that was never evaluated.
+var overhaulType = R.operations.findType(maintenanceRocket.typeId);
+var farportRocket = R.operations.createRocket(overhaulType, R.world.pads[2]);
+farportRocket.stageState[0].engineBurnTimeUsed = R.constants.parts.engines[0].maxThrottleSeconds + 1;
+var fromSelect = fixture.getElementById('dispatch-from');
+fromSelect.value = R.world.pads[2].id;
+fromSelect.dispatch('change', {});
+R.deck.sync(game);
+assert.equal(fixture.getElementById('dispatch-send').disabled, true, 'leaving the pad drops the authorization');
+assert.equal(fixture.getElementById('dispatch-blocked').textContent, R.operations.reasons.NEEDS_OVERHAUL,
+	'so the worn engine at the new pad holds the launch again');
+assert.equal(fixture.getElementById('dispatch-maintenance-buy').hidden, false, 'with its price to buy again');
+fromSelect.value = R.world.pads[0].id;
+fromSelect.dispatch('change', {});
+R.deck.sync(game);
+
 fixture.getElementById('dispatch-send').click();
 assert.equal(game.phase, 'flying', 'one click sends the mission on autopilot');
 assert.equal(R.autopilot.enabled, true, 'and hands it to the autopilot');

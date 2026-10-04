@@ -88,7 +88,8 @@
 
 	// Records what preparing the leg cost. `structureCost` is the steel value of
 	// the stack that flew — capital at risk for later depreciation, not a charge.
-	// `repairCost` is quoted from 0.4.3 and charged from 0.5.
+	// `repairCost` is quoted from 0.4.3 and charged from 0.5, so it is recorded
+	// on the flight and in the log without moving cash yet.
 	economy.beginFlight = function(game, charges) {
 		var flight = game.flight;
 
@@ -96,7 +97,7 @@
 		flight.turnaroundCost = charges.turnaroundCost;
 		flight.overhaulCost = charges.overhaulCost;
 		flight.fuelCost = charges.fuelCost;
-		flight.repairCost = 0;
+		flight.repairCost = charges.repairCost;
 		flight.fuelUsed = 0;
 		flight.cashDelta = -(charges.turnaroundCost + charges.overhaulCost + charges.fuelCost);
 	};

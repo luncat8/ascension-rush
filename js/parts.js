@@ -136,17 +136,24 @@
 		return parts.restoreStructureValue(type, stageState) * R.economy.priceSteel(padId);
 	};
 
-	// ------------------------------------------------------------- service life
+// ------------------------------------------------------------- service life
 
-	// Wear lives on the fleet instance's stage (`engineBurnTimeUsed` seconds at
-	// throttle, `lifeFlights` legs flown, `stress` from 0.5), and a stage the
-	// turnaround replaces comes back with none of it.
+// Wear lives on the fleet instance's stage (`engineBurnTimeUsed` seconds at
+// throttle, `lifeFlights` legs flown, `stress` from 0.5), and a stage the
+// turnaround replaces comes back with none of it.
 
-	// A tank is flown out on the leg after its rating: the turnaround that
-	// follows replaces the stage, which is what a life limit costs.
-	parts.wornOut = function(stage, slot) {
-		return slot.lifeFlights >= parts.tank(stage.tankId).maxFlights;
-	};
+// The stages a leg keeps flying: attached, and not on a stage this leg's
+// turnaround is already replacing. A stage that is rebuilt comes back new, so
+// nothing spent on the old one — an overhaul, a repair — carries over to it.
+function keptStage(stage, slot, refuel) {
+	return slot.alive && !(refuel && parts.wornOut(stage, slot));
+}
+
+// A tank is flown out on the leg after its rating: the turnaround that
+// follows replaces the stage, which is what a life limit costs.
+parts.wornOut = function(stage, slot) {
+	return slot.lifeFlights >= parts.tank(stage.tankId).maxFlights;
+};
 
 	parts.flightsLeft = function(stage, slot) {
 		return parts.tank(stage.tankId).maxFlights - slot.lifeFlights;
@@ -162,25 +169,41 @@
 		return parts.engine(stage.engineId).maxThrottleSeconds - slot.engineBurnTimeUsed;
 	};
 
-	// An overhaul is a fraction of a new engine, in steel-kg.
-	parts.stageOverhaulValue = function(stage) {
-		return parts.stageBreakdown(stage).engineMass * parts.engine(stage.engineId).costPerMass *
-			R.constants.parts.overhaulFactor;
-	};
+// An overhaul is a fraction of a new engine, in steel-kg.
+parts.stageOverhaulValue = function(stage) {
+	return parts.stageBreakdown(stage).engineMass * parts.engine(stage.engineId).costPerMass *
+		R.constants.parts.overhaulFactor;
+};
 
-	// What servicing the stack on the pad costs: every attached engine that is
-	// past its rating. A stage already being rebuilt is not charged twice.
-	parts.overhaulValue = function(type, stageState) {
-		var value = 0;
-		var i;
+// What servicing the stack on the pad costs: every engine the leg keeps flying
+// that is past its rating. A stage the turnaround is rebuilding is not serviced
+// twice — it comes back with a fresh engine.
+parts.overhaulValue = function(type, stageState, refuel) {
+	var value = 0;
+	var i;
 
-		for (i = 0; i < type.stageCount; i += 1) {
-			if (stageState[i].alive && parts.engineOverdue(type.stages[i], stageState[i])) {
-				value += parts.stageOverhaulValue(type.stages[i]);
-			}
+	for (i = 0; i < type.stageCount; i += 1) {
+		if (keptStage(type.stages[i], stageState[i], refuel) &&
+			parts.engineOverdue(type.stages[i], stageState[i])) {
+			value += parts.stageOverhaulValue(type.stages[i]);
 		}
-		return value;
-	};
+	}
+	return value;
+};
+
+// The seconds an authorized overhaul buys back: exactly the engines its price
+// covered, so a stage that was not due keeps the clock it has.
+parts.applyOverhaul = function(type, stageState, refuel) {
+	var i;
+
+	for (i = 0; i < type.stageCount; i += 1) {
+		if (keptStage(type.stages[i], stageState[i], refuel) &&
+			parts.engineOverdue(type.stages[i], stageState[i])) {
+			stageState[i].engineBurnTimeUsed = 0;
+		}
+	}
+	return stageState;
+};
 
 	// The repair bill 0.5 charges: the stress a stage arrived with times what its
 	// parts cost to put right per kg. Both are 0 until 0.5 measures touchdown
@@ -194,17 +217,17 @@
 			breakdown.fairingMass * (fairing ? fairing.repairPerKg : 0));
 	};
 
-	parts.repairValue = function(type, stageState) {
-		var value = 0;
-		var i;
+parts.repairValue = function(type, stageState, refuel) {
+	var value = 0;
+	var i;
 
-		for (i = 0; i < type.stageCount; i += 1) {
-			if (stageState[i].alive) {
-				value += parts.stageRepairValue(type.stages[i], stageState[i]);
-			}
+	for (i = 0; i < type.stageCount; i += 1) {
+		if (keptStage(type.stages[i], stageState[i], refuel)) {
+			value += parts.stageRepairValue(type.stages[i], stageState[i]);
 		}
-		return value;
-	};
+	}
+	return value;
+};
 
 	if (typeof module !== 'undefined' && module.exports) {
 		module.exports = parts;

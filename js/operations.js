@@ -395,7 +395,7 @@
 		result.fuelMass = preparation.fuelMass;
 		result.dryMass = preparation.dryMass;
 		result.structureValue = preparation.structureValue;
-		result.overhaulValue = R.parts.overhaulValue(type, rocket.stageState);
+		result.overhaulValue = R.parts.overhaulValue(type, rocket.stageState, refuel);
 		result.overhaulCost = overhaul ? result.overhaulValue * R.economy.priceSteel(fromPadId) : 0;
 		if (result.overhaulValue > 0 && !overhaul) {
 			result.reason = operations.reasons.NEEDS_OVERHAUL;
@@ -473,10 +473,14 @@
 			// no-refuel leg, so nothing is charged then.
 			turnaroundCost: R.economy.turnaround(game, preparation.structureValue, leg.fromPadId),
 			// An authorized leg buys the overhaul its engines need, and the seconds
-			// come off the clock.
+			// come off the clock — exactly the engines the price covered.
 			overhaulCost: R.economy.overhaul(game, leg.overhaul ?
-				R.parts.overhaulValue(type, rocket.stageState) : 0, leg.fromPadId),
+				R.parts.overhaulValue(type, rocket.stageState, leg.refuel) : 0, leg.fromPadId),
 			fuelCost: R.economy.refuel(game, preparation.fuelMass, leg.fromPadId),
+			// The repair bill the stack arrives with, quoted at the pad that would
+			// do the work. 0.5 charges it, when touchdown hardness fills `stress`.
+			repairCost: R.parts.repairValue(type, rocket.stageState, leg.refuel) *
+				R.economy.priceSteel(leg.fromPadId),
 			// The payout is quoted now and paid on delivery: a price that moves
 			// while the rocket is in the air cannot change the promise.
 			rewardQuote: quote.reward,
@@ -485,9 +489,7 @@
 			contractId: quote.contractId
 		};
 		if (leg.overhaul) {
-			for (i = 0; i < type.stageCount; i += 1) {
-				rocket.stageState[i].engineBurnTimeUsed = 0;
-			}
+			R.parts.applyOverhaul(type, rocket.stageState, leg.refuel);
 		}
 		if (leg.refuel) {
 			fullStageState(type, rocket.stageState);

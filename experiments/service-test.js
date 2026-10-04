@@ -263,6 +263,40 @@ var entry = fly();
 assert.equal(entry.overhaulCost, overhaulCharged, 'the log keeps the overhaul on the leg that paid it');
 assert.equal(entry.repairCost, 0, 'and quotes the repair bill 0.5 will fill');
 
+// An overdue engine is overhauled; one that is not due keeps its clock, because
+// the price only covered the engine that was past its rating.
+createRun();
+reference = R.operations.state.types[0];
+rocket = instance();
+rocket.stageState[0].engineBurnTimeUsed = standardEngine.maxThrottleSeconds;
+rocket.stageState[1].engineBurnTimeUsed = standardEngine.maxThrottleSeconds - 60;
+assert.equal(send({ overhaul: true }).ok, true, 'the authorized leg is dispatched');
+assert.equal(rocket.stageState[0].engineBurnTimeUsed, 0, 'the overdue engine is overhauled');
+assert.equal(rocket.stageState[1].engineBurnTimeUsed, standardEngine.maxThrottleSeconds - 60,
+	'and an engine that was not due keeps the seconds it has');
+fly();
+
+// A stage the turnaround is rebuilding is not serviced twice: its tank is flown
+// out, the leg refuels, so the stage comes back with a fresh engine and the
+// overhaul gate does not fire for it. A no-refuel leg keeps flying that stage,
+// so its engine is the one that is overdue.
+createRun();
+var wornOverhaulType = addType([parts.sanitizeStage({ fuelMass: 400, strength: 0.9 })], 'worn stage type');
+R.operations.state.fleet.length = 0;
+R.operations.createRocket(wornOverhaulType, home);
+rocket = instance();
+rocket.stageState[0].lifeFlights = parts.tank(catalog.defaultTankId).maxFlights;
+rocket.stageState[0].engineBurnTimeUsed = standardEngine.maxThrottleSeconds;
+assert.equal(parts.overhaulValue(wornOverhaulType, rocket.stageState, true), 0,
+	'a stage the turnaround replaces is not overhauled');
+assert.equal(parts.overhaulValue(wornOverhaulType, rocket.stageState, false),
+	parts.stageOverhaulValue(wornOverhaulType.stages[0]),
+	'but a no-refuel leg still flies the worn stage and services its engine');
+var wornOverhaulLeg = R.operations.evaluateLeg(wornOverhaulType.id, home.id,
+	R.world.planet.defaultPayload, true, null, false);
+assert.equal(wornOverhaulLeg.ready, true, 'so the refuel leg is not held by the overhaul gate');
+assert.equal(wornOverhaulLeg.overhaulValue, 0, 'and quotes no service for a stage it is replacing');
+
 // A leg that needs no service pays none, on the same rocket.
 createRun();
 reference = R.operations.state.types[0];
@@ -312,5 +346,22 @@ rocket.stageState[0].stress = 5;
 assert.equal(parts.stageRepairValue(reference.stages[0], rocket.stageState[0]), 0,
 	'stress with no repair rate yet costs nothing');
 assert.equal(parts.repairValue(reference, rocket.stageState), 0, 'and neither does the stack');
+
+// The bill is quoted from 0.4.3: with a repair rate on the parts it reaches the
+// flight record and the log row, and the cash never moves until 0.5 charges it.
+catalog.engines[0].repairPerKg = 0.5;
+var stressedEngineMass = parts.stageBreakdown(reference.stages[0]).engineMass;
+var repairQuote = stressedEngineMass * 5 * 0.5 * R.economy.priceSteel(home.id);
+var repairCashBefore = game.cash;
+try {
+	assert.ok(parts.repairValue(reference, rocket.stageState) > 0, 'a stressed stack now has a bill');
+	assert.equal(send({}).ok, true, 'and the leg still flies: the repair is quoted, not gated');
+	assert.equal(game.flight.repairCost, repairQuote, 'the flight record quotes the repair');
+	assert.equal(game.cash, repairCashBefore - game.flight.fuelCost - game.flight.turnaroundCost -
+		game.flight.overhaulCost, 'without charging it');
+	assert.equal(fly().repairCost, repairQuote, 'and the log row carries the quote');
+} finally {
+	catalog.engines[0].repairPerKg = 0;
+}
 
 console.log('Service and wear tests passed.');

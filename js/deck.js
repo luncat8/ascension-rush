@@ -59,6 +59,12 @@
 		return meters < 1000 ? Math.round(meters) + ' m' : (Math.round(meters / 100) / 10) + ' km';
 	}
 
+	function margin(net, reward) {
+		var value = Math.round(net / reward * 1000) / 10;
+
+		return (value > 0 ? '+' : '') + value + '%';
+	}
+
 	function padName(padId) {
 		var pad = R.world.findPadById(padId);
 
@@ -291,7 +297,10 @@
 			}
 			line += (line ? ' · ' : '') + 'S' + (i + 1) + ' ' + Math.round(slot.engineBurnTimeUsed) + '/' +
 				R.parts.engine(type.stages[i].engineId).maxThrottleSeconds + ' s · ' + slot.lifeFlights + '/' +
-				R.parts.tank(type.stages[i].tankId).maxFlights + ' legs';
+				R.parts.tank(type.stages[i].tankId).maxFlights + ' legs' +
+				// A tank at its rating is replaced by the next turnaround: say so,
+				// because the structure price on this leg is where it costs money.
+				(R.parts.wornOut(type.stages[i], slot) ? ' TANK WORN' : '');
 		}
 		return line || 'no stages attached';
 	}
@@ -304,6 +313,26 @@
 
 		line = appendPartGroup(type, 'tankId', catalog.tanks, line);
 		return appendPartGroup(type, 'fairingId', catalog.fairings, line);
+	}
+
+	// The margin a dispatch books: each leg's payout less the autopilot fee,
+	// against the costs the card quotes above. A round trip pays for its return
+	// leg too, and that leg refuels at the destination: the bill is the tanks
+	// filling there, at most a full load, priced before the outbound leg has
+	// burned any of it. Structure the outbound leg wrecks is not quotable yet,
+	// the same reason the card does not price the repair bill.
+	function dispatchProfit(type, evaluation, quote) {
+		var back = null;
+		var reward = quote.reward;
+		var net = reward * (1 - R.autopilot.feeFraction) - evaluation.cost;
+
+		if (form.mode === 'return') {
+			back = R.market.quote(form.targetPadId, form.sourcePadId, form.returnPayload, null);
+			reward += back.reward;
+			net += back.reward * (1 - R.autopilot.feeFraction) - (form.fuelPolicy === 'refuel' ?
+				R.parts.typeFuelMass(type) * R.economy.priceFuel(form.targetPadId) : 0);
+		}
+		return reward > 0 ? margin(net, reward) + ' · ' + money(net) : '—';
 	}
 
 	// The dispatch card's read-only summary and the reason the send button is
@@ -441,6 +470,12 @@
 		quote = R.market.quote(form.sourcePadId, form.targetPadId, form.outboundPayload, form.contractId);
 		ui.summary.appendChild(summaryRow('PAYS', money(quote.reward) + ' at $' + quote.pricePerKg.toFixed(2) + '/kg' +
 			(form.contractId ? ' · contract' : '')));
+		// The number experiments/balance.js measures over a chain of legs, for
+		// the one in front of the player: a standing service inside the target
+		// band is a route worth flying twice.
+		ui.summary.appendChild(summaryRow('PROFIT', type && (evaluation.ready ||
+			evaluation.reason === R.operations.reasons.INSUFFICIENT_FUNDS) ?
+			dispatchProfit(type, evaluation, quote) : '—'));
 
 		if (game.phase !== 'deck') {
 			blocked = R.operations.reasons.BUSY;
@@ -494,6 +529,7 @@
 		form.outboundPayload = form.returnPayload;
 		form.returnPayload = payload;
 		form.rocketId = null;
+		form.overhaul = false;
 		clearStaleContract();
 		R.operations.touch();
 	}
@@ -1081,6 +1117,8 @@
 		on(ui.from, 'change', function() {
 			form.sourcePadId = ui.from.value;
 			form.rocketId = null;
+			// The authorization was priced against the pad it was quoted at.
+			form.overhaul = false;
 			if (form.targetPadId === form.sourcePadId) {
 				form.targetPadId = R.world.pads[(R.world.padIndex(form.sourcePadId) + 1) % R.world.pads.length].id;
 			}

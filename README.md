@@ -39,8 +39,7 @@ two HUD rows quoting the distance from the selected pad and the predicted
 arrival speeds. The debrief reports the measured touchdown speeds and pad error
 alongside peak Q and peak thrust acceleration.
 `[` and `]` move a `0.5x–4x` time scale. Flights are sized for 20–30 s of real
-time at the default `2x`. Economy is still prototype balance; parts, wear and
-failures are not implemented yet.
+time at the default `2x`.
 
 The **0.4.1** market gives every pad its own prices: fuel, steel and delivery
 drift a bounded step per finished leg, from a seed each world reproduces, and
@@ -88,6 +87,8 @@ node experiments/coords-test.js
 node experiments/aerodynamics-test.js
 node experiments/flight-test.js
 node experiments/builder-test.js            # rocket-type workshop, snapshots
+node experiments/parts-test.js              # catalog, structure value, service pricing
+node experiments/service-test.js            # wear, overhaul gate, tank life, repair quote
 node experiments/render-smoke-test.js       # app startup against the real index.html
 node experiments/autopilot-test.js          # envelope limits, profiles, staging, frame rates
 node experiments/trajectory-test.js         # coast predictor: integrator equivalence, edges
@@ -97,9 +98,14 @@ node experiments/envelope.js verdant 0      # flight envelope per planet/build
 node experiments/envelope.js cinder 0 gentle 30 4   # profile (or `off`), fps, time scale
 node experiments/build-sweep.js 300 1       # random builds: dry baseline vs limits off and profiles
 node experiments/impact-accuracy.js 12 7    # coast-forecast error and cost per state
+node experiments/balance.js 20261004 4 2    # economy Monte Carlo: margin bands per world/build
 ```
 
 Measurement scripts share `experiments/harness.js`; their recorded output is in
 `experiments/logs/`. `experiments/logs/0.3.5-touchdowns.txt` is the
 reference-route table for all four worlds in all three autopilot profiles, and
 is byte-identical to the 0.3.4 table below its header.
+`experiments/logs/0.4.4-balance.txt` is the balance run the prices were tuned
+against: a margin histogram per world, bracket, stage count and payload, plus the
+bands the plan targets. The dispatch card's PROFIT row quotes the same margin for
+the leg it is about to fly.

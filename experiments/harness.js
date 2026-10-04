@@ -36,13 +36,15 @@ var arrivalRadius = 500;
 var flipSpeed = 30;
 var flipThrottle = 0.1;
 
-harness.createGame = function(sourcePad, targetPadId, timeScale) {
+// `cash` defaults to the run's starting cash, so an experiment measures the
+// economy the player starts with; a caller that only flies legs can pass more.
+harness.createGame = function(sourcePad, targetPadId, timeScale, cash) {
 	return {
 		currentPadId: sourcePad.id,
 		targetPadId: targetPadId,
 		rocket: R.rocket.create(sourcePad),
 		phase: 'deck',
-		cash: 1e8,
+		cash: cash === undefined ? R.constants.economy.startingCash : cash,
 		ledger: [],
 		flight: null,
 		mission: null,

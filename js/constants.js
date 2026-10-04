@@ -67,7 +67,7 @@
 	};
 
 	constants.economy = {
-		startingCash: 30000
+		startingCash: 40000
 	};
 
 	// Pad markets: prices live on each pad and drift one step per finished leg.
@@ -76,19 +76,19 @@
 	constants.market = {
 		seed: 20261003,
 		contractSlots: 3,
-		padSpread: 0.12,
+		padSpread: 0.18,
 		driftPerTurn: 0.03,
 		meanReversion: 0.1,
 		// Delivery volume nudges a pad's price down a little per delivery.
 		servedPressure: 0.01,
-		urgencyBonus: 0.25,
-		fragileBonus: 0.35,
+		urgencyBonus: 1,
+		fragileBonus: 0.5,
 		fragileChance: 0.25,
 		fragileSpeedFactor: 0.6,
 		maxContractTurns: 4,
 		minContractTurns: 2,
 		payloadLadder: [0.5, 1, 1.5],
-		distanceBonus: 0.5
+		distanceBonus: 1.7
 	};
 
 	// Operations deck: bounded in-session history and the visible window an

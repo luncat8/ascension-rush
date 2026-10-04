@@ -41,6 +41,7 @@ archive/ - for implemented plans
 
 experiments/ - measurement scripts (node), not loaded by the page.
 experiments/logs/ - keep useful;
+experiments/balance.js - economy Monte Carlo through the real dispatch/autopilot/physics: margin bands per world, bracket, stage count and payload. `experiments/logs/0.4.4-balance.txt` is its recorded run.
 
 ## sandbox
 
