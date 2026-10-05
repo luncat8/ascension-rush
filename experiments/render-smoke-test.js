@@ -105,6 +105,7 @@ require('../js/physics.js');
 require('../js/trajectory.js');
 require('../js/autopilot.js');
 require('../js/operations.js');
+require('../js/competitor.js');
 require('../js/builder.js');
 require('../js/deck.js');
 require('../js/controls.js');
@@ -439,6 +440,12 @@ var contractLoads = marketList.querySelectorAll('.contract-load');
 assert.ok(marketList.textContent.indexOf('DELIVERY') >= 0, 'the market tab quotes every pad');
 assert.ok(marketList.textContent.indexOf('/kg') >= 0, 'in money per kilogram');
 assert.ok(marketList.textContent.indexOf('served') >= 0, 'and how much each pad has been served');
+assert.ok(/rival \d+ · \d+ kg/.test(marketList.textContent), 'including rival delivery count and kilograms');
+assert.equal(fixture.getElementById('market-scoreboard').hidden, false, 'the Market tab shows company standings');
+assert.equal(fixture.getElementById('score-rival-name').textContent, R.constants.competitor.name.toUpperCase(),
+	'the scoreboard names the rival');
+assert.ok(fixture.getElementById('score-rival-record').textContent.indexOf('REP') >= 0,
+	'and shows its reputation');
 assert.ok(contractLoads.length > 0, 'every pad board offers contracts to load');
 contractLoads[0].click();
 R.deck.sync(game);

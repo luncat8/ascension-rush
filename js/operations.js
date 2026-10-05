@@ -599,6 +599,7 @@
 			profileId: spec.profileId,
 			overhaul: !!spec.overhaul,
 			contractId: contract ? contract.id : null,
+			operatorId: spec.operatorId || 'player',
 			currentLeg: 0,
 			status: 'active',
 			createdAt: operations.now()
@@ -609,7 +610,7 @@
 			evaluation.rocket.assignedRouteId = order.routeId;
 		}
 		if (contract) {
-			R.market.assign(contract.id);
+			R.market.assign(contract.id, order.operatorId);
 		}
 		leg = operations.legOf(order, 1);
 		operations.beginLeg(game, order, leg);
@@ -693,28 +694,47 @@
 		route.lastRunAt = result.completedAt;
 	};
 
+	function updatePlayerStats(result) {
+		var stats = operations.state.playerStats;
+		var tuning = R.constants.competitor;
+
+		if (result.status === 'delivered' && result.payloadMass > 0) {
+			stats.deliveries += 1;
+			stats.reputation = Math.min(100, stats.reputation + tuning.reputationPerDelivery);
+			return;
+		}
+		if (result.status === 'crashed' || result.cargoLost) {
+			stats.reputation = Math.max(0, stats.reputation - tuning.reputationLoss);
+		}
+	}
+
 	operations.applyLegResult = function(game, result) {
 		var state = operations.state;
 		var order = game.mission;
 		var rocket = operations.findRocket(order.rocketId);
 		var lastLeg = result.leg >= result.legCount;
 		var complete = lastLeg || result.status !== 'delivered';
+		var externalOperator = order.operatorId && order.operatorId !== 'player';
+		var deliveredKg = result.payloadMass * (1 - result.payloadDamage);
 		var returnLeg;
 		var i;
 
-		operations.logEntry(order, result);
-		operations.countRouteLeg(order, result);
-		// A finished leg is one dispatch turn: prices drift, open contracts
-		// age and expire, boards refill. Then the leg settles the contract it
-		// carried: delivered fulfils it, anything else puts it back on the
-		// board with the turns it has left.
-		R.market.advance();
+		if (!externalOperator) {
+			operations.logEntry(order, result);
+			operations.countRouteLeg(order, result);
+			updatePlayerStats(result);
+			// A player leg is one market turn. A rival resolves inside that turn
+			// and settles its own delivery without ageing the board a second time.
+			R.market.advance();
+		}
 		if (result.contractId) {
 			if (result.status === 'delivered') {
-				R.market.fulfil(result.contractId);
+				R.market.fulfil(result.contractId, deliveredKg, order.operatorId);
 			} else {
 				R.market.release(result.contractId);
 			}
+		} else if (result.status === 'delivered') {
+			R.market.recordDelivery(result.targetPadId, deliveredKg, order.operatorId);
 		}
 		operations.touch();
 		rocket.padId = result.landingPadId || rocket.padId;
@@ -1110,6 +1130,7 @@
 			types: [],
 			fleet: [],
 			routes: [],
+			playerStats: { deliveries: 0, reputation: 50 },
 			mission: null,
 			offer: null,
 			countdown: 0,
@@ -1125,6 +1146,9 @@
 		R.market.initialize(R.market.seedFor(planetId));
 		operations.referenceType();
 		operations.createRocket(state.types[0], R.world.pads[0]);
+		if (R.competitor) {
+			R.competitor.initialize();
+		}
 		return state;
 	};
 

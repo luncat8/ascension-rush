@@ -157,6 +157,9 @@
 		// the flight only reports what happened. The debrief returned here is
 		// generated from the same result that was logged, so the two agree.
 		R.operations.applyLegResult(game, result);
+		if (game === R.game && !game.competitorSimulation && R.competitor) {
+			R.competitor.afterPlayerLeg(game, result);
+		}
 		return game.lastReport;
 	}
 
@@ -274,11 +277,30 @@
 		var result = flightResult(game, 'crashed', null);
 
 		result.cause = 'rupture';
+		game.explosion = { wx: state.wx, wy: state.wy, startedAt: game.simTime || 0 };
 		result.payloadDamage = 1;
 		result.cargoLost = true;
 		result.touchdownVerticalSpeed = state.vy;
 		result.touchdownHorizontalSpeed = state.vx;
 		result.targetError = targetPad ? R.util.wrapDelta(state.wx - targetPad.wx, planet.circumference) : 0;
+		result.cashDelta = R.economy.finishFlight(game, 0, 0);
+		return finish(game, result, R.world.findPadById(game.flight.departedPadId));
+	};
+
+	// A headless rival flight has a fixed compute budget. If guidance ever
+	// stalls past it, adjudicate a loss through the ordinary fleet/contract path.
+	mission.timeout = function(game) {
+		var state = game.rocket;
+		var targetPad = R.world.findPadById(game.flight.targetPadId);
+		var result = flightResult(game, 'crashed', null);
+
+		result.cause = 'timeout';
+		result.payloadDamage = 1;
+		result.cargoLost = true;
+		result.touchdownVerticalSpeed = state.vy;
+		result.touchdownHorizontalSpeed = state.vx;
+		result.targetError = targetPad ? R.util.wrapDelta(state.wx - targetPad.wx,
+			R.world.planet.circumference) : 0;
 		result.cashDelta = R.economy.finishFlight(game, 0, 0);
 		return finish(game, result, R.world.findPadById(game.flight.departedPadId));
 	};

@@ -671,6 +671,59 @@ input[type="range"] {
 	gap: 10px;
 }
 
+.market-scoreboard {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 8px;
+	margin: 0 0 12px;
+}
+
+.market-scoreboard[hidden] {
+	display: none;
+}
+
+.score-company {
+	min-width: 0;
+	padding: 9px 10px;
+	border: 1px solid rgba(100, 213, 194, 0.28);
+	border-radius: 9px;
+	background: rgba(100, 213, 194, 0.06);
+}
+
+.score-company.rival {
+	border-color: rgba(244, 199, 106, 0.28);
+	background: rgba(244, 199, 106, 0.06);
+}
+
+.score-company span,
+.score-company strong,
+.score-company small {
+	display: block;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.score-company span {
+	color: #83a1af;
+	font: 9px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.score-company strong {
+	margin: 3px 0 2px;
+	color: #9be6d7;
+	font-size: 14px;
+}
+
+.score-company.rival strong {
+	color: #f4c76a;
+}
+
+.score-company small {
+	color: #a8bac2;
+	font: 9px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
 .route-card,
 .log-card,
 .market-card {

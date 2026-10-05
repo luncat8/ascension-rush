@@ -20,6 +20,7 @@
 	render.scratch = {
 		pad: { x: 0, y: 0 },
 		rocket: { x: 0, y: 0 },
+		explosion: { x: 0, y: 0 },
 		crosshair: { x: 0, y: 0 },
 		coast: { x: 0, y: 0 }
 	};
@@ -811,6 +812,46 @@
 		render.skyGradient.addColorStop(1, '#243742');
 	};
 
+	function drawExplosion(context, game) {
+		var effect = game.explosion;
+		var duration = R.constants.damage.ruptureExplosionSeconds;
+		var age;
+		var progress;
+		var radius;
+		var center;
+		var angle;
+		var i;
+
+		if (!effect) {
+			return;
+		}
+		age = game.simTime - effect.startedAt;
+		if (age < 0 || age >= duration) {
+			return;
+		}
+		progress = age / duration;
+		radius = 8 + progress * 42;
+		center = R.camera.project(effect.wx, effect.wy, render.scratch.explosion);
+		context.save();
+		context.globalAlpha = 1 - progress;
+		context.beginPath();
+		context.arc(center.x, center.y, radius, 0, Math.PI * 2);
+		context.fillStyle = '#f4c76a';
+		context.fill();
+		context.beginPath();
+		for (i = 0; i < 8; i += 1) {
+			angle = i * Math.PI / 4;
+			context.moveTo(center.x + Math.cos(angle) * radius * 0.55,
+				center.y + Math.sin(angle) * radius * 0.55);
+			context.lineTo(center.x + Math.cos(angle) * (radius + 16),
+				center.y + Math.sin(angle) * (radius + 16));
+		}
+		context.strokeStyle = '#f28b82';
+		context.lineWidth = 3;
+		context.stroke();
+		context.restore();
+	}
+
 	render.draw = function(game) {
 		var context = render.context;
 		var rocket = game.rocket;
@@ -829,6 +870,7 @@
 
 		R.camera.project(rocket.wx, rocket.wy, render.scratch.rocket);
 		R.rocket.draw(context, render.scratch.rocket.x, render.scratch.rocket.y, rocket.heading, flameThrottle);
+		drawExplosion(context, game);
 		drawMissionPanel(context, game);
 		if (game.phase === 'flying') {
 			drawFlightTelemetry(context, game);

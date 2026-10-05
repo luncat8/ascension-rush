@@ -20,6 +20,7 @@
 			flight: null,
 			mission: null,
 			lastReport: null,
+			explosion: null,
 			// What the map highlights. Mutated in place by the deck.
 			selection: {
 				sourcePadId: home,
@@ -42,6 +43,9 @@
 		var simDt = Math.min(Math.max(0, dt), R.constants.rocket.maxFrameStep) * game.timeScale;
 
 		game.simTime += simDt;
+		if (game.explosion && game.simTime - game.explosion.startedAt >= R.constants.damage.ruptureExplosionSeconds) {
+			game.explosion = null;
+		}
 		R.controls.update(game, simDt);
 		R.physics.advance(game, dt);
 		// The coast-impact marker is a forecast for whoever is flying: it says

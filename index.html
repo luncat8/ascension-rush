@@ -138,6 +138,18 @@
     </section>
 
     <section id="view-market" class="deck-view" role="tabpanel" aria-labelledby="tab-market" tabindex="0" hidden>
+      <section id="market-scoreboard" class="market-scoreboard" aria-label="Company standings" hidden>
+        <div class="score-company">
+          <span>YOUR COMPANY</span>
+          <strong id="score-player-cash">$40,000</strong>
+          <small id="score-player-record">0 deliveries · REP 50</small>
+        </div>
+        <div class="score-company rival">
+          <span id="score-rival-name">RIVAL</span>
+          <strong id="score-rival-cash">$40,000</strong>
+          <small id="score-rival-record">0 deliveries · REP 50</small>
+        </div>
+      </section>
       <p class="builder-hint">Prices drift with every finished leg. A contract pays its posted rate per kg
         wherever it is flown; a standing service sells at the destination's current price.</p>
       <div id="market-list" class="card-list"></div>
@@ -342,6 +354,7 @@
 <script src="js/trajectory.js"></script>
 <script src="js/autopilot.js"></script>
 <script src="js/operations.js"></script>
+<script src="js/competitor.js"></script>
 <script src="js/builder.js"></script>
 <script src="js/deck.js"></script>
 <script src="js/controls.js"></script>

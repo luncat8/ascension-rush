@@ -586,7 +586,7 @@
 			contract.turnsLeft + ' turn' + (contract.turnsLeft === 1 ? '' : 's') + ' left'));
 		row.appendChild(detail);
 		if (contract.status === 'assigned') {
-			row.appendChild(el('span', 'contract-tag', 'IN FLIGHT'));
+			row.appendChild(el('span', 'contract-tag', contract.assignedTo === 'player' ? 'YOUR FLIGHT' : 'RIVAL FLIGHT'));
 		} else {
 			row.appendChild(load);
 		}
@@ -598,10 +598,12 @@
 		var head = el('header');
 		var prices = el('dl', 'route-detail');
 		var contracts = R.market.contractsAt(pad.id);
+		var rivalId = R.competitor ? R.competitor.id : 'rival';
 		var i;
 
 		head.appendChild(el('strong', null, pad.name));
-		head.appendChild(el('span', 'market-served', R.market.servedAt(pad.id) + ' served'));
+		head.appendChild(el('span', 'market-served', R.market.servedAt(pad.id) + ' served · rival ' +
+			R.market.servedBy(pad.id, rivalId) + ' · ' + Math.round(R.market.servedKgBy(pad.id, rivalId)) + ' kg'));
 		card.appendChild(head);
 		prices.appendChild(summaryRow('FUEL', '$' + R.market.price(pad.id, 'fuel').toFixed(2) + '/kg'));
 		prices.appendChild(summaryRow('STEEL', '$' + R.market.price(pad.id, 'steel').toFixed(2) + '/kg'));
@@ -614,10 +616,26 @@
 		return card;
 	}
 
-	function renderMarket() {
+	function renderScoreboard(game) {
+		var rival = R.competitor && R.competitor.state;
+		var player = R.operations.state.playerStats;
+
+		if (!ui.marketScoreboard || !rival) {
+			return;
+		}
+		ui.marketScoreboard.hidden = false;
+		ui.scorePlayerCash.textContent = money(game.cash);
+		ui.scorePlayerRecord.textContent = player.deliveries + ' deliveries · REP ' + player.reputation;
+		ui.scoreRivalName.textContent = rival.name.toUpperCase();
+		ui.scoreRivalCash.textContent = money(rival.cash);
+		ui.scoreRivalRecord.textContent = rival.deliveries + ' deliveries · REP ' + rival.reputation;
+	}
+
+	function renderMarket(game) {
 		var pads = R.world.pads;
 		var i;
 
+		renderScoreboard(game);
 		ui.marketList.innerHTML = '';
 		for (i = 0; i < pads.length; i += 1) {
 			ui.marketList.appendChild(marketCard(pads[i]));
@@ -972,7 +990,7 @@
 		if (deck.tab === 'dispatch') {
 			renderDispatch(game);
 		} else if (deck.tab === 'market') {
-			renderMarket();
+			renderMarket(game);
 		} else if (deck.tab === 'routes') {
 			renderRoutes();
 		} else {
@@ -1049,6 +1067,12 @@
 		ui.viewDispatch = doc.getElementById('view-dispatch');
 		ui.viewMarket = doc.getElementById('view-market');
 		ui.marketList = doc.getElementById('market-list');
+		ui.marketScoreboard = doc.getElementById('market-scoreboard');
+		ui.scorePlayerCash = doc.getElementById('score-player-cash');
+		ui.scorePlayerRecord = doc.getElementById('score-player-record');
+		ui.scoreRivalName = doc.getElementById('score-rival-name');
+		ui.scoreRivalCash = doc.getElementById('score-rival-cash');
+		ui.scoreRivalRecord = doc.getElementById('score-rival-record');
 		ui.viewRoutes = doc.getElementById('view-routes');
 		ui.viewLog = doc.getElementById('view-log');
 		ui.report = doc.getElementById('dispatch-report');

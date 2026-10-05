@@ -236,6 +236,13 @@ assert.equal(frozenReport.reward, frozenQuote);
 // ------------------------------------------------------- contract lifecycle
 
 game = createRun();
+var rivalContract = contractAt(home.id);
+assert.equal(R.market.assign(rivalContract.id, 'skybolt'), true, 'the rival can reserve an open posting');
+assert.equal(rivalContract.assignedTo, 'skybolt', 'the posting identifies the rival operator');
+assert.equal(R.market.release(rivalContract.id), true, 'a failed rival attempt returns the posting');
+assert.equal(rivalContract.assignedTo, null, 'a released posting is unowned again');
+
+game = createRun();
 var contract = contractAt(home.id);
 var contractId = contract.id;
 var contractPayload = contract.payloadMass;
@@ -245,6 +252,7 @@ var contractsBefore = R.market.state.contracts.length;
 assert.equal(send({ destination: contract.toPadId, outboundPayload: contract.payloadMass, contractId: contractId }).ok, true,
 	'the contract dispatches on its own pads and payload');
 assert.equal(R.market.find(contractId).status, 'assigned', 'taking it takes it off the board');
+assert.equal(R.market.find(contractId).assignedTo, 'player', 'the board marks the assigned operator');
 assert.equal(R.market.contractsAt(home.id).length, settings.contractSlots,
 	'the pad posts a replacement so the board stays full');
 assert.equal(contractAt(home.id, function(row) { return row.id === contractId; }), null, 'the taken contract is not offered again');
@@ -329,6 +337,27 @@ for (i = 0; i < expiryTurns; i += 1) {
 }
 assert.equal(R.market.find(expiryId), null, 'a contract past its turns is gone');
 assert.equal(R.market.contractsAt(home.id).length, settings.contractSlots, 'and the board is full again');
+
+// Price pressure follows delivered cargo mass, for both operators and both
+// contract and standing-service deliveries.
+game = createRun();
+var pressureBefore = R.market.price(east.id, 'delivery');
+var referenceDrop = planet.prices.delivery * settings.servedPressure;
+
+assert.equal(R.market.recordDelivery(east.id, planet.defaultPayload, 'player'), true);
+assert.ok(Math.abs(pressureBefore - R.market.price(east.id, 'delivery') - referenceDrop) < 1e-9,
+	'a reference payload exerts one unit of delivery-price pressure');
+pressureBefore = R.market.price(east.id, 'delivery');
+assert.equal(R.market.recordDelivery(east.id, planet.defaultPayload / 2, 'skybolt'), true);
+assert.ok(Math.abs(pressureBefore - R.market.price(east.id, 'delivery') - referenceDrop / 2) < 1e-9,
+	'a half load from the rival exerts half the pressure');
+assert.equal(R.market.servedAt(east.id), 2, 'all operators contribute to the destination service count');
+assert.equal(R.market.servedBy(east.id, 'player'), 1, 'player volume remains attributable');
+assert.equal(R.market.servedBy(east.id, 'skybolt'), 1, 'rival volume is attributable too');
+assert.equal(R.market.servedKgBy(east.id, 'player'), planet.defaultPayload, 'player delivered mass is retained');
+assert.equal(R.market.servedKgBy(east.id, 'skybolt'), planet.defaultPayload / 2, 'rival delivered mass is retained');
+assert.equal(R.market.servedKgAt(east.id), planet.defaultPayload * 1.5, 'the market keeps total delivered kilograms');
+assert.equal(R.market.recordDelivery(east.id, 0, 'skybolt'), false, 'empty cargo does not count as service');
 
 game = createRun();
 contract = contractAt(home.id);

@@ -278,6 +278,7 @@ game.rocket.stages[0].stress = settings.damage.ruptureStress;
 R.damage.reset(7);
 R.physics.step(game, 1 / 120);
 assert.equal(game.phase, 'deck', 'a tank past its rupture limit ends the flight where it is');
+assert.ok(game.explosion && game.explosion.wy > 0, 'the rupture leaves a visible blast at the failure position');
 var ruptureEntry = R.flightLog.entries[0];
 assert.equal(ruptureEntry.status, 'crashed', 'a rupture is a loss');
 assert.equal(ruptureEntry.cause, 'rupture', 'and the log says what caused it');

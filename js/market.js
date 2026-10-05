@@ -59,7 +59,12 @@
 				steel: planet.prices.steel,
 				delivery: planet.prices.delivery,
 				demand: demandBase(),
-				served: 0
+				served: 0,
+				servedKg: 0,
+				playerServed: 0,
+				playerKg: 0,
+				competitorServed: 0,
+				competitorKg: 0
 			});
 		}
 		market.state = state;
@@ -115,7 +120,8 @@
 	// toward it so a delivery cannot park a price at a bound.
 	function drift(entry, field, base) {
 		var spread = base * settings.padSpread;
-		var value = entry[field] + (base - entry[field]) * settings.meanReversion +
+		var reversion = field === 'delivery' ? settings.deliveryMeanReversion : settings.meanReversion;
+		var value = entry[field] + (base - entry[field]) * reversion +
 			(nextRandom() * 2 - 1) * settings.driftPerTurn * base;
 
 		entry[field] = Math.min(base + spread, Math.max(base - spread, value));
@@ -215,6 +221,7 @@
 			turnsLeft: turnsLeft,
 			fragile: fragile,
 			status: 'open',
+			assignedTo: null,
 			postedTurn: market.state.turn
 		};
 	}
@@ -241,6 +248,30 @@
 		var entry = padEntry(padId);
 
 		return entry ? entry.served : 0;
+	};
+
+	market.servedBy = function(padId, operatorId) {
+		var entry = padEntry(padId);
+
+		if (!entry) {
+			return 0;
+		}
+		return operatorId === 'player' ? entry.playerServed : entry.competitorServed;
+	};
+
+	market.servedKgAt = function(padId) {
+		var entry = padEntry(padId);
+
+		return entry ? entry.servedKg : 0;
+	};
+
+	market.servedKgBy = function(padId, operatorId) {
+		var entry = padEntry(padId);
+
+		if (!entry) {
+			return 0;
+		}
+		return operatorId === 'player' ? entry.playerKg : entry.competitorKg;
 	};
 
 	market.contractsAt = function(padId) {
@@ -283,13 +314,14 @@
 	};
 
 	// The contract is being flown: it leaves the board but keeps its clock.
-	market.assign = function(contractId) {
+	market.assign = function(contractId, operatorId) {
 		var contract = market.find(contractId);
 
 		if (!contract || contract.status !== 'open') {
 			return false;
 		}
 		contract.status = 'assigned';
+		contract.assignedTo = operatorId || 'player';
 		return true;
 	};
 
@@ -302,27 +334,51 @@
 			return false;
 		}
 		contract.status = 'open';
+		contract.assignedTo = null;
 		contract.turnsLeft = Math.max(1, contract.turnsLeft);
 		return true;
 	};
 
-	// Delivered: the contract is done, the destination has been served, and its
-	// price gives a little to the extra volume.
-	market.fulfil = function(contractId) {
+	// Delivered kilograms apply pressure at the pad that receives them. The
+	// reference payload is one unit of pressure, so a damaged partial load only
+	// moves the price by the volume that actually arrived.
+	market.recordDelivery = function(padId, deliveredKg, operatorId) {
+		var entry = padEntry(padId);
+		var base = basePrice('delivery');
+		var kg = Math.max(0, deliveredKg || 0);
+		var pressure;
+
+		if (!entry || kg <= 0) {
+			return false;
+		}
+		operatorId = operatorId || 'player';
+		entry.served += 1;
+		entry.servedKg += kg;
+		if (operatorId === 'player') {
+			entry.playerServed += 1;
+			entry.playerKg += kg;
+		} else {
+			entry.competitorServed += 1;
+			entry.competitorKg += kg;
+		}
+		pressure = base * settings.servedPressure * kg / Math.max(1, R.world.planet.defaultPayload);
+		entry.delivery = Math.max(base * (1 - settings.padSpread), entry.delivery - pressure);
+		return true;
+	};
+
+	// Delivered: the contract is done and its surviving cargo exerts pressure
+	// on the destination market just like a standing-service shipment.
+	market.fulfil = function(contractId, deliveredKg, operatorId) {
 		var state = market.state;
 		var contract = market.find(contractId);
-		var entry;
 		var i;
 
 		if (!contract) {
 			return false;
 		}
-		entry = padEntry(contract.toPadId);
-		if (entry) {
-			entry.served += 1;
-			entry.delivery = Math.max(basePrice('delivery') * (1 - settings.padSpread),
-				entry.delivery - basePrice('delivery') * settings.servedPressure);
-		}
+		operatorId = operatorId || contract.assignedTo || 'player';
+		market.recordDelivery(contract.toPadId,
+			deliveredKg === undefined ? contract.payloadMass : deliveredKg, operatorId);
 		for (i = 0; i < state.contracts.length; i += 1) {
 			if (state.contracts[i].id === contractId) {
 				state.contracts.splice(i, 1);

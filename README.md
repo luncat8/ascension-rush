@@ -1,9 +1,9 @@
 # Ascension Rush: Payload Delivery
 
 A small 2D rocket-delivery game: wrap-around planets, staged rockets, manual
-flight or autopilot, pad-to-pad delivery, fuel/hull/payload economics, and a
-logarithmic altitude view, damage and failures in flight, and a rival company
-still to come.
+flight or autopilot, pad-to-pad delivery, fuel/hull/payload economics, a
+logarithmic altitude view, in-flight damage and failures, and a competing
+logistics company.
 
 ## Status
 The 0.1 world/render scaffold, the 0.2 playable flight slice, the 0.3
@@ -64,10 +64,11 @@ the Monte Carlo behind the prices, recorded in `experiments/logs/0.4.4-balance.t
 
 The **0.5.1** damage model charges a flight for how hard it flew. A stage is
 rated against the world's own certified envelope — the pressure and
-acceleration limits the autopilot flies — times how strongly it was built, so
-the reference build flies the certified envelope for free and a skimpy one is
-damaged by the same hop. What the loads leave behind is stress, and stress is
-what fails: an engine that loses half its thrust, an engine that dies (the
+acceleration limits the autopilot flies — times how strongly it was built. A
+reference stage accumulates only cheap fatigue inside its rating; sustained
+overload wears it quickly, and a skimpy one is damaged much sooner on the same
+hop. What the loads leave behind is stress, and stress is what fails: an
+engine that loses half its thrust, an engine that dies (the
 autopilot stages on the spot), a tank that leaks faster and faster, a fairing
 that pops early, or a tank that comes apart entirely when it is pushed far
 enough past its rating with propellant aboard. The flight HUD carries a
@@ -81,12 +82,27 @@ fly, and when to overhaul. `experiments/logs/0.5.1-failures.txt` is the Monte
 Carlo the rates were tuned on, and `experiments/logs/0.5.1-balance-damage.txt`
 is the economy with the model switched on.
 
+The **0.5.2** rival, Skybolt Logistics, owns a catalog-built courier, budget and
+reputation, and bids probabilistically on the same open contracts. After each
+finished player flight leg at the deck, it resolves at most one rival delivery
+using the actual autopilot and fixed-step physics in an isolated simulation.
+For an out-and-back order, the player authorizes the return from the deck after
+the first leg, so the rival may act between the two flights. Rival failures,
+repair, refuelling and replacement vehicles use the same operations and economy
+rules. Deliveries from either company add pressure in proportion to surviving
+cargo mass, then destination prices recover toward baseline over later turns.
+The Market tab shows cash, deliveries and reputation side by side, plus each
+pad's rival delivery count and kilograms. The rival is seeded per world; its
+contracts remain ordinary shared-board contracts, so a player cannot dispatch
+cargo the rival has already taken.
+
 ## Plans (subject-numbered, not version sequence)
 Active:
-- [`0.5-plan.md`](./0.5-plan.md) — Damage/failures mid-flight and landing (0.5.1, shipped), competitor company AI (0.5.2).
+- [`0.5-plan.md`](./0.5-plan.md) — Damage & failures (0.5.1) and competitor pressure (0.5.2), both shipped.
 - [`0.4-plan.md`](./0.4-plan.md) — Economy balance, parts catalog with service/repair, market prices & contract board.
 
 Increments of the active plans, recorded in `archive/` as they land:
+- [`archive/0.5.2-worklog.md`](./archive/0.5.2-worklog.md) — Rival bidding, isolated autopilot flights, market pressure and scoreboard (0.5.2).
 - [`archive/0.5.1-worklog.md`](./archive/0.5.1-worklog.md) — Damage & failures: stress, failure modes, landing damage, repair bills (0.5.1).
 - [`archive/0.4.1-worklog.md`](./archive/0.4.1-worklog.md) — Pad markets & contract board (0.4.1).
 - [`archive/0.3.6-worklog.md`](./archive/0.3.6-worklog.md) — Operations deck review fixes (0.3.6).
@@ -122,6 +138,8 @@ node experiments/trajectory-test.js         # coast predictor: integrator equiva
 node experiments/operations-test.js         # fleet, wait reasons, legs, routes, log, offers
 node experiments/market-test.js             # pad prices, contracts, quotes, fragile cargo
 node experiments/damage-test.js             # stress, failure modes, landing damage, repair
+node experiments/competitor-test.js         # rival bids, shared pressure and isolated flights
+node experiments/competitor-sweep.js 20 20261006 # seeded rival-tuning run
 node experiments/envelope.js verdant 0      # flight envelope per planet/build
 node experiments/envelope.js cinder 0 gentle 30 4   # profile (or `off`), fps, time scale
 node experiments/build-sweep.js 300 1       # random builds: dry baseline vs limits off and profiles
@@ -145,3 +163,9 @@ the leg it is about to fly.
 against: how often a hop breaks something on each world at four build strengths,
 fresh and with worn engines. `experiments/logs/0.5.1-balance-damage.txt` is the
 economy with the model on, against the same chains without it.
+`experiments/logs/0.5.2-competitor.txt` records a seeded 20-turn rival run:
+6 of 20 profitable bids taken, all six delivered, with per-pad mass and delivery
+prices recorded. `experiments/logs/0.5.2-balance-pressure.txt` records the
+steady-service economy with delivered-volume pricing enabled; every established
+margin band still passes. The damage-on repeat is in
+`experiments/logs/0.5.2-balance-pressure-damage.txt` and passes too.

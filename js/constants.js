@@ -79,8 +79,11 @@
 		padSpread: 0.18,
 		driftPerTurn: 0.03,
 		meanReversion: 0.1,
-		// Delivery volume nudges a pad's price down a little per delivery.
-		servedPressure: 0.01,
+		// A full reference load moves delivery prices by 3%; faster recovery
+		// keeps sustained-service earnings in the existing balance band while
+		// making local competitive pressure visible over a few turns.
+		deliveryMeanReversion: 0.3,
+		servedPressure: 0.03,
 		// A pad absorbs this many reference loads per leg: the destination's
 		// appetite, not the rocket's bay, is what caps a leg's cargo. Without it
 		// a light load and a full one burn almost the same fuel, so the margin
@@ -100,9 +103,9 @@
 
 	// Damage and failures (0.5.1). A stage is rated against the world's own
 	// certified flight envelope — the limits the autopilot flies — times a
-	// margin for how strongly it was built. Inside them a flight costs
-	// nothing; the excess is what damages the stack, and damage is what
-	// fails. `experiments/failure.js` is the Monte Carlo these were tuned on.
+	// margin for how strongly it was built. Inside the rating it accumulates
+	// only cheap fatigue; sustained overload is what damages it quickly.
+	// `experiments/failure.js` is the Monte Carlo these were tuned on.
 	constants.damage = {
 		// The seed `experiments/failure.js` starts its buckets from; a flight
 		// is seeded from the mission id, so this is only a measurement tool.
@@ -155,7 +158,32 @@
 		leakRate: 0.8,
 		leakGrowth: 0.2,
 		// How long a failure stays on the HUD after it happens.
-		alarmSeconds: 5
+		alarmSeconds: 5,
+		// A rupture gets a short map-space blast after the flight is adjudicated.
+		ruptureExplosionSeconds: 1.2
+	};
+
+	// The rival gets one abstracted, real-physics dispatch after each finished
+	// player leg. It shares the board and market but owns its cash and fleet.
+	constants.competitor = {
+		id: 'skybolt',
+		name: 'Skybolt Logistics',
+		seed: 20261006,
+		startingCash: 40000,
+		initialStrength: 0.72,
+		initialSkill: 0.25,
+		maxSkill: 0.85,
+		skillPerDelivery: 0.025,
+		baseBidChance: 0.34,
+		minBidChance: 0.20,
+		maxBidChance: 0.60,
+		cashLeadSwing: 0.20,
+		marginSwing: 0.08,
+		skillSwing: 0.05,
+		expectedCargoLoss: 0.04,
+		reputationPerDelivery: 1,
+		reputationLoss: 2,
+		maxFlightSeconds: 300
 	};
 
 	// Operations deck: bounded in-session history and the visible window an

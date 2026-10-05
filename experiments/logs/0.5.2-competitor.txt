@@ -1,0 +1,28 @@
+Skybolt Logistics · Verdant · 20 market turns · seed 20261006
+turn  action                 route                   result      rival cash
+   1  passed                 —                       —           $40000
+   2  delivered              Homeport → Eastport     delivered   $42247
+   3  passed                 —                       —           $42247
+   4  passed                 —                       —           $42247
+   5  passed                 —                       —           $42247
+   6  delivered              Eastport → Westport     delivered   $44092
+   7  passed                 —                       —           $44092
+   8  passed                 —                       —           $44092
+   9  passed                 —                       —           $44092
+  10  passed                 —                       —           $44092
+  11  passed                 —                       —           $44092
+  12  passed                 —                       —           $44092
+  13  delivered              Westport → Farport      delivered   $45211
+  14  passed                 —                       —           $45211
+  15  delivered              Farport → Eastport      delivered   $48130
+  16  delivered              Eastport → Farport      delivered   $49888
+  17  passed                 —                       —           $49888
+  18  delivered              Farport → Westport      delivered   $50936
+  19  passed                 —                       —           $50936
+  20  passed                 —                       —           $50936
+
+Accepted 6 of 20 eligible bids (30.0%); delivered 6, failed 0, reputation 56, skill 0.40.
+Homeport     0 rival deliveries · 0 kg · delivery $17.97/kg (open $18.06)
+Eastport     2 rival deliveries · 210 kg · delivery $16.80/kg (open $18.49)
+Farport      2 rival deliveries · 240 kg · delivery $16.91/kg (open $18.08)
+Westport     2 rival deliveries · 210 kg · delivery $17.24/kg (open $17.73)
