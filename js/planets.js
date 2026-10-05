@@ -56,7 +56,7 @@
 				{ name: 'Rim Relay', frac: 0.5 },
 				{ name: 'Tinstack', frac: 0.68 }
 			],
-			prices: { fuel: 2.6, steel: 2.0, delivery: 3.5 },
+			prices: { fuel: 2.6, steel: 2.0, delivery: 4.2 },
 			defaultFuel: [200, 140, 100],
 			defaultPayload: 80,
 			flight: { cruiseAltitudeMax: 1500, glideSlope: 0.5, climbVelocity: 70, maxThrustAcceleration: 16 }
@@ -104,7 +104,7 @@
 				{ name: 'Halcyon', frac: 0.45 },
 				{ name: 'Zephyr', frac: 0.75 }
 			],
-			prices: { fuel: 5.0, steel: 2.2, delivery: 20 },
+			prices: { fuel: 5.0, steel: 2.2, delivery: 22.5 },
 			defaultFuel: [380, 240, 180],
 			defaultPayload: 80,
 			flight: { cruiseAltitudeMax: 2500, glideSlope: 0.55, climbVelocity: 80, maxDynamicPressure: 60000, maxThrustAcceleration: 22, maxAngleOfAttackDeg: 35 }

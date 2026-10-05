@@ -315,7 +315,14 @@ assert.equal(R.flightLog.entries.length, 2);
 assert.equal(R.flightLog.entries[0].fuelStart, fuelAtTouchdown, 'the log quotes the fuel the return started with');
 
 // A surviving stack that cannot lift the return payload ends the mission where
-// it stands instead of inventing delta-v.
+// it stands instead of inventing delta-v. A leg's cargo is capped by the
+// destination's appetite, so this run widens that appetite — through the
+// planet's reference load, which is what demand derives from — to put a heavy
+// return payload in the air: the guard under test is the launch gate, not the
+// market.
+var referenceLoad = R.world.planet.defaultPayload;
+
+R.world.planet.defaultPayload = Math.ceil(600 / R.constants.market.demandFactor);
 game = createRun();
 var weakTop = R.operations.addType({
 	name: 'Weak upper stage',
@@ -329,20 +336,22 @@ var weakTop = R.operations.addType({
 	defaultProfileId: 'balanced'
 });
 R.operations.createRocket(weakTop, home);
+var strandedPayload = 600;
 var weakDispatch = send({
 	mode: 'return',
 	fuelPolicy: 'none',
 	outboundPayload: 80,
-	returnPayload: 600,
+	returnPayload: strandedPayload,
 	typeId: weakTop.id,
 	rocketId: R.operations.state.fleet[1].id
 });
+R.world.planet.defaultPayload = referenceLoad;
 assert.equal(weakDispatch.ok, true, 'the full stack lifts a heavy payload');
 R.rocket.separateStage(game.rocket);
 R.rocket.separateStage(game.rocket);
 var stranded = R.rocket.captureStageState(game.rocket, R.rocket.createStageState());
 
-assert.ok(R.rocket.launchTwr(weakTop, stranded, 600) < R.constants.rocket.minimumLaunchTwr,
+assert.ok(R.rocket.launchTwr(weakTop, stranded, strandedPayload) < R.constants.rocket.minimumLaunchTwr,
 	'what survived cannot lift the return payload, so the return must be refused');
 land(game, east);
 

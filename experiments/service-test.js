@@ -149,9 +149,12 @@ assert.ok(rocket.stageState[0].engineBurnTimeUsed > 0, 'the stage that burned ha
 assert.ok(rocket.stageState[0].engineBurnTimeUsed <= flown.elapsed + R.constants.rocket.fixedStep,
 	'and never counts more seconds than the leg flew');
 for (i = 0; i < rocket.stageCount; i += 1) {
-	assert.equal(rocket.stageState[i].lifeFlights, rocket.stageState[i].alive ? 1 : 0,
-		'a leg flown counts against the stages that came back, not the ones left in the air');
+	assert.equal(rocket.stageState[i].lifeFlights, rocket.stageState[i].engineBurnTimeUsed > 0 ? 1 : 0,
+		'a leg counts against the tank of a stage that burned on it, not one that rode along cold or was left in the air');
 }
+assert.equal(rocket.stageState[0].lifeFlights, 1, 'the booster burned, so the leg is on its tank');
+assert.equal(rocket.stageState[1].alive, true, 'the stages behind it came back attached');
+assert.equal(rocket.stageState[1].lifeFlights, 0, 'and a hop that never lit them is no cycle on their tanks');
 
 // The seconds land on the instance, so the next leg starts from them.
 var flownSeconds = rocket.stageState[0].engineBurnTimeUsed;

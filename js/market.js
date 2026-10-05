@@ -58,6 +58,7 @@
 				fuel: planet.prices.fuel,
 				steel: planet.prices.steel,
 				delivery: planet.prices.delivery,
+				demand: demandBase(),
 				served: 0
 			});
 		}
@@ -65,6 +66,9 @@
 		randState = state.seed;
 		// The first turn-0 prices are a step of drift, so no two pads open at
 		// exactly the planet's list price and cheap fuel is visible from the map.
+		// The appetite does not drift: a pad's standing demand is what a route is
+		// planned against, and 0.5 moves it with shocks and rival volume rather
+		// than with noise.
 		for (i = 0; i < state.pads.length; i += 1) {
 			drift(state.pads[i], 'fuel', planet.prices.fuel);
 			drift(state.pads[i], 'steel', planet.prices.steel);
@@ -92,6 +96,12 @@
 		return R.world.planet.prices[field];
 	}
 
+	// A pad's appetite in kilos per leg: the planet's reference load times the
+	// market's demand factor, drifting inside the same band as its prices.
+	function demandBase() {
+		return R.world.planet.defaultPayload * settings.demandFactor;
+	}
+
 	// The live price of `field` ('fuel' | 'steel' | 'delivery') at a pad, in
 	// money per kg. Without a market (a cold render) the planet's list price is
 	// the honest answer.
@@ -113,6 +123,15 @@
 
 	market.turn = function() {
 		return market.state ? market.state.turn : 0;
+	};
+
+	// What the destination will take on one leg, in kilos, rounded to the ten
+	// kilos the payload slider works in. Without a market the planet's own
+	// appetite is the honest answer.
+	market.demand = function(padId) {
+		var entry = padEntry(padId);
+
+		return Math.round((entry ? entry.demand : demandBase()) / 10) * 10;
 	};
 
 	// One dispatch turn: prices drift, open contracts age, expired ones go, and
@@ -156,9 +175,11 @@
 		return count;
 	}
 
-	function payloadFor(planet) {
+	// The board asks for a rung of the destination's appetite, never more: a
+	// contract the pad would not take could not be flown by any rocket.
+	function payloadFor(demand) {
 		var ladder = settings.payloadLadder;
-		var mass = ladder[Math.floor(nextRandom() * ladder.length)] * planet.defaultPayload;
+		var mass = ladder[Math.floor(nextRandom() * ladder.length)] * demand;
 
 		return Math.min(R.constants.rocket.maxPayloadMass, Math.max(10, Math.round(mass / 10) * 10));
 	}
@@ -179,7 +200,6 @@
 	// pays a quarter of it) and a fragility premium. Quoting at posting is why
 	// the board's numbers never move while the player decides.
 	function makeContract(fromPadId) {
-		var planet = R.world.planet;
 		var destination = otherPad(fromPadId);
 		var turnsLeft = settings.minContractTurns +
 			Math.floor(nextRandom() * (settings.maxContractTurns - settings.minContractTurns + 1));
@@ -190,7 +210,7 @@
 			id: market.state.nextContractId++,
 			fromPadId: fromPadId,
 			toPadId: destination.id,
-			payloadMass: payloadFor(planet),
+			payloadMass: payloadFor(market.demand(destination.id)),
 			perKg: market.price(destination.id, 'delivery') * (1 + urgency + (fragile ? settings.fragileBonus : 0)),
 			turnsLeft: turnsLeft,
 			fragile: fragile,

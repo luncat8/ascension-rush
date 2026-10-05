@@ -342,9 +342,12 @@
 		var mission = state.mission;
 		var type = R.operations.findType(form.typeId);
 		var evaluation = R.operations.evaluateLeg(form.typeId, form.sourcePadId, form.outboundPayload, true,
-			form.rocketId, form.overhaul);
+			form.rocketId, form.overhaul, form.targetPadId);
 		var typeStats = type ? R.operations.typeStats(type) : null;
 		var capacity = typeStats ? Math.floor(typeStats.payloadLimit) : 0;
+		// The destination's appetite caps the cargo as firmly as the bay does,
+		// so the slider stops where the market does.
+		var demand = evaluation.demand === null ? capacity : Math.min(capacity, evaluation.demand);
 		var legDistance = R.operations.legDistance(form.sourcePadId, form.targetPadId);
 		var offer = state.offer ? R.operations.findRoute(state.offer.routeId) : null;
 		var returnCost = 0;
@@ -411,15 +414,15 @@
 		ui.returnPayloadRow.hidden = form.mode !== 'return';
 
 		if (type) {
-			ui.outbound.max = String(capacity);
-			ui.returnPayload.max = String(capacity);
+			ui.outbound.max = String(demand);
+			ui.returnPayload.max = String(demand);
 			// A contracted payload is what the board offers: it is not clamped
 			// to this rocket's capacity, it fails the evaluation if it does not
 			// fit, and the player picks another rocket or type.
 			if (!contract) {
-				form.outboundPayload = Math.min(form.outboundPayload, capacity);
+				form.outboundPayload = Math.min(form.outboundPayload, demand);
 			}
-			form.returnPayload = Math.min(form.returnPayload, capacity);
+			form.returnPayload = Math.min(form.returnPayload, demand);
 		}
 		ui.outbound.disabled = !!contract;
 		ui.outbound.value = String(form.outboundPayload);
@@ -442,8 +445,9 @@
 		ui.summary.innerHTML = '';
 		ui.summary.appendChild(summaryRow('LEGS', form.mode === 'return' ?
 			'2 · ' + distance(legDistance) + ' each way' : '1 · ' + distance(legDistance)));
-		ui.summary.appendChild(summaryRow('PAYLOAD', form.mode === 'return' ?
-			mass(form.outboundPayload) + ' out · ' + mass(form.returnPayload) + ' back' : mass(form.outboundPayload)));
+		ui.summary.appendChild(summaryRow('PAYLOAD', (form.mode === 'return' ?
+			mass(form.outboundPayload) + ' out · ' + mass(form.returnPayload) + ' back' : mass(form.outboundPayload)) +
+			' · ' + padName(form.targetPadId) + ' wants ' + mass(R.market.demand(form.targetPadId))));
 		rocket = evaluation.rocket;
 		ui.summary.appendChild(summaryRow('ROCKET', rocket ?
 			'#' + rocket.id + ' ' + type.name + ' · ' + padName(rocket.padId) + ' · ' + rocket.status :
@@ -597,6 +601,7 @@
 		prices.appendChild(summaryRow('FUEL', '$' + R.market.price(pad.id, 'fuel').toFixed(2) + '/kg'));
 		prices.appendChild(summaryRow('STEEL', '$' + R.market.price(pad.id, 'steel').toFixed(2) + '/kg'));
 		prices.appendChild(summaryRow('DELIVERY', '$' + R.market.price(pad.id, 'delivery').toFixed(2) + '/kg'));
+		prices.appendChild(summaryRow('WANTS', mass(R.market.demand(pad.id)) + ' per leg'));
 		card.appendChild(prices);
 		for (i = 0; i < contracts.length; i += 1) {
 			card.appendChild(contractRow(contracts[i]));

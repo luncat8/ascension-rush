@@ -106,10 +106,18 @@ harness.withLimits = function(overrides, work) {
 // launched game, or null when the mission rejects the build.
 harness.launch = function(sourcePad, targetPadId, build, profileId, timeScale) {
 	var game = harness.createGame(sourcePad, targetPadId, timeScale);
+	var planet = R.world.planet;
+	var referencePayload = planet.defaultPayload;
 	var type;
 	var result;
 
 	R.game = game;
+	// A pad's appetite caps a leg's cargo in the game, and it derives from the
+	// planet's reference load. These experiments measure the build they were
+	// handed, so the gate is widened for the launch and closed again after it:
+	// the market decides money, never flight.
+	planet.defaultPayload = Math.max(referencePayload, Math.ceil(build.payloadMass /
+		(R.constants.market.demandFactor * (1 - R.constants.market.padSpread))));
 	R.operations.initialize();
 	R.operations.state.types.length = 0;
 	R.operations.state.fleet.length = 0;
@@ -134,6 +142,7 @@ harness.launch = function(sourcePad, targetPadId, build, profileId, timeScale) {
 		typeId: type.id,
 		profileId: profileId
 	});
+	planet.defaultPayload = referencePayload;
 	return result.ok ? game : null;
 };
 

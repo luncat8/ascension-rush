@@ -81,13 +81,20 @@
 		meanReversion: 0.1,
 		// Delivery volume nudges a pad's price down a little per delivery.
 		servedPressure: 0.01,
+		// A pad absorbs this many reference loads per leg: the destination's
+		// appetite, not the rocket's bay, is what caps a leg's cargo. Without it
+		// a light load and a full one burn almost the same fuel, so the margin
+		// would climb without bound as the cargo grew.
+		demandFactor: 1.5,
+		// The board's rungs are fractions of the destination's appetite, so a
+		// posted contract is always a cargo the pad will take.
+		payloadLadder: [0.5, 0.75, 1],
 		urgencyBonus: 1,
 		fragileBonus: 0.5,
 		fragileChance: 0.25,
 		fragileSpeedFactor: 0.6,
 		maxContractTurns: 4,
 		minContractTurns: 2,
-		payloadLadder: [0.5, 1, 1.5],
 		distanceBonus: 1.7
 	};
 

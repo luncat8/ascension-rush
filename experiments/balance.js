@@ -671,62 +671,6 @@ R.planets.list.forEach(function(world) {
 // structure — the player pays that when the rocket is replaced — so the report
 // shows both, and the total is what a crash costs a run.
 function crashReport() {
-	var source = R.world.pads[0];
-	var target = bracketTarget(source, false);
-	var build = buildFor(1, 1);
-	var game = harness.createGame(source, target.id, timeScale, settings.economy.startingCash);
-	var type;
-	var order;
-	var entry;
-	var replacement;
-
-	R.game = game;
-	R.operations.initialize();
-	R.operations.state.types.length = 0;
-	R.operations.state.fleet.length = 0;
-	type = R.operations.addType({
-		name: 'undersized',
-		stageCount: 1,
-		stages: build.stages,
-		nominalPayload: build.payloadMass,
-		defaultProfileId: profileId
-	});
-	R.operations.createRocket(type, source);
-	// A rocket that refuels for the leg and then wrecks has paid for the fuel
-	// it burned, which is the honest cost of the attempt.
-	game.ledger.length = 0;
-	R.operations.state.fleet[0].stageState[0].fuelMass = build.stages[0].fuelMass * 0.4;
-	order = R.operations.dispatch({
-		source: source.id,
-		destination: target.id,
-		mode: 'oneway',
-		fuelPolicy: 'refuel',
-		outboundPayload: build.payloadMass * 4,
-		returnPayload: 0,
-		typeId: type.id,
-		profileId: profileId,
-		overhaul: true
-	});
-	if (!order.ok) {
-		console.log('=== bands · crash ===');
-		console.log('the undersized stack was refused: ' + order.reason);
-		return;
-	}
-	harness.fly(game, frameDt);
-	entry = R.flightLog.entries[0];
-	replacement = R.parts.typeBuildCost(type, entry.departedPadId);
-	console.log('=== bands · crash · verdant near hop, an undersized stack ===');
-	console.log('status ' + entry.status + ' · revenue $0 · leg cash ' + Math.round(entry.cashDelta) +
-		' (the fuel it loaded) · replacement $' + Math.round(replacement) +
-		' · a crash costs $' + Math.round(-entry.cashDelta + replacement) +
-		' against a leg that pays nothing · target: a large negative, never a mid-band result');
-}
-
-// The crash band: a leg that ends in a wreck earns nothing and costs the stack
-// it flew. The ledger charges the fuel the leg loaded but not the lost
-// structure — the player pays that when the rocket is replaced — so the report
-// shows both, and the total is what a crash costs a run.
-function crashReport() {
 	var source;
 	var target;
 	var build;
@@ -736,18 +680,24 @@ function crashReport() {
 	var order;
 	var entry;
 	var replacement;
+	var referenceLoad;
 
 	R.world.initialize('verdant');
 	source = R.world.pads[0];
 	target = bracketTarget(source, false);
 	game = harness.createGame(source, target.id, timeScale, settings.economy.startingCash);
 	R.game = game;
+	// A pad's appetite caps a leg's cargo, and this band needs a stack loaded
+	// past what any hop wants: the widest appetite the catalog allows is put in
+	// place for the launch and taken away after it.
+	referenceLoad = R.world.planet.defaultPayload;
+	R.world.planet.defaultPayload = Math.ceil(settings.rocket.maxPayloadMass / settings.market.demandFactor);
 	R.operations.initialize();
 	R.operations.state.types.length = 0;
 	R.operations.state.fleet.length = 0;
 	// A stack loaded to its launch gate with the least fuel the catalog allows:
-	// it lifts off, cannot complete the hop, and wrecks. The gate is a liftoff
-	// check, not a promise the rocket can fly the leg.
+	// it lifts off, cannot complete the hop, and wrecks. The launch gate is a
+	// liftoff check, not a promise the rocket can fly the leg.
 	type = R.operations.addType({
 		name: 'undersized',
 		stageCount: 1,
@@ -771,7 +721,8 @@ function crashReport() {
 		profileId: profileId,
 		overhaul: true
 	});
-	console.log('=== bands · crash · verdant near hop, a stack loaded to its gate (' + capacity + ' kg) ===');
+	R.world.planet.defaultPayload = referenceLoad;
+	console.log('=== bands · crash · verdant near hop, an undersized stack loaded to its gate (' + capacity + ' kg) ===');
 	if (!order.ok) {
 		console.log('the stack was refused before it flew: ' + order.reason);
 		return;
@@ -785,8 +736,94 @@ function crashReport() {
 		' · target: a large negative, never a mid-band result');
 }
 
+// The band the plan targets, measured where a player actually meets it: a
+// standing service flown long enough to buy its own maintenance. A short chain
+// flatters a build — the tank that wears out and the overhaul that comes due
+// are the per-flight costs the band is meant to include, and they land on one
+// leg in ten rather than on every leg.
+function steadyReport() {
+	var worlds = R.planets.list;
+	var legs = 24;
+	var source;
+	var target;
+	var build;
+	var chain;
+	var world;
+	var type;
+	var average;
+	var i;
+
+	console.log('=== bands · standing service in the steady state · reference build, near hop, ' + legs + ' legs ===');
+	for (i = 0; i < worlds.length; i += 1) {
+		world = worlds[i];
+		R.world.initialize(world.id);
+		R.operations.initialize();
+		market.initialize(baseSeed);
+		R.operations.state.types.length = 0;
+		R.operations.state.fleet.length = 0;
+		source = R.world.pads[0];
+		target = bracketTarget(source, false);
+		build = buildFor(3, 1);
+		type = R.operations.addType({
+			name: 'steady',
+			stageCount: build.stageCount,
+			stages: build.stages,
+			nominalPayload: build.payloadMass,
+			defaultProfileId: profileId
+		});
+		chain = flyServiceChain(type, source, target, false, legs);
+		average = chain.margins.standing.length ? mean(chain.margins.standing) : NaN;
+		console.log(padRight(world.id, 10) + 'margin ' + percent(average) + ' over ' + chain.margins.standing.length +
+			' delivered legs · worst leg ' + percent(Math.min.apply(null, chain.margins.standing)) +
+			' · target +10.0…+20.0% ' + (average >= 0.1 && average <= 0.2 ? 'PASS' : 'MISS'));
+	}
+}
+
+// The ceiling the market puts on a leg: the leanest build that flies the hop,
+// loaded with everything the destination will take. Without that ceiling the
+// cargo a leg carries is bounded only by the rocket's bay, and because a light
+// load and a full one burn almost the same fuel the margin would climb without
+// limit as the cargo grew.
+function demandReport() {
+	var worlds = R.planets.list;
+	var source;
+	var target;
+	var chain;
+	var world;
+	var build;
+	var type;
+	var i;
+
+	console.log('=== bands · the heaviest cargo a pad will take · leanest build on the near hop ===');
+	for (i = 0; i < worlds.length; i += 1) {
+		world = worlds[i];
+		R.world.initialize(world.id);
+		R.operations.initialize();
+		market.initialize(baseSeed);
+		R.operations.state.types.length = 0;
+		R.operations.state.fleet.length = 0;
+		source = R.world.pads[0];
+		target = bracketTarget(source, false);
+		build = buildFor(1, 1);
+		build.payloadMass = market.demand(target.id);
+		type = R.operations.addType({
+			name: 'full load',
+			stageCount: build.stageCount,
+			stages: build.stages,
+			nominalPayload: build.payloadMass,
+			defaultProfileId: profileId
+		});
+		chain = flyServiceChain(type, source, target, false, legsPerBucket * 3);
+		console.log(padRight(world.id, 10) + market.demand(target.id) + ' kg · margin ' +
+			percent(chain.margins.standing.length ? mean(chain.margins.standing) : NaN) + ' over ' +
+			chain.margins.standing.length + ' delivered legs · the bay is not the limit, the pad is');
+	}
+}
+
 bandReport();
+steadyReport();
 overbuildReport();
+demandReport();
 crashReport();
 contractReport();
 leftoverFuelReport();

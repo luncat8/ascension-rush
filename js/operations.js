@@ -4,6 +4,9 @@
 	var R = root.R || (root.R = {});
 	var operations = R.operations || (R.operations = {});
 	var stageSlots = 3;
+	// Which of this leg's stages actually burned, held across the state copy at
+	// leg end (one slot per stage slot, allocated once).
+	var burnedStage = [false, false, false];
 	var stats = R.rocket.createStats();
 	var plan = { fuelMass: 0, dryMass: 0, structureValue: 0 };
 	var scratchStageState = R.rocket.createStageState();
@@ -30,6 +33,7 @@
 		NO_ROCKET: 'NO ROCKET AT ',
 		ROCKET_BUSY: 'ROCKET BUSY',
 		PAYLOAD_OVER: 'PAYLOAD EXCEEDS CAPACITY',
+		NO_DEMAND: 'NO DEMAND FOR THAT MUCH AT ',
 		NEEDS_REFUEL: 'NEEDS REFUEL',
 		NEEDS_OVERHAUL: 'NEEDS OVERHAUL',
 		INSUFFICIENT_FUNDS: 'INSUFFICIENT FUNDS',
@@ -61,8 +65,12 @@
 		operations.state.dismissedRouteId = null;
 	};
 
+	// The reasons that name the pad they are about end in a space and take the
+	// pad's name; the rest are complete sentences already.
 	function reasonText(reason, pad) {
-		return reason === operations.reasons.NO_ROCKET ? reason + pad.name.toUpperCase() : reason;
+		return reason === operations.reasons.NO_ROCKET || reason === operations.reasons.NO_DEMAND ?
+			reason + pad.name.toUpperCase() :
+			reason;
 	}
 
 	function snapshotType(type) {
@@ -127,12 +135,37 @@
 		return id;
 	};
 
-	// 0.3.5 has no contract market, so payload availability is provisional: a
-	// mass is available when the rocket type can lift it. 0.4 replaces this one
-	// function with contracts and cargo inventory; the scheduler does not change.
-	operations.payloadProvider = function(mass, payloadLimit) {
-		return mass >= 0 && mass <= payloadLimit ? null : operations.reasons.PAYLOAD_OVER;
+	// Whether a payload can go at all, in one place: the rocket has to be able
+	// to lift it and the destination has to want it. `demand` is null when the
+	// caller has no destination in hand, which leaves the rocket's bay the only
+	// limit. Every gate — dispatch, a saved route, a return leg — refuses for
+	// the same reason because they all come through here.
+	operations.payloadProvider = function(mass, payloadLimit, demand) {
+		if (!(mass >= 0) || mass > payloadLimit) {
+			return operations.reasons.PAYLOAD_OVER;
+		}
+		return demand != null && mass > demand ? operations.reasons.NO_DEMAND : null;
 	};
+
+	// Both legs of an order against the rocket's bay and the appetite of the pad
+	// each one lands on. One helper, because dispatch, a saved route, a type
+	// change and a route edit all ask the same question; `padId` says which pad
+	// the refusal is about so the reason can name it.
+	var cargoCheck = { reason: '', padId: null };
+
+	function checkCargo(payloadLimit, mode, source, destination, outboundPayload, returnPayload) {
+		cargoCheck.reason = operations.payloadProvider(outboundPayload, payloadLimit, R.market.demand(destination));
+		cargoCheck.padId = destination;
+		if (!cargoCheck.reason && mode === 'return') {
+			cargoCheck.reason = operations.payloadProvider(returnPayload, payloadLimit, R.market.demand(source));
+			cargoCheck.padId = source;
+		}
+		return cargoCheck;
+	}
+
+	function cargoReason(check) {
+		return reasonText(check.reason, R.world.findPadById(check.padId));
+	}
 
 	operations.findType = function(id) {
 		var types = operations.state.types;
@@ -365,20 +398,22 @@
 	// invented twice. `overhaul` is the authorization to buy the service the
 	// stack needs on this leg: without it an engine past its rating holds the
 	// launch with NEEDS OVERHAUL and quotes what paying would cost.
-	operations.evaluateLeg = function(typeId, fromPadId, payloadMass, refuel, rocketId, overhaul) {
+	operations.evaluateLeg = function(typeId, fromPadId, payloadMass, refuel, rocketId, overhaul, toPadId) {
 		var type = operations.findType(typeId);
 		var pad = R.world.findPadById(fromPadId);
+		var destination = R.world.findPadById(toPadId);
 		var rocket = rocketId ? operations.findRocket(rocketId) : null;
 		var preparation;
-		var result = { ready: false, reason: '', rocket: null, cost: 0, fuelMass: 0, dryMass: 0, structureValue: 0, overhaulValue: 0, overhaulCost: 0, twr: 0 };
+		var result = { ready: false, reason: '', rocket: null, cost: 0, fuelMass: 0, dryMass: 0, structureValue: 0, overhaulValue: 0, overhaulCost: 0, twr: 0, demand: destination ? R.market.demand(destination.id) : null };
 
 		if (!type || type.archived) {
 			result.reason = operations.reasons.NO_TYPE;
 			return result;
 		}
 		operations.typeStats(type);
-		result.reason = operations.payloadProvider(payloadMass, stats.payloadLimit) || '';
+		result.reason = operations.payloadProvider(payloadMass, stats.payloadLimit, result.demand) || '';
 		if (result.reason) {
+			result.reason = reasonText(result.reason, destination);
 			return result;
 		}
 		if (!rocket) {
@@ -511,6 +546,7 @@
 		var order;
 		var evaluation;
 		var contract = spec.contractId ? R.market.find(spec.contractId) : null;
+		var refusal;
 		var leg;
 
 		if (!game || game.phase !== 'deck') {
@@ -530,15 +566,15 @@
 			return { ok: false, reason: operations.reasons.CONTRACT_MISMATCH };
 		}
 		operations.forgetDismissal();
-		evaluation = operations.evaluateLeg(spec.typeId, spec.source, spec.outboundPayload, true, spec.rocketId, spec.overhaul);
+		evaluation = operations.evaluateLeg(spec.typeId, spec.source, spec.outboundPayload, true,
+			spec.rocketId, spec.overhaul, spec.destination);
 		if (!evaluation.ready) {
 			return { ok: false, reason: evaluation.reason };
 		}
-		if (spec.mode === 'return') {
-			operations.typeStats(operations.findType(spec.typeId));
-			if (operations.payloadProvider(spec.returnPayload, stats.payloadLimit)) {
-				return { ok: false, reason: operations.reasons.PAYLOAD_OVER };
-			}
+		refusal = cargoReason(checkCargo(stats.payloadLimit, spec.mode, spec.source, spec.destination,
+			spec.outboundPayload, spec.returnPayload));
+		if (refusal) {
+			return { ok: false, reason: refusal };
 		}
 		order = {
 			id: operations.nextId(),
@@ -671,13 +707,18 @@
 		}
 		operations.touch();
 		rocket.padId = result.landingPadId || rocket.padId;
-		copyStageState(result.stageState, rocket.stageState);
-		// A leg flown counts against the tank of every stage that came back
-		// attached; a stage left in the air is replaced and starts over.
+		// A leg counts against the tank of a stage that burned on it, decided
+		// before the landed state is copied over the instance: a stage that rode
+		// along full and cold is not a cycle on its tank, so an upper stage a
+		// short hop never lights does not age out on the booster's schedule and
+		// take the whole stack down with it at the next turnaround.
 		for (i = 0; i < stageSlots; i += 1) {
-			if (rocket.stageState[i].alive) {
-				rocket.stageState[i].lifeFlights += 1;
-			}
+			burnedStage[i] = rocket.stageState[i].alive &&
+				result.stageState[i].engineBurnTimeUsed > rocket.stageState[i].engineBurnTimeUsed;
+		}
+		copyStageState(result.stageState, rocket.stageState);
+		for (i = 0; i < stageSlots; i += 1) {
+			rocket.stageState[i].lifeFlights += burnedStage[i] ? 1 : 0;
 		}
 
 		if (result.status === 'crashed') {
@@ -727,7 +768,7 @@
 		}
 		leg = operations.legOf(order, 2);
 		evaluation = operations.evaluateLeg(order.typeId, leg.fromPadId, leg.payloadMass, leg.refuel,
-			order.rocketId, leg.overhaul);
+			order.rocketId, leg.overhaul, leg.toPadId);
 		if (!evaluation.ready) {
 			return { ok: false, reason: evaluation.reason };
 		}
@@ -772,6 +813,7 @@
 	};
 
 	operations.routeReadiness = function(route) {
+		var refusal;
 		var type;
 
 		if (!route.enabled) {
@@ -782,11 +824,13 @@
 			return { ready: false, reason: operations.reasons.NO_TYPE };
 		}
 		operations.typeStats(type);
-		if (operations.payloadProvider(route.outboundPayload, stats.payloadLimit) ||
-			(route.mode === 'return' && operations.payloadProvider(route.returnPayload, stats.payloadLimit))) {
-			return { ready: false, reason: operations.reasons.PAYLOAD_OVER };
+		refusal = cargoReason(checkCargo(stats.payloadLimit, route.mode, route.source, route.destination,
+			route.outboundPayload, route.returnPayload));
+		if (refusal) {
+			return { ready: false, reason: refusal };
 		}
-		return operations.evaluateLeg(route.typeId, route.source, route.outboundPayload, true, null, true);
+		return operations.evaluateLeg(route.typeId, route.source, route.outboundPayload, true, null, true,
+			route.destination);
 	};
 
 	// Refreshes every route's status and wait reason and returns the oldest ready
@@ -915,6 +959,7 @@
 		var route = operations.findRoute(routeId);
 		var type = operations.findType(typeId);
 		var state = operations.state;
+		var refusal;
 
 		if (!route || !type) {
 			return { ok: false, reason: operations.reasons.NO_TYPE };
@@ -923,9 +968,10 @@
 			return { ok: false, reason: operations.reasons.BUSY };
 		}
 		operations.typeStats(type);
-		if (operations.payloadProvider(route.outboundPayload, stats.payloadLimit) ||
-			(route.mode === 'return' && operations.payloadProvider(route.returnPayload, stats.payloadLimit))) {
-			return { ok: false, reason: operations.reasons.PAYLOAD_OVER };
+		refusal = cargoReason(checkCargo(stats.payloadLimit, route.mode, route.source, route.destination,
+			route.outboundPayload, route.returnPayload));
+		if (refusal) {
+			return { ok: false, reason: refusal };
 		}
 		route.typeId = typeId;
 		operations.forgetDismissal();
@@ -967,6 +1013,7 @@
 		var state = operations.state;
 		var route = routeId ? operations.findRoute(routeId) : null;
 		var type = operations.findType(spec.typeId);
+		var refusal;
 
 		if (!type || type.archived) {
 			return { ok: false, reason: operations.reasons.NO_TYPE };
@@ -975,9 +1022,10 @@
 			return { ok: false, reason: operations.reasons.BUSY };
 		}
 		operations.typeStats(type);
-		if (operations.payloadProvider(spec.outboundPayload, stats.payloadLimit) ||
-			(spec.mode === 'return' && operations.payloadProvider(spec.returnPayload, stats.payloadLimit))) {
-			return { ok: false, reason: operations.reasons.PAYLOAD_OVER };
+		refusal = cargoReason(checkCargo(stats.payloadLimit, spec.mode, spec.source, spec.destination,
+			spec.outboundPayload, spec.returnPayload));
+		if (refusal) {
+			return { ok: false, reason: refusal };
 		}
 		if (!route) {
 			return { ok: true, routeId: operations.createRoute(spec).id };

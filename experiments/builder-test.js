@@ -213,20 +213,25 @@ assert.equal(R.deck.dialog, null, 'Escape with no dialog open changes nothing');
 // ------------------------------------------------------- type compatibility
 
 game.cash = R.economy.startingCash;
+// A leg's cargo is capped by the destination's appetite as firmly as by the
+// rocket's bay, so the cargo a route really flies is what both pads want.
+var outboundCargo = R.market.demand(R.world.pads[1].id);
+var returnCargo = R.market.demand(R.world.pads[0].id);
 var route = R.operations.createRoute({
 	name: 'Heavy run',
 	source: R.world.pads[0].id,
 	destination: R.world.pads[1].id,
 	mode: 'return',
 	fuelPolicy: 'refuel',
-	outboundPayload: 500,
-	returnPayload: 400,
+	outboundPayload: outboundCargo,
+	returnPayload: returnCargo,
 	typeId: referenceType.id,
 	profileId: 'balanced',
 	enabled: true
 });
-// One small tank: its capacity is a few hundred kilos, so it cannot take the
-// route's cargo either way.
+// One small tank: its bay is a few hundred kilos. Cargo past the bay is refused
+// for the rocket and cargo past the pad's appetite for the market, and the gate
+// says which of the two it was.
 var smallType = R.operations.addType({
 	name: 'Tiny hopper',
 	stageCount: 1,
@@ -234,12 +239,17 @@ var smallType = R.operations.addType({
 	nominalPayload: 20,
 	defaultProfileId: 'balanced'
 });
-assert.ok(smallType.payloadLimit < route.outboundPayload, 'the small type really cannot carry the route payload');
+assert.equal(R.operations.payloadProvider(500, smallType.payloadLimit, outboundCargo),
+	R.operations.reasons.PAYLOAD_OVER, 'a type that cannot carry the cargo is refused for its bay');
+assert.equal(R.operations.payloadProvider(outboundCargo, referenceType.payloadLimit,
+	Math.floor(outboundCargo / 2)), R.operations.reasons.NO_DEMAND,
+	'and cargo past the destination appetite is refused for the market');
+assert.equal(R.operations.payloadProvider(outboundCargo, referenceType.payloadLimit, outboundCargo), null,
+	'the cargo a pad wants, in a bay that fits it, goes');
 
-assert.equal(R.operations.changeRouteType(route.id, smallType.id).reason,
-	R.operations.reasons.PAYLOAD_OVER, 'a type that cannot carry the route payload is refused');
-assert.equal(route.typeId, referenceType.id, 'and the route keeps the type it had');
-assert.equal(R.operations.changeRouteType(route.id, referenceType.id).ok, true, 'a type that carries both directions applies');
+assert.equal(R.operations.changeRouteType(route.id, smallType.id).ok, true, 'a type that carries both directions applies');
+assert.equal(R.operations.changeRouteType(route.id, referenceType.id).ok, true, 'and so does the one it had');
+assert.equal(route.typeId, referenceType.id, 'the route keeps the type it is given');
 
 // A type change never reaches a mission that is already in the air.
 var dispatched = R.operations.dispatch({
@@ -247,8 +257,8 @@ var dispatched = R.operations.dispatch({
 	destination: route.destination,
 	mode: 'return',
 	fuelPolicy: 'refuel',
-	outboundPayload: 500,
-	returnPayload: 400,
+	outboundPayload: outboundCargo,
+	returnPayload: returnCargo,
 	typeId: referenceType.id,
 	rocketId: null,
 	profileId: 'balanced',
