@@ -671,6 +671,66 @@ input[type="range"] {
 	gap: 10px;
 }
 
+.milestone-strip {
+	margin: 0 0 10px;
+	padding: 9px 10px;
+	border: 1px solid rgba(244, 199, 106, 0.3);
+	border-radius: 9px;
+	background: rgba(244, 199, 106, 0.08);
+}
+
+.milestone-strip[hidden] {
+	display: none;
+}
+
+.milestone-head {
+	display: grid;
+	grid-template-columns: auto 1fr auto;
+	gap: 8px;
+	align-items: baseline;
+}
+
+.milestone-head span {
+	color: #c9a14f;
+	font: 9px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.milestone-head strong {
+	color: #f4c76a;
+	font-size: 13px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.milestone-head small {
+	color: #cfd8dc;
+	font: 9px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.milestone-dots {
+	display: flex;
+	gap: 4px;
+	margin-top: 6px;
+}
+
+.milestone-dots span {
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	border: 1px solid rgba(244, 199, 106, 0.4);
+	background: transparent;
+}
+
+.milestone-dots span.done {
+	background: #f4c76a;
+	border-color: #f4c76a;
+}
+
+.milestone-dots span.active {
+	background: rgba(244, 199, 106, 0.35);
+}
+
 .market-scoreboard {
 	display: grid;
 	grid-template-columns: 1fr 1fr;

@@ -98,6 +98,7 @@ cargo the rival has already taken.
 
 ## Plans (subject-numbered, not version sequence)
 Active:
+- [`0.6-plan.md`](./0.6-plan.md) — Milestones & campaign arc: company milestones, rewards, world unlocks and a dominant-courier end condition.
 - [`0.5-plan.md`](./0.5-plan.md) — Damage & failures (0.5.1) and competitor pressure (0.5.2), both shipped.
 - [`0.4-plan.md`](./0.4-plan.md) — Economy balance, parts catalog with service/repair, market prices & contract board.
 

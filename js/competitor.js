@@ -89,12 +89,13 @@
 		};
 	}
 
-	competitor.initialize = function(seed) {
+	competitor.initialize = function(seed, carry) {
 		var playerOperations = R.operations.state;
 		var planet = R.world.planet;
 		var home = R.world.pads[0];
 		var operationState = createOperationsState(planet.id);
-		var rivalSeed = seed === undefined ? R.market.state.seed : seed;
+		var rivalSeed = (typeof seed === 'number' ? seed : (R.market.state ? R.market.state.seed : settings.seed));
+		var skillOffset = carry && carry.rivalSkillOffset ? carry.rivalSkillOffset : 0;
 
 		competitor.state = {
 			id: settings.id,
@@ -103,7 +104,7 @@
 			cash: settings.startingCash,
 			deliveries: 0,
 			reputation: 50,
-			skill: settings.initialSkill,
+			skill: settings.initialSkill + skillOffset,
 			turns: 0,
 			contractsAccepted: 0,
 			failedFlights: 0,
@@ -258,6 +259,7 @@
 		var count = 0;
 
 		while (game.phase === 'flying' && count < maxSteps) {
+			game.simTime += step;
 			R.controls.update(game, step);
 			R.physics.step(game, step);
 			count += 1;

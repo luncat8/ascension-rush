@@ -157,8 +157,19 @@
 		// the flight only reports what happened. The debrief returned here is
 		// generated from the same result that was logged, so the two agree.
 		R.operations.applyLegResult(game, result);
-		if (game === R.game && !game.competitorSimulation && R.competitor) {
-			R.competitor.afterPlayerLeg(game, result);
+		if (game === R.game && !game.competitorSimulation) {
+			if (R.competitor) {
+				R.competitor.afterPlayerLeg(game, result);
+			}
+			if (R.campaign) {
+				result.milestone = R.campaign.onLegSettled(result);
+				if (result.milestone) {
+					game.lastReport.milestone = result.milestone;
+					if (R.deck && R.deck.announce) {
+						R.deck.announce('Milestone reached: ' + result.milestone.milestone.title + '.');
+					}
+				}
+			}
 		}
 		return game.lastReport;
 	}

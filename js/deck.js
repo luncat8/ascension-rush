@@ -234,18 +234,21 @@
 
 	function fillProfiles(select, selectedId) {
 		var profiles = R.constants.autopilotProfiles;
+		var campaignOn = R.campaign && R.campaign.state;
 		var option;
+		var locked;
 		var i;
 
-		if (select.options.length === profiles.length) {
-			select.value = selectedId;
-			return;
-		}
 		select.innerHTML = '';
 		for (i = 0; i < profiles.length; i += 1) {
-			option = el('option', null, profiles[i].label);
+			locked = campaignOn && !R.campaign.unlocked(profiles[i].id + '-profile');
+			option = el('option', null, profiles[i].label + (locked ? ' (locked)' : ''));
 			option.value = profiles[i].id;
+			option.disabled = locked;
 			select.appendChild(option);
+		}
+		if (campaignOn && !R.campaign.unlocked(selectedId + '-profile')) {
+			selectedId = 'balanced';
 		}
 		select.value = selectedId;
 	}
@@ -616,6 +619,46 @@
 		return card;
 	}
 
+	function renderMilestones(game) {
+		var state = R.campaign && R.campaign.state;
+		var active;
+		var ladder;
+		var amount;
+		var target;
+		var dot;
+		var i;
+
+		if (!ui.milestoneStrip || !state) {
+			return;
+		}
+		ui.milestoneStrip.hidden = false;
+		active = R.campaign.activeMilestone();
+		ladder = state.ladder;
+		if (!active) {
+			ui.milestoneLabel.textContent = 'CAMPAIGN COMPLETE';
+			ui.milestoneTitle.textContent = ladder.length ? ladder[ladder.length - 1].title : '—';
+			ui.milestoneProgress.textContent = 'all milestones met';
+			amount = ladder.length;
+			target = ladder.length;
+		} else {
+			amount = R.campaign.progress(active);
+			target = active.target;
+			ui.milestoneLabel.textContent = 'MILESTONE ' + (state.activeIndex + 1) + ' / ' + ladder.length;
+			ui.milestoneTitle.textContent = active.title;
+			ui.milestoneProgress.textContent = amount + ' / ' + target;
+		}
+		ui.milestoneDots.innerHTML = '';
+		for (i = 0; i < ladder.length; i += 1) {
+			dot = doc.createElement('span');
+			if (i < state.activeIndex) {
+				dot.className = 'done';
+			} else if (i === state.activeIndex) {
+				dot.className = 'active';
+			}
+			ui.milestoneDots.appendChild(dot);
+		}
+	}
+
 	function renderScoreboard(game) {
 		var rival = R.competitor && R.competitor.state;
 		var player = R.operations.state.playerStats;
@@ -635,6 +678,7 @@
 		var pads = R.world.pads;
 		var i;
 
+		renderMilestones(game);
 		renderScoreboard(game);
 		ui.marketList.innerHTML = '';
 		for (i = 0; i < pads.length; i += 1) {
@@ -1068,6 +1112,11 @@
 		ui.viewMarket = doc.getElementById('view-market');
 		ui.marketList = doc.getElementById('market-list');
 		ui.marketScoreboard = doc.getElementById('market-scoreboard');
+		ui.milestoneStrip = doc.getElementById('milestone-strip');
+		ui.milestoneLabel = doc.getElementById('milestone-label');
+		ui.milestoneTitle = doc.getElementById('milestone-title');
+		ui.milestoneProgress = doc.getElementById('milestone-progress');
+		ui.milestoneDots = doc.getElementById('milestone-dots');
 		ui.scorePlayerCash = doc.getElementById('score-player-cash');
 		ui.scorePlayerRecord = doc.getElementById('score-player-record');
 		ui.scoreRivalName = doc.getElementById('score-rival-name');

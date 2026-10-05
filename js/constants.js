@@ -183,7 +183,52 @@
 		expectedCargoLoss: 0.04,
 		reputationPerDelivery: 1,
 		reputationLoss: 2,
+		noticeReputation: 65,
+		noticedSkillGrowth: 0.01,
 		maxFlightSeconds: 300
+	};
+
+	// Milestones (0.6). A world has an ordered ladder of named thresholds; the
+	// active one is checked on every deck settlement. Rewards pay cash, unlock
+	// features or mark progress toward the inter-world arc. `kind` picks the
+	// counter; `target` is the threshold. `requires` gates access to later
+	// worlds; `unlocks` gates a feature. `fromStart` measures cash from the
+	// opening balance so a loss never pushes progress below zero.
+	constants.campaign = {
+		seed: 20261007,
+		startReputation: 50,
+		carryReputationCap: 60,
+		worlds: {
+			verdant: {
+				name: 'Verdant',
+				ladder: [
+					{ id: 'first-receipt', title: 'First receipt',
+						kind: 'deliveries', target: 1,
+						reward: { cash: 2000 },
+						detail: 'Complete your first profitable delivery.' },
+					{ id: 'on-the-board', title: 'On the board',
+						kind: 'contracts', target: 3,
+						reward: { unlock: 'gentle-profile' },
+						detail: 'Complete three posted contracts.' },
+					{ id: 'haulier', title: 'Haulier',
+						kind: 'cargoKg', target: 400,
+						reward: { cash: 5000 },
+						detail: 'Deliver 400 kg of surviving cargo.' },
+					{ id: 'reliable', title: 'Reliable service',
+						kind: 'reputationClean', target: 65, cleanWindow: 5,
+						reward: { cash: 8000, rivalNotice: true },
+						detail: 'Reach reputation 65 without a crash in the last 5 legs.' },
+					{ id: 'long-reach', title: 'Long reach',
+						kind: 'contractTo', target: 1, padName: 'Farport',
+						reward: { cash: 10000, unlock: 'tinmoon' },
+						detail: 'Complete one contract to Farport.' },
+					{ id: 'dominant', title: 'Dominant courier – Verdant',
+						kind: 'dominant', target: 1,
+						reward: { settlement: 'verdant' },
+						detail: 'Hold more cash than Skybolt and serve every pad at least as often.' }
+				]
+			}
+		}
 	};
 
 	// Operations deck: bounded in-session history and the visible window an

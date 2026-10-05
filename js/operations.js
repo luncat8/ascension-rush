@@ -42,7 +42,8 @@
 		RETURN_BLOCKED: 'RETURN BLOCKED',
 		TYPE_FLYING: 'A ROCKET OF THIS TYPE IS FLYING',
 		CONTRACT_GONE: 'CONTRACT IS NO LONGER ON THE BOARD',
-		CONTRACT_MISMATCH: 'CONTRACT NEEDS ITS OWN PADS AND PAYLOAD'
+		CONTRACT_MISMATCH: 'CONTRACT NEEDS ITS OWN PADS AND PAYLOAD',
+		LOCKED_PROFILE: 'PROFILE LOCKED — COMPLETE ITS MILESTONE TO UNLOCK'
 	};
 	operations.autoLaunchSeconds = R.constants.operations.autoLaunchSeconds;
 	// Set while a dialog or the workshop is open: automation must never pull the
@@ -574,6 +575,9 @@
 			return { ok: false, reason: operations.reasons.CONTRACT_MISMATCH };
 		}
 		operations.forgetDismissal();
+		if (spec.profileId && R.campaign && !R.campaign.unlocked(spec.profileId + '-profile')) {
+			return { ok: false, reason: operations.reasons.LOCKED_PROFILE };
+		}
 		evaluation = operations.evaluateLeg(spec.typeId, spec.source, spec.outboundPayload, true,
 			spec.rocketId, spec.overhaul, spec.destination);
 		if (!evaluation.ready) {
@@ -1122,15 +1126,16 @@
 		};
 	};
 
-	operations.initialize = function() {
+	operations.initialize = function(carry) {
 		var planetId = R.world.planet.id;
+		var reputation;
 		var state = {
 			planetId: planetId,
 			nextId: 1,
 			types: [],
 			fleet: [],
 			routes: [],
-			playerStats: { deliveries: 0, reputation: 50 },
+			playerStats: { deliveries: 0, reputation: R.constants.campaign.startReputation },
 			mission: null,
 			offer: null,
 			countdown: 0,
@@ -1139,6 +1144,13 @@
 			dismissedRouteId: null
 		};
 
+		if (R.campaign) {
+			R.campaign.initialize(carry);
+			reputation = R.campaign.state.reputationCarry;
+			if (typeof reputation === 'number' && reputation > 0) {
+				state.playerStats.reputation = reputation;
+			}
+		}
 		operations.state = state;
 		R.flightLog.reset();
 		// Prices and contracts are part of the per-world reset: a market never
@@ -1147,7 +1159,7 @@
 		operations.referenceType();
 		operations.createRocket(state.types[0], R.world.pads[0]);
 		if (R.competitor) {
-			R.competitor.initialize();
+			R.competitor.initialize(carry);
 		}
 		return state;
 	};
