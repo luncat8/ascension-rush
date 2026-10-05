@@ -88,6 +88,7 @@ global.document = fixture;
 
 var R = require('../js/namespaces.js');
 require('../js/parts.js');
+require('../js/damage.js');
 require('../js/util.js');
 require('../js/constants.js');
 require('../js/planets.js');
@@ -110,6 +111,10 @@ require('../js/controls.js');
 require('../js/input.js');
 require('../js/render.js');
 require('../js/menu.js');
+
+// Damage and failures are measured by experiments/failure.js; every other
+// suite flies the 0.4 model, so a leg here is never at the mercy of a roll.
+R.damage.enabled = false;
 
 R.world.initialize();
 R.camera.resize(1280, 720);
@@ -197,6 +202,27 @@ assert.ok(drawnText.indexOf(Math.abs(R.trajectory.impact.vy).toFixed(1)) >= 0, '
 assert.ok(drawnText.indexOf(Math.abs(R.trajectory.impact.vx).toFixed(1)) >= 0, 'and the predicted horizontal speed');
 assert.ok(drawnText.indexOf(coastError >= 1000 ? (coastError / 1000).toFixed(1) : String(Math.round(coastError))) >= 0,
 	'and how far the coast impact is from the selected pad');
+
+// Damage: the flight HUD carries the structure the flight is wearing down and
+// the failure that has just happened. Damage is off in this suite, so the rows
+// are drawn from the model's own record rather than from a live flight.
+assert.ok(drawnText.indexOf('STRUCTURE') >= 0, 'flight HUD draws the structure row');
+assert.ok(drawnText.indexOf('ALARM') >= 0, 'and the alarm row');
+R.damage.stageStress = R.constants.damage.scrapStress;
+R.damage.alarm = R.damage.flags.LEAK;
+R.damage.alarmTime = 1;
+drawnText.length = 0;
+R.render.draw(coastGame);
+assert.ok(drawnText.indexOf(Math.round(R.damage.stageStress * 100) + ' %') >= 0,
+	'a damaged stage is quoted as a share of the scrap threshold');
+assert.ok(drawnText.indexOf('TANK LEAK') >= 0, 'a failure is named on the alarm row');
+R.damage.stageStress = 0;
+R.damage.alarm = 0;
+R.damage.alarmTime = 0;
+drawnText.length = 0;
+R.render.draw(coastGame);
+assert.equal(drawnText.indexOf('TANK LEAK'), -1, 'and it clears when the alarm expires');
+
 
 R.trajectory.impact.valid = false;
 drawnText.length = 0;
@@ -367,6 +393,41 @@ fourTimes = game.flight.elapsed - elapsedBefore;
 assert.equal(game.timeScale, R.constants.time.scales[6], 'time scale index selects the multiplier');
 assert.ok(fourTimes > 0 && fourTimes > twoTimes, 'a higher time scale buys more simulated time per frame');
 assert.ok(R.util.mod(game.rocket.wx - pads[0].wx, R.world.planet.circumference) > 0, 'the frame loop flies downrange');
+
+// Fly the leg out to its end: the deck reports it, the log keeps it.
+frames = 0;
+while (game.phase === 'flying' && frames < 4000) {
+	timestamp += 16.7;
+	frameCallback(timestamp);
+	frames += 1;
+}
+assert.equal(game.phase, 'deck', 'the frame loop flies the leg to its end');
+assert.equal(R.flightLog.entries.length, 1, 'and the finished leg is in the log');
+R.deck.setTab('log');
+R.deck.sync(game);
+assert.ok(fixture.getElementById('log-list').textContent.indexOf('NET') >= 0,
+	'the log card itemizes the leg that just flew');
+
+// Damage: a stack that came down damaged is repaired by the leg that flies it.
+// Damage is off for the rest of this suite, so this block turns it on.
+R.damage.enabled = true;
+R.deck.setTab('dispatch');
+var landedRocket = R.operations.state.fleet[0];
+fromSelect.value = landedRocket.padId;
+fromSelect.dispatch('change', {});
+landedRocket.stageState[0].stress = 0.4;
+R.deck.sync(game);
+assert.ok(fixture.getElementById('dispatch-maintenance-text').textContent.indexOf('40% DAMAGED') >= 0,
+	'the service line names the damage a stage carries');
+assert.ok(fixture.getElementById('dispatch-maintenance-text').textContent.indexOf('REPAIR ON THIS LEG $') >= 0,
+	'and quotes the repair the leg is about to buy');
+assert.ok(fixture.getElementById('dispatch-summary').textContent.indexOf('repair $') >= 0,
+	'the dispatch counts the repair in what the leg costs');
+fixture.getElementById('dispatch-send').click();
+assert.equal(game.phase, 'flying', 'the leg flies');
+assert.ok(game.flight.repairCost > 0, 'and the flight record carries the repair it paid');
+assert.equal(landedRocket.stageState[0].stress, 0, 'the stack was serviced before it launched');
+R.damage.enabled = false;
 
 // The market tab renders the board the project ships with, and a contract can
 // be loaded straight into the dispatch card.

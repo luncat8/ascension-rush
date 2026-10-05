@@ -4,7 +4,8 @@
 // with NEEDS OVERHAUL until the leg buys the overhaul; tanks are rated in legs
 // flown and are replaced by the turnaround that follows their last one. Wear
 // lives on the fleet instance, so a stage the turnaround replaces comes back
-// new. `repairPerKg`/`stress` exist and stay 0 for 0.5 to fill.
+// new. The repair bill 0.5.1 charges is the damage a stack carries: charged on
+// the leg that flies it, and quoted by the debrief the leg that earned it.
 
 var assert = require('node:assert/strict');
 var R = require('../js/namespaces.js');
@@ -20,6 +21,7 @@ require('../js/rocket.js');
 require('../js/market.js');
 require('../js/economy.js');
 require('../js/flight-log.js');
+require('../js/damage.js');
 require('../js/mission.js');
 require('../js/aerodynamics.js');
 require('../js/physics.js');
@@ -28,6 +30,10 @@ require('../js/autopilot.js');
 require('../js/operations.js');
 require('../js/controls.js');
 require('../js/input.js');
+
+// Damage and failures are measured by experiments/failure.js; every other
+// suite flies the 0.4 model, so a leg here is never at the mercy of a roll.
+R.damage.enabled = false;
 
 R.world.initialize('verdant');
 R.camera.resize(1280, 720);
@@ -120,11 +126,13 @@ catalog.engines.forEach(function(engine) {
 	assert.ok(engine.maxThrottleSeconds > 0 && Number.isFinite(engine.maxThrottleSeconds),
 		engine.id + ' is rated in finite seconds at throttle');
 	assert.ok(typeof engine.repairPerKg === 'number', engine.id + ' carries a repair rate');
-	assert.equal(engine.repairPerKg, 0, engine.id + ' leaves the repair rate for 0.5');
+	assert.ok(engine.repairPerKg > 0 && engine.repairPerKg < 1,
+		engine.id + ' can be repaired for less than it costs to replace');
 });
 catalog.tanks.forEach(function(tank) {
 	assert.ok(tank.maxFlights > 0, tank.id + ' is rated in legs flown');
-	assert.equal(tank.repairPerKg, 0, tank.id + ' leaves the repair rate for 0.5');
+	assert.ok(tank.repairPerKg > 0 && tank.repairPerKg < 1,
+		tank.id + ' can be repaired for less than it costs to replace');
 });
 assert.ok(catalog.overhaulFactor > 0 && catalog.overhaulFactor < 1, 'an overhaul is cheaper than a new engine');
 
@@ -342,29 +350,54 @@ assert.equal(R.operations.evaluateLeg(reference.id, home.id, R.world.planet.defa
 
 // ------------------------------------------------------------- repair is 0.5
 
+// The bill is the damage the stack carries, priced through the parts: a stage
+// that is merely stressed is repaired, one that is too far gone is replaced by
+// the turnaround instead, and an engine that burned out is rebought whole.
 createRun();
 reference = R.operations.state.types[0];
 rocket = instance();
-rocket.stageState[0].stress = 5;
-assert.equal(parts.stageRepairValue(reference.stages[0], rocket.stageState[0]), 0,
-	'stress with no repair rate yet costs nothing');
-assert.equal(parts.repairValue(reference, rocket.stageState), 0, 'and neither does the stack');
+var repairBreakdown = parts.stageBreakdown(reference.stages[0]);
+var repairableQuote = repairBreakdown.engineMass * standardEngine.repairPerKg +
+	repairBreakdown.tankMass * parts.tank(catalog.defaultTankId).repairPerKg;
+rocket.stageState[0].stress = 0.3;
+assert.ok(Math.abs(parts.stageRepairValue(reference.stages[0], rocket.stageState[0]) -
+	0.3 * repairableQuote) < 1e-9, 'a stressed stage is billed by how damaged it is');
+assert.equal(parts.scrapped(reference.stages[0], rocket.stageState[0]), false,
+	'and a stage that is only damaged is still worth repairing');
 
-// The bill is quoted from 0.4.3: with a repair rate on the parts it reaches the
-// flight record and the log row, and the cash never moves until 0.5 charges it.
-catalog.engines[0].repairPerKg = 0.5;
-var stressedEngineMass = parts.stageBreakdown(reference.stages[0]).engineMass;
-var repairQuote = stressedEngineMass * 5 * 0.5 * R.economy.priceSteel(home.id);
+rocket.stageState[0].stress = R.constants.damage.scrapStress;
+assert.equal(parts.scrapped(reference.stages[0], rocket.stageState[0]), true,
+	'a stage past the scrap threshold is beyond repair');
+assert.equal(parts.repairValue(reference, rocket.stageState, true), 0,
+	'and a refuelling turnaround replaces it rather than billing the repair');
+
+rocket.stageState[0].stress = 0;
+rocket.stageState[0].engineOut = true;
+assert.ok(Math.abs(parts.stageRepairValue(reference.stages[0], rocket.stageState[0]) -
+	repairBreakdown.engineMass * standardEngine.costPerMass) < 1e-9,
+	'an engine that failed outright is rebought, not repaired');
+
+// The leg that flies the stack pays the bill: the repair is part of what the
+// dispatch has to buy, and the stack launches with the damage put right.
+rocket.stageState[0].engineOut = false;
+rocket.stageState[0].stress = 0.4;
+var repairQuote = parts.repairValue(reference, rocket.stageState, true);
+var repairMoney = repairQuote * R.economy.priceSteel(home.id);
+var repairEvaluation = R.operations.evaluateLeg(reference.id, home.id, R.world.planet.defaultPayload,
+	true, rocket.id, false, east.id);
+assert.ok(repairQuote > 0, 'a damaged stack has a bill');
+assert.equal(repairEvaluation.repairCost, repairMoney, 'the dispatch quotes it in money');
+assert.ok(repairEvaluation.cost >= repairMoney, 'and counts it in what the leg has to buy');
 var repairCashBefore = game.cash;
-try {
-	assert.ok(parts.repairValue(reference, rocket.stageState) > 0, 'a stressed stack now has a bill');
-	assert.equal(send({}).ok, true, 'and the leg still flies: the repair is quoted, not gated');
-	assert.equal(game.flight.repairCost, repairQuote, 'the flight record quotes the repair');
-	assert.equal(game.cash, repairCashBefore - game.flight.fuelCost - game.flight.turnaroundCost -
-		game.flight.overhaulCost, 'without charging it');
-	assert.equal(fly().repairCost, repairQuote, 'and the log row carries the quote');
-} finally {
-	catalog.engines[0].repairPerKg = 0;
-}
+assert.equal(send({}).ok, true, 'and the leg still flies');
+assert.equal(game.flight.repairCost, repairMoney, 'the flight record carries the repair');
+assert.equal(game.cash, repairCashBefore - game.flight.fuelCost - game.flight.turnaroundCost -
+	game.flight.overhaulCost - repairMoney, 'the leg pays it, through the ledger');
+assert.equal(R.economy.priceSteel(home.id) > 0 && game.ledger.some(function(entry) {
+	return entry.type === 'repair' && -entry.amount === repairMoney;
+}), true, 'the repair went through the ledger');
+assert.equal(game.rocket.stages[0].stress, 0, 'the stack launched with the damage put right');
+assert.equal(rocket.stageState[0].stress, 0, 'and the instance carries no damage into the flight');
+assert.equal(fly().repairCost, repairMoney, 'the log row keeps the repair on the leg that paid it');
 
 console.log('Service and wear tests passed.');

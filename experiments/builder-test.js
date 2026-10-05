@@ -22,6 +22,7 @@ require('../js/rocket.js');
 require('../js/market.js');
 require('../js/economy.js');
 require('../js/flight-log.js');
+require('../js/damage.js');
 require('../js/mission.js');
 require('../js/aerodynamics.js');
 require('../js/physics.js');
@@ -31,6 +32,10 @@ require('../js/operations.js');
 require('../js/builder.js');
 require('../js/deck.js');
 require('../js/controls.js');
+
+// Damage and failures are measured by experiments/failure.js; every other
+// suite flies the 0.4 model, so a leg here is never at the mercy of a roll.
+R.damage.enabled = false;
 
 function byId(id) {
 	var element = fixture.getElementById(id);

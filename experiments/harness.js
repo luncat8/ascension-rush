@@ -7,6 +7,7 @@
 
 var R = require('../js/namespaces.js');
 require('../js/parts.js');
+require('../js/damage.js');
 
 require('../js/util.js');
 require('../js/constants.js');
@@ -26,6 +27,11 @@ require('../js/autopilot.js');
 require('../js/operations.js');
 require('../js/controls.js');
 require('../js/input.js');
+
+// Damage and failures are a 0.5 model of wear and chance on top of the
+// physics: the baselines these scripts measure are flown without it, and
+// experiments/failure.js measures it on its own terms.
+R.damage.enabled = false;
 
 var harness = { R: R, maxSeconds: 300, overrideKeys: ['maxDynamicPressure', 'maxThrustAcceleration', 'maxAngleOfAttackDeg', 'stageOnAuthority'] };
 // Flights that come back within this distance of the target count as arrived.

@@ -19,6 +19,7 @@ require('../js/rocket.js');
 require('../js/market.js');
 require('../js/economy.js');
 require('../js/flight-log.js');
+require('../js/damage.js');
 require('../js/mission.js');
 require('../js/aerodynamics.js');
 require('../js/physics.js');
@@ -27,6 +28,10 @@ require('../js/autopilot.js');
 require('../js/operations.js');
 require('../js/controls.js');
 require('../js/input.js');
+
+// Damage and failures are measured by experiments/failure.js; every other
+// suite flies the 0.4 model, so a leg here is never at the mercy of a roll.
+R.damage.enabled = false;
 
 R.world.initialize('verdant');
 R.camera.resize(1280, 720);
@@ -383,6 +388,25 @@ assert.equal(R.operations.evaluateLeg(referenceType.id, home.id, 80, true, null)
 	R.operations.reasons.NO_ROCKET + home.name.toUpperCase(), 'and the pad it left is empty');
 assert.equal(R.flightLog.entries[0].status, 'crashed', 'a crash is logged like any other leg');
 assert.equal(R.flightLog.entries[0].landingPadId, null, 'with no pad to its name');
+assert.equal(R.flightLog.entries[0].payloadDamage, 1, 'a crash delivers none of the cargo');
+assert.equal(R.flightLog.entries[0].repairCost, 0, 'and a written-off stack is never repaired');
+
+// A rupture is the ending the damage model reaches on its own: the flight
+// never lands, so the log has to say what happened to it.
+game = createRun();
+var ruptureDispatch = send({});
+var ruptureRocket = R.operations.findRocket(ruptureDispatch.mission.rocketId);
+game.rocket.wy = 900;
+game.rocket.vy = 40;
+R.mission.rupture(game);
+
+assert.equal(game.lastReport.title, 'TANK RUPTURE · VEHICLE LOST', 'a rupture is its own ending, not a crash on landing');
+assert.equal(game.lastReport.status, 'crashed', 'and it is still a loss');
+assert.equal(ruptureRocket.status, 'lost', 'the vehicle is gone');
+assert.equal(R.flightLog.entries[0].cause, 'rupture', 'the log keeps why the flight ended');
+assert.equal(R.flightLog.entries[0].payloadDamage, 1, 'and that no cargo survived it');
+assert.equal(R.flightLog.entries[0].landingPadId, null, 'it never reached a pad');
+assert.match(game.lastReport.detail, /came apart in the air/, 'and the debrief says so in words');
 
 // ------------------------------------------------------------------- routes
 

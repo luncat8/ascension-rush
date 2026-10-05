@@ -55,6 +55,7 @@
 		var newWy;
 		var crossingFraction;
 		var topStage;
+		var load;
 
 		if (game.phase !== 'flying') {
 			return false;
@@ -125,6 +126,11 @@
 		}
 		accelerationX = thrust * Math.sin(state.heading) / mass + aeroSample.dragAccelX;
 		accelerationY = thrust * Math.cos(state.heading) / mass - gravity + aeroSample.dragAccelY;
+		// The load the structure carries is the non-gravitational part:
+		// thrust and drag. Weight is not a load a stage has to hold up
+		// against itself, so gravity is put back before it is measured.
+		load = Math.sqrt(accelerationX * accelerationX +
+			(accelerationY + gravity) * (accelerationY + gravity));
 		acceleration = Math.sqrt(accelerationX * accelerationX + accelerationY * accelerationY);
 		if (acceleration > settings.maxAcceleration) {
 			accelerationX *= settings.maxAcceleration / acceleration;
@@ -151,6 +157,9 @@
 		state.vx = newVx;
 		state.vy = newVy;
 		game.flight.elapsed += dt;
+		// Damage is judged on the step that just flew. A rupture ends the
+		// flight here, not at the next ground crossing.
+		R.damage.step(game, dt, load, aeroSample.dynamicPressure);
 		return false;
 	};
 

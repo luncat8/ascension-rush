@@ -427,7 +427,7 @@
 		var coastError;
 		var margin = Math.min(24, render.width * 0.05);
 		var panelWidth = 230;
-		var panelHeight = 387;
+		var panelHeight = 427;
 		var x = render.width - panelWidth - margin;
 		var y = 20;
 
@@ -543,48 +543,69 @@
 		context.fillStyle = '#a8bac2';
 		context.fillText('kPa', x + panelWidth - 16, y + 208);
 
+		// Damage: how far the stage that is burning is from scrap, and the
+		// failure that has just happened. Both come from the same model the
+		// log and the repair bill read.
 		context.fillStyle = '#a8bac2';
 		context.textAlign = 'left';
-		context.fillText('BALANCE', x + 16, y + 234);
+		context.fillText('STRUCTURE', x + 16, y + 228);
+		context.textAlign = 'right';
+		context.fillStyle = R.damage.stageStress >= R.constants.damage.scrapStress ? '#f1a89d' :
+			(R.damage.stageStress > 0 ? '#f4c76a' : '#829ba6');
+		context.fillText(R.damage.stageStress > 0 ? Math.round(R.damage.stageStress * 100) + ' %' : '—',
+			x + panelWidth - 16, y + 228);
+		drawBar(context, x + 16, y + 235, panelWidth - 32, R.damage.stageStress,
+			R.damage.stageStress >= R.constants.damage.scrapStress ? '#f1a89d' : '#f4c76a');
+
+		context.textAlign = 'left';
+		context.fillStyle = '#a8bac2';
+		context.fillText('ALARM', x + 16, y + 254);
+		context.textAlign = 'right';
+		context.fillStyle = R.damage.alarmTime > 0 ? '#f1a89d' : '#829ba6';
+		context.fillText(R.damage.alarmTime > 0 ? R.damage.alarmLabel() : '—', x + panelWidth - 16, y + 254);
+
+		context.fillStyle = '#a8bac2';
+		context.textAlign = 'left';
+		context.fillText('BALANCE', x + 16, y + 274);
 		context.fillStyle = '#e7eff6';
 		context.textAlign = 'right';
-		context.fillText('$', x + panelWidth - 58, y + 234);
-		context.fillText(Math.round(game.cash), x + panelWidth - 16, y + 234);
+		context.fillText('$', x + panelWidth - 58, y + 274);
+		context.fillText(Math.round(game.cash), x + panelWidth - 16, y + 274);
 
 		context.textAlign = 'left';
 		context.fillStyle = '#a8bac2';
-		context.fillText('FLIGHT Δ', x + 16, y + 254);
+		context.fillText('FLIGHT Δ', x + 16, y + 294);
 		context.textAlign = 'right';
 		context.fillStyle = game.flight.cashDelta >= 0 ? '#91e3d3' : '#f1a89d';
-		context.fillText(game.flight.cashDelta < 0 ? '−$' : '+$', x + panelWidth - 58, y + 254);
-		context.fillText(Math.round(Math.abs(game.flight.cashDelta)), x + panelWidth - 16, y + 254);
+		context.fillText(game.flight.cashDelta < 0 ? '−$' : '+$', x + panelWidth - 58, y + 294);
+		context.fillText(Math.round(Math.abs(game.flight.cashDelta)), x + panelWidth - 16, y + 294);
 
 		context.fillStyle = '#a8bac2';
 		context.textAlign = 'left';
-		context.fillText('AUTOPILOT', x + 16, y + 275);
+		context.fillText('AUTOPILOT', x + 16, y + 315);
 		context.textAlign = 'right';
 		if (R.autopilot.enabled) {
 			context.fillStyle = '#7de0ca';
-			context.fillText(R.autopilot.label(), x + panelWidth - 16, y + 275);
+			context.fillText(R.autopilot.label(), x + panelWidth - 16, y + 315);
 		} else {
 			context.fillStyle = '#829ba6';
-			context.fillText('OFF', x + panelWidth - 16, y + 275);
+			context.fillText('OFF', x + panelWidth - 16, y + 315);
 		}
 
 		// Why the guidance is holding back, with the profile whose limits it flies.
 		context.textAlign = 'left';
 		context.fillStyle = '#a8bac2';
-		context.fillText('LIMITER', x + 16, y + 296);
+		context.fillText('LIMITER', x + 16, y + 336);
 		context.textAlign = 'right';
 		if (!R.autopilot.enabled) {
 			context.fillStyle = '#829ba6';
-			context.fillText('OFF', x + panelWidth - 16, y + 296);
+			context.fillText('OFF', x + panelWidth - 16, y + 336);
 		} else {
 			context.fillStyle = R.autopilot.limiter ? '#f4c76a' : '#829ba6';
-			context.fillText(R.autopilot.limiter ? R.autopilot.limiterLabel() : '—', x + panelWidth - 16, y + 296);
+			context.fillText(R.autopilot.limiter ? R.autopilot.limiterLabel() : '—', x + panelWidth - 16, y + 336);
 			context.textAlign = 'left';
 			context.fillStyle = '#829ba6';
-			context.fillText(R.autopilot.profileById(game.flight.autopilotProfile).label, x + 74, y + 296);
+			context.fillText(R.autopilot.profileById(game.flight.autopilotProfile).label, x + 74, y + 336);
 		}
 
 		// The coast forecast: where an engine-off trajectory from this state
@@ -593,43 +614,43 @@
 		// keeps burning and lands where its own guidance takes it.
 		context.textAlign = 'left';
 		context.fillStyle = '#a8bac2';
-		context.fillText('COAST IMPACT', x + 16, y + 317);
+		context.fillText('COAST IMPACT', x + 16, y + 357);
 		context.textAlign = 'right';
 		if (!impact.valid) {
 			context.fillStyle = '#829ba6';
-			context.fillText('OUT OF HORIZON', x + panelWidth - 16, y + 317);
+			context.fillText('OUT OF HORIZON', x + panelWidth - 16, y + 357);
 		} else if (impact.onTargetPad) {
 			context.fillStyle = '#7de0ca';
-			context.fillText('ON TARGET PAD', x + panelWidth - 16, y + 317);
+			context.fillText('ON TARGET PAD', x + panelWidth - 16, y + 357);
 		} else {
 			coastError = Math.abs(impact.targetError);
 			context.fillStyle = impact.safeTouchdown ? '#f4c76a' : '#f1a89d';
-			context.fillText(coastError >= 1000 ? (coastError / 1000).toFixed(1) : String(Math.round(coastError)), x + panelWidth - 50, y + 317);
+			context.fillText(coastError >= 1000 ? (coastError / 1000).toFixed(1) : String(Math.round(coastError)), x + panelWidth - 50, y + 357);
 			context.textAlign = 'left';
-			context.fillText(coastUnits[(impact.targetError >= 0 ? 1 : 0) + (coastError >= 1000 ? 2 : 0)], x + panelWidth - 48, y + 317);
+			context.fillText(coastUnits[(impact.targetError >= 0 ? 1 : 0) + (coastError >= 1000 ? 2 : 0)], x + panelWidth - 48, y + 357);
 		}
 
 		context.textAlign = 'left';
 		context.fillStyle = '#a8bac2';
-		context.fillText('COAST TOUCHDOWN', x + 16, y + 337);
+		context.fillText('COAST TOUCHDOWN', x + 16, y + 377);
 		context.textAlign = 'right';
 		if (!impact.valid) {
 			context.fillStyle = '#829ba6';
-			context.fillText('—', x + panelWidth - 16, y + 337);
+			context.fillText('—', x + panelWidth - 16, y + 377);
 		} else {
 			context.fillStyle = impact.safeTouchdown ? '#7de0ca' : '#f1a89d';
-			context.fillText('V', x + panelWidth - 116, y + 337);
-			context.fillText(Math.abs(impact.vy).toFixed(1), x + panelWidth - 66, y + 337);
-			context.fillText('H', x + panelWidth - 56, y + 337);
-			context.fillText(Math.abs(impact.vx).toFixed(1), x + panelWidth - 16, y + 337);
+			context.fillText('V', x + panelWidth - 116, y + 377);
+			context.fillText(Math.abs(impact.vy).toFixed(1), x + panelWidth - 66, y + 377);
+			context.fillText('H', x + panelWidth - 56, y + 377);
+			context.fillText(Math.abs(impact.vx).toFixed(1), x + panelWidth - 16, y + 377);
 		}
 
 		context.textAlign = 'left';
 		context.fillStyle = '#a8bac2';
-		context.fillText('TIME SCALE', x + 16, y + 358);
+		context.fillText('TIME SCALE', x + 16, y + 398);
 		context.textAlign = 'right';
 		context.fillStyle = '#e7eff6';
-		context.fillText(timeLabel(game), x + panelWidth - 16, y + 358);
+		context.fillText(timeLabel(game), x + panelWidth - 16, y + 398);
 
 		context.fillStyle = '#829ba6';
 		context.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';

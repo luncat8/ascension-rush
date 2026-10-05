@@ -146,13 +146,20 @@
 // turnaround is already replacing. A stage that is rebuilt comes back new, so
 // nothing spent on the old one — an overhaul, a repair — carries over to it.
 function keptStage(stage, slot, refuel) {
-	return slot.alive && !(refuel && parts.wornOut(stage, slot));
+	return slot.alive && !(refuel && parts.scrapped(stage, slot));
 }
 
 // A tank is flown out on the leg after its rating: the turnaround that
 // follows replaces the stage, which is what a life limit costs.
 parts.wornOut = function(stage, slot) {
 	return slot.lifeFlights >= parts.tank(stage.tankId).maxFlights;
+};
+
+// A stage is beyond saving when its tank has flown out its rating or it came
+// down too damaged to repair: either way the turnaround that follows replaces
+// the whole stage, which is what a life limit and a wreck both cost.
+parts.scrapped = function(stage, slot) {
+	return parts.wornOut(stage, slot) || slot.stress >= R.constants.damage.scrapStress;
 };
 
 	parts.flightsLeft = function(stage, slot) {
@@ -205,16 +212,17 @@ parts.applyOverhaul = function(type, stageState, refuel) {
 	return stageState;
 };
 
-	// The repair bill 0.5 charges: the stress a stage arrived with times what its
-	// parts cost to put right per kg. Both are 0 until 0.5 measures touchdown
-	// hardness, so from 0.4.3 this is quoted in the log and never charged.
+	// The repair bill: the stress a stage carries times what its parts cost to
+	// put right per kg, plus a whole new engine for one that burned out — a
+	// part that failed outright is replaced, not repaired.
 	parts.stageRepairValue = function(stage, slot) {
 		var breakdown = parts.stageBreakdown(stage);
 		var fairing = parts.fairing(stage.fairingId);
 
 		return slot.stress * (breakdown.engineMass * parts.engine(stage.engineId).repairPerKg +
 			breakdown.tankMass * parts.tank(stage.tankId).repairPerKg +
-			breakdown.fairingMass * (fairing ? fairing.repairPerKg : 0));
+			breakdown.fairingMass * (fairing ? fairing.repairPerKg : 0)) +
+			(slot.engineOut ? breakdown.engineMass * parts.engine(stage.engineId).costPerMass : 0);
 	};
 
 parts.repairValue = function(type, stageState, refuel) {
@@ -227,6 +235,21 @@ parts.repairValue = function(type, stageState, refuel) {
 		}
 	}
 	return value;
+};
+
+// A repair is what the pad does with the stack before the leg: the damage it
+// arrived with is put right, so the leg launches with clean stages. A stage
+// the turnaround is rebuilding instead is not repaired — it comes back new.
+parts.applyRepair = function(type, stageState, refuel) {
+	var i;
+
+	for (i = 0; i < type.stageCount; i += 1) {
+		if (keptStage(type.stages[i], stageState[i], refuel)) {
+			stageState[i].stress = 0;
+			stageState[i].engineOut = false;
+		}
+	}
+	return stageState;
 };
 
 	if (typeof module !== 'undefined' && module.exports) {

@@ -19,7 +19,15 @@
 			engineBurnTimeUsed: 0,
 			lifeFlights: 0,
 			stress: 0,
-			alive: false
+			alive: false,
+			// 0.5 damage: what the catalog built this stage from, the thrust
+			// it was built with, and what this flight has done to it.
+			engineId: '',
+			tankId: '',
+			thrustNominal: 0,
+			engineHealth: 1,
+			leakRate: 0,
+			engineOut: false
 		};
 	}
 
@@ -117,7 +125,10 @@
 			fuelMass: 0,
 			engineBurnTimeUsed: 0,
 			lifeFlights: 0,
-			stress: 0
+			stress: 0,
+			// A stage that came down with a dead engine needs a new one; the
+			// repair the next leg buys is what fits it.
+			engineOut: false
 		};
 	}
 
@@ -127,6 +138,7 @@
 		slot.engineBurnTimeUsed = 0;
 		slot.lifeFlights = 0;
 		slot.stress = 0;
+		slot.engineOut = false;
 		return slot;
 	};
 
@@ -146,6 +158,7 @@
 			out[i].engineBurnTimeUsed = state.stages[i].engineBurnTimeUsed;
 			out[i].lifeFlights = state.stages[i].lifeFlights;
 			out[i].stress = state.stages[i].stress;
+			out[i].engineOut = out[i].alive ? state.stages[i].engineOut : false;
 		}
 		return out;
 	};
@@ -191,9 +204,10 @@
 
 	// Fuel the instance still has to buy to reach the type's capacities, the dry
 	// mass of the stages it has to replace, and what that structure costs through
-	// its parts. A stage is replaced when it is gone *or* when its tank has flown
-	// out its rating — both come back new, which is what a life limit costs. All
-	// three numbers are what a turnaround charges.
+	// its parts. A stage is replaced when it is gone, when its tank has flown out
+	// its rating, or when it came down too damaged to repair — all three come
+	// back new, which is what a life limit and a wreck both cost. All three
+	// numbers are what a turnaround charges.
 	rocket.restorePlan = function(type, stageState, plan) {
 		var i;
 
@@ -201,7 +215,7 @@
 		plan.dryMass = 0;
 		plan.structureValue = 0;
 		for (i = 0; i < type.stageCount; i += 1) {
-			if (!stageState[i].alive || R.parts.wornOut(type.stages[i], stageState[i])) {
+			if (!stageState[i].alive || R.parts.scrapped(type.stages[i], stageState[i])) {
 				plan.dryMass += rocket.stageDryMass(type.stages[i]);
 				plan.structureValue += R.parts.stageStructureValue(type.stages[i]);
 				plan.fuelMass += type.stages[i].fuelMass;
@@ -249,6 +263,12 @@
 				stage.engineBurnTimeUsed = 0;
 				stage.lifeFlights = 0;
 				stage.stress = 0;
+				stage.engineId = '';
+				stage.tankId = '';
+				stage.thrustNominal = 0;
+				stage.engineHealth = 1;
+				stage.leakRate = 0;
+				stage.engineOut = false;
 				continue;
 			}
 
@@ -257,9 +277,18 @@
 			stage.fuelMax = fuelMax;
 			stage.dryMass = rocket.stageDryMass(type.stages[i]);
 			stage.thrustMax = thrust;
+			stage.thrustNominal = thrust;
 			stage.ispSea = R.parts.engine(type.stages[i].engineId).ispSea;
 			stage.ispVac = R.parts.engine(type.stages[i].engineId).ispVac;
+			stage.engineId = type.stages[i].engineId;
+			stage.tankId = type.stages[i].tankId;
 			stage.strength = type.stages[i].strength;
+			// A leg starts with the stack the pad serviced: the damage it
+			// arrived with is repaired here, and the failures of a flight
+			// belong to that flight alone.
+			stage.engineHealth = 1;
+			stage.leakRate = 0;
+			stage.engineOut = false;
 			stage.alive = stageState[i].alive;
 			stage.fuelMass = stage.alive ? stageState[i].fuelMass : 0;
 			stage.engineBurnTimeUsed = stageState[i].engineBurnTimeUsed;
@@ -274,6 +303,7 @@
 		// and adds its mass once at build. A type without one keeps these neutral.
 		fairing = R.parts.fairing(type.stages[count - 1].fairingId);
 		state.fairingAttached = !!fairing;
+		state.fairingLost = false;
 		state.fairingMass = fairing ? fairing.mass : 0;
 		state.fairingDragFraction = fairing ? fairing.dragFraction : 1;
 		return state;
@@ -297,8 +327,11 @@
 			landed: false,
 			crashed: false,
 			fairingAttached: false,
+			fairingLost: false,
 			fairingMass: 0,
-			fairingDragFraction: 1
+			fairingDragFraction: 1,
+			// Whether the cargo this leg carries is rated for a gentler ride.
+			fragileCargo: false
 		};
 	};
 
@@ -366,6 +399,8 @@
 			return false;
 		}
 
+		// Separation shakes the stack; the stage that goes is gone with it.
+		R.damage.separation(state);
 		stage.alive = false;
 		next = rocket.nextAliveStageIndex(state, state.currentStage + 1);
 		state.currentStage = next < 0 ? state.stageCount : next;

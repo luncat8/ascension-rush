@@ -299,6 +299,7 @@
 		var nextStage;
 		var hoverAuthority;
 		var dryStage;
+		var deadStage;
 		var earlyStage;
 
 		command.stage = false;
@@ -359,11 +360,16 @@
 		// it buys. The last stage is never dropped this way, and neither is a
 		// stage whose successor cannot take over from it.
 		dryStage = !!stage && stage.fuelMass <= 0.5;
+		// An engine that has failed leaves the stack with no thrust at all.
+		// The only recovery is the next stage, and it is the autopilot's to
+		// command: the fuel left in a dead stage is worth nothing anyway.
+		deadStage = !!stage && stage.thrustMax <= 0 && nextStage >= 0 &&
+			rocket.stages[nextStage].fuelMass > 0;
 		earlyStage = !!stage && tuning.stageOnAuthority && !dryStage && nextStage >= 0 &&
 			rocket.stages[nextStage].fuelMass >= stage.fuelMass &&
 			R.rocket.stackThrustAcceleration(rocket, stageIndex, 0) < hoverAuthority &&
 			R.rocket.stackThrustAcceleration(rocket, nextStage, rocket.stages[nextStage].fuelMass) >= hoverAuthority;
-		if (stage && nextStage >= 0 && (dryStage || earlyStage)) {
+		if (stage && nextStage >= 0 && (dryStage || deadStage || earlyStage)) {
 			command.stage = true;
 			autopilot.stagedEarly = earlyStage;
 		}

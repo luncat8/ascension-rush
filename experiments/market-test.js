@@ -19,6 +19,7 @@ require('../js/rocket.js');
 require('../js/market.js');
 require('../js/economy.js');
 require('../js/flight-log.js');
+require('../js/damage.js');
 require('../js/mission.js');
 require('../js/aerodynamics.js');
 require('../js/physics.js');
@@ -27,6 +28,10 @@ require('../js/autopilot.js');
 require('../js/operations.js');
 require('../js/controls.js');
 require('../js/input.js');
+
+// Damage and failures are measured by experiments/failure.js; every other
+// suite flies the 0.4 model, so a leg here is never at the mercy of a roll.
+R.damage.enabled = false;
 
 R.world.initialize('verdant');
 R.camera.resize(1280, 720);

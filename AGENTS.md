@@ -41,7 +41,13 @@ archive/ - for implemented plans
 
 experiments/ - measurement scripts (node), not loaded by the page.
 experiments/logs/ - keep useful;
-experiments/balance.js - economy Monte Carlo through the real dispatch/autopilot/physics: margin bands per world, bracket, stage count and payload. `experiments/logs/0.4.4-balance.txt` is its recorded run.
+experiments/balance.js - economy Monte Carlo through the real dispatch/autopilot/physics: margin bands per world, bracket, stage count and payload. `experiments/logs/0.4.4-balance.txt` is its recorded run; `node experiments/balance.js 20261004 4 2 damage` flies the same chains with the damage model on.
+experiments/failure.js - damage Monte Carlo through the same path: failure rates, stress per hop and repair bills per world and build strength. `experiments/logs/0.5.1-failures.txt` is its recorded run.
+
+## damage
+- js/damage.js is the whole model; its tuning is constants.damage and nothing else.
+- it runs inside the physics step, so it allocates nothing: every scratch buffer is module-level.
+- the baselines (envelope.js, build-sweep.js, impact-accuracy.js, balance.js) fly with damage off - the harness switches it off at load, and a script that is about damage switches it back on.
 
 ## sandbox
 

@@ -2,8 +2,8 @@
 
 A small 2D rocket-delivery game: wrap-around planets, staged rockets, manual
 flight or autopilot, pad-to-pad delivery, fuel/hull/payload economics, and a
-logarithmic altitude view. Persistent parts, damage and a rival company are
-planned follow-ups.
+logarithmic altitude view, damage and failures in flight, and a rival company
+still to come.
 
 ## Status
 The 0.1 world/render scaffold, the 0.2 playable flight slice, the 0.3
@@ -55,12 +55,39 @@ tanking up where it is cheap is real money. Loading a contract into dispatch
 pins its pads and payload; the flight log records the rate it was paid, the
 contract it flew and whether the cargo was lost.
 
+The **0.4.2** parts catalog makes a build a bill of materials — engines, tanks
+and a fairing, with mass, cost, Isp and service life — and the **0.4.3** service
+model rates an engine in seconds at throttle and a tank in legs flown: an
+overhaul buys the seconds back, a flown-out tank is replaced by the turnaround,
+and the deck sells the overhaul the stack needs. The **0.4.4** balance pass is
+the Monte Carlo behind the prices, recorded in `experiments/logs/0.4.4-balance.txt`.
+
+The **0.5.1** damage model charges a flight for how hard it flew. A stage is
+rated against the world's own certified envelope — the pressure and
+acceleration limits the autopilot flies — times how strongly it was built, so
+the reference build flies the certified envelope for free and a skimpy one is
+damaged by the same hop. What the loads leave behind is stress, and stress is
+what fails: an engine that loses half its thrust, an engine that dies (the
+autopilot stages on the spot), a tank that leaks faster and faster, a fairing
+that pops early, or a tank that comes apart entirely when it is pushed far
+enough past its rating with propellant aboard. The flight HUD carries a
+`STRUCTURE` bar and names the failure on an `ALARM` row; the debrief and the log
+say what broke and what it cost. A hard arrival bills the stack and the cargo:
+the payout is for the share that arrived, and a soft one inside the autopilot's
+own band costs nothing. Repair is part of what a dispatch has to afford, charged
+at the pad that does the work like the overhaul, so a stack is serviced before
+it launches — what the player decides is how strongly to build, which profile to
+fly, and when to overhaul. `experiments/logs/0.5.1-failures.txt` is the Monte
+Carlo the rates were tuned on, and `experiments/logs/0.5.1-balance-damage.txt`
+is the economy with the model switched on.
+
 ## Plans (subject-numbered, not version sequence)
 Active:
+- [`0.5-plan.md`](./0.5-plan.md) — Damage/failures mid-flight and landing (0.5.1, shipped), competitor company AI (0.5.2).
 - [`0.4-plan.md`](./0.4-plan.md) — Economy balance, parts catalog with service/repair, market prices & contract board.
-- [`0.5-plan.md`](./0.5-plan.md) — Damage/failures mid-flight and landing, competitor company AI.
 
-Increments of the active 0.4 plan, recorded in `archive/` as they land:
+Increments of the active plans, recorded in `archive/` as they land:
+- [`archive/0.5.1-worklog.md`](./archive/0.5.1-worklog.md) — Damage & failures: stress, failure modes, landing damage, repair bills (0.5.1).
 - [`archive/0.4.1-worklog.md`](./archive/0.4.1-worklog.md) — Pad markets & contract board (0.4.1).
 - [`archive/0.3.6-worklog.md`](./archive/0.3.6-worklog.md) — Operations deck review fixes (0.3.6).
 
@@ -94,12 +121,16 @@ node experiments/autopilot-test.js          # envelope limits, profiles, staging
 node experiments/trajectory-test.js         # coast predictor: integrator equivalence, edges
 node experiments/operations-test.js         # fleet, wait reasons, legs, routes, log, offers
 node experiments/market-test.js             # pad prices, contracts, quotes, fragile cargo
+node experiments/damage-test.js             # stress, failure modes, landing damage, repair
 node experiments/envelope.js verdant 0      # flight envelope per planet/build
 node experiments/envelope.js cinder 0 gentle 30 4   # profile (or `off`), fps, time scale
 node experiments/build-sweep.js 300 1       # random builds: dry baseline vs limits off and profiles
 node experiments/impact-accuracy.js 12 7    # coast-forecast error and cost per state
+node experiments/failure.js 120 20261005    # damage Monte Carlo: failure rates per world/strength
 node experiments/balance.js 20261004 4 2    # economy Monte Carlo: margin bands per world/build
 ```
+(`node experiments/balance.js 20261004 4 2 damage` flies the same chains with
+the 0.5.1 damage model on.)
 
 Measurement scripts share `experiments/harness.js`; their recorded output is in
 `experiments/logs/`. `experiments/logs/0.3.5-touchdowns.txt` is the
@@ -109,3 +140,8 @@ is byte-identical to the 0.3.4 table below its header.
 against: a margin histogram per world, bracket, stage count and payload, plus the
 bands the plan targets. The dispatch card's PROFIT row quotes the same margin for
 the leg it is about to fly.
+
+`experiments/logs/0.5.1-failures.txt` is the run the damage constants were tuned
+against: how often a hop breaks something on each world at four build strengths,
+fresh and with worn engines. `experiments/logs/0.5.1-balance-damage.txt` is the
+economy with the model on, against the same chains without it.

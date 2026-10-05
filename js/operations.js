@@ -106,19 +106,21 @@
 			to[i].engineBurnTimeUsed = from[i].engineBurnTimeUsed;
 			to[i].lifeFlights = from[i].lifeFlights;
 			to[i].stress = from[i].stress;
+			to[i].engineOut = from[i].engineOut;
 		}
 		return to;
 	}
 
 	// The stack a refuel leg launches with: every stage of the type, alive and
-	// full. A stage that was lost, or whose tank had flown out its rating, is a
-	// new one and starts with no wear; the others keep the wear they have.
+	// full. A stage that was lost, that had flown out its tank's rating, or
+	// that came down too damaged to repair is a new one and starts with no
+	// wear; the others keep the wear they have.
 	function fullStageState(type, out) {
 		var replaced;
 		var i;
 
 		for (i = 0; i < stageSlots; i += 1) {
-			replaced = i >= type.stageCount || !out[i].alive || R.parts.wornOut(type.stages[i], out[i]);
+			replaced = i >= type.stageCount || !out[i].alive || R.parts.scrapped(type.stages[i], out[i]);
 			out[i].alive = i < type.stageCount;
 			out[i].fuelMass = out[i].alive ? type.stages[i].fuelMass : 0;
 			if (replaced) {
@@ -404,7 +406,7 @@
 		var destination = R.world.findPadById(toPadId);
 		var rocket = rocketId ? operations.findRocket(rocketId) : null;
 		var preparation;
-		var result = { ready: false, reason: '', rocket: null, cost: 0, fuelMass: 0, dryMass: 0, structureValue: 0, overhaulValue: 0, overhaulCost: 0, twr: 0, demand: destination ? R.market.demand(destination.id) : null };
+		var result = { ready: false, reason: '', rocket: null, cost: 0, fuelMass: 0, dryMass: 0, structureValue: 0, overhaulValue: 0, overhaulCost: 0, repairValue: 0, repairCost: 0, twr: 0, demand: destination ? R.market.demand(destination.id) : null };
 
 		if (!type || type.archived) {
 			result.reason = operations.reasons.NO_TYPE;
@@ -436,7 +438,12 @@
 			result.reason = operations.reasons.NEEDS_OVERHAUL;
 			return result;
 		}
-		result.cost = operations.planCost(preparation, fromPadId) + result.overhaulCost;
+		// The damage the stack carries is put right before it flies, so the
+		// repair is part of what the leg has to buy — and a stack the player
+		// cannot afford to repair does not launch.
+		result.repairValue = R.parts.repairValue(type, rocket.stageState, refuel);
+		result.repairCost = result.repairValue * R.economy.priceSteel(fromPadId);
+		result.cost = operations.planCost(preparation, fromPadId) + result.overhaulCost + result.repairCost;
 		result.twr = R.rocket.launchTwr(type, rocket.stageState, payloadMass);
 		if (result.twr < R.constants.rocket.minimumLaunchTwr) {
 			result.reason = refuel ? operations.reasons.PAYLOAD_OVER : operations.reasons.NEEDS_REFUEL;
@@ -512,10 +519,10 @@
 			overhaulCost: R.economy.overhaul(game, leg.overhaul ?
 				R.parts.overhaulValue(type, rocket.stageState, leg.refuel) : 0, leg.fromPadId),
 			fuelCost: R.economy.refuel(game, preparation.fuelMass, leg.fromPadId),
-			// The repair bill the stack arrives with, quoted at the pad that would
-			// do the work. 0.5 charges it, when touchdown hardness fills `stress`.
-			repairCost: R.parts.repairValue(type, rocket.stageState, leg.refuel) *
-				R.economy.priceSteel(leg.fromPadId),
+			// The repair bill the stack arrived with, paid at the pad that does
+			// the work: a leg launches with the damage put right.
+			repairCost: R.economy.repair(game, R.parts.repairValue(type, rocket.stageState, leg.refuel),
+				leg.fromPadId),
 			// The payout is quoted now and paid on delivery: a price that moves
 			// while the rocket is in the air cannot change the promise.
 			rewardQuote: quote.reward,
@@ -526,6 +533,7 @@
 		if (leg.overhaul) {
 			R.parts.applyOverhaul(type, rocket.stageState, leg.refuel);
 		}
+		R.parts.applyRepair(type, rocket.stageState, leg.refuel);
 		if (leg.refuel) {
 			fullStageState(type, rocket.stageState);
 		}
@@ -627,6 +635,9 @@
 			contractId: result.contractId,
 			rewardPerKg: result.rewardPerKg,
 			cargoLost: result.cargoLost,
+			payloadDamage: result.payloadDamage,
+			failures: result.failures,
+			cause: result.cause,
 			elapsed: result.elapsed,
 			fuelStart: result.fuelStart,
 			fuelUsed: result.fuelUsed,

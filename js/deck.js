@@ -298,9 +298,12 @@
 			line += (line ? ' · ' : '') + 'S' + (i + 1) + ' ' + Math.round(slot.engineBurnTimeUsed) + '/' +
 				R.parts.engine(type.stages[i].engineId).maxThrottleSeconds + ' s · ' + slot.lifeFlights + '/' +
 				R.parts.tank(type.stages[i].tankId).maxFlights + ' legs' +
-				// A tank at its rating is replaced by the next turnaround: say so,
-				// because the structure price on this leg is where it costs money.
-				(R.parts.wornOut(type.stages[i], slot) ? ' TANK WORN' : '');
+				// A tank at its rating is replaced by the next turnaround, and a
+				// stage too damaged to repair is as well: say so, because the
+				// structure price on this leg is where it costs money.
+				(R.parts.wornOut(type.stages[i], slot) ? ' TANK WORN' : '') +
+				(slot.stress > 0 ? ' · ' + Math.round(slot.stress * 100) + '% DAMAGED' : '') +
+				(slot.engineOut ? ' · ENGINE OUT' : '');
 		}
 		return line || 'no stages attached';
 	}
@@ -462,7 +465,8 @@
 			ui.maintenanceText.textContent = 'Service · #' + rocket.id + ' · ' + serviceLine(type, rocket) +
 				(evaluation.overhaulValue > 0 ? (form.overhaul ?
 					' · OVERHAUL ON THIS LEG ' + money(evaluation.overhaulCost) :
-					' · OVERHAUL DUE ' + money(overhaulPrice)) : '');
+					' · OVERHAUL DUE ' + money(overhaulPrice)) : '') +
+				(evaluation.repairCost > 0 ? ' · REPAIR ON THIS LEG ' + money(evaluation.repairCost) : '');
 			ui.maintenanceBuy.hidden = evaluation.overhaulValue <= 0 || form.overhaul;
 			ui.maintenanceBuy.textContent = 'Add overhaul to this leg · ' + money(overhaulPrice);
 			ui.maintenanceBuy.disabled = game.cash < overhaulPrice;
@@ -470,7 +474,8 @@
 		ui.summary.appendChild(summaryRow('THIS LEG', evaluation.ready || evaluation.reason === R.operations.reasons.INSUFFICIENT_FUNDS ?
 			'up to ' + money(evaluation.cost) + ' (fuel ' + money(evaluation.fuelMass * R.economy.priceFuel(form.sourcePadId)) +
 			' · structure ' + money(evaluation.structureValue * R.economy.priceSteel(form.sourcePadId)) +
-			(evaluation.overhaulCost > 0 ? ' · overhaul ' + money(evaluation.overhaulCost) : '') + ')' : '—'));
+			(evaluation.overhaulCost > 0 ? ' · overhaul ' + money(evaluation.overhaulCost) : '') +
+			(evaluation.repairCost > 0 ? ' · repair ' + money(evaluation.repairCost) : '') + ')' : '—'));
 		quote = R.market.quote(form.sourcePadId, form.targetPadId, form.outboundPayload, form.contractId);
 		ui.summary.appendChild(summaryRow('PAYS', money(quote.reward) + ' at $' + quote.pricePerKg.toFixed(2) + '/kg' +
 			(form.contractId ? ' · contract' : '')));
@@ -708,7 +713,8 @@
 		var type = R.operations.findType(entry.rocketTypeId);
 		var actions = el('div', 'route-actions');
 
-		head.appendChild(el('strong', null, entry.cargoLost ? 'CARGO LOST' : statusLabel(entry.status)));
+		head.appendChild(el('strong', null, entry.cause === 'rupture' ? 'TANK RUPTURE' :
+		(entry.cargoLost ? 'CARGO LOST' : statusLabel(entry.status))));
 		head.appendChild(el('span', 'log-when', clockAt(entry.completedAt) +
 			(entry.legCount === 2 ? ' · LEG ' + entry.leg + ' OF 2' : '')));
 		card.appendChild(head);
@@ -719,13 +725,27 @@
 		detail.appendChild(summaryRow('CARGO', mass(entry.payloadMass) + ' · ' + profileLabel(entry.profileId)));
 		detail.appendChild(summaryRow('FLIGHT', entry.elapsed.toFixed(1) + ' s · fuel ' + mass(entry.fuelUsed) +
 			' of ' + mass(entry.fuelStart) + ' · ' + mass(entry.fuelRemaining) + ' left'));
-		detail.appendChild(summaryRow('TOUCHDOWN', Math.abs(entry.touchdownVerticalSpeed).toFixed(1) + ' m/s down · ' +
-			Math.abs(entry.touchdownHorizontalSpeed).toFixed(1) + ' m/s across · ' +
-			distance(Math.abs(entry.targetError)) + ' off target'));
+		// A ruptured stack never touched down: where it came apart is the
+		// only arrival there is.
+		if (entry.cause === 'rupture') {
+			detail.appendChild(summaryRow('LOST', distance(Math.abs(entry.targetError)) + ' off target'));
+		} else {
+			detail.appendChild(summaryRow('TOUCHDOWN', Math.abs(entry.touchdownVerticalSpeed).toFixed(1) + ' m/s down · ' +
+				Math.abs(entry.touchdownHorizontalSpeed).toFixed(1) + ' m/s across · ' +
+				distance(Math.abs(entry.targetError)) + ' off target'));
+		}
+		if (entry.failures || entry.cause) {
+			detail.appendChild(summaryRow('DAMAGE', (entry.cause === 'rupture' ? 'tank rupture · ' : '') +
+				R.damage.failureText(entry.failures).toLowerCase()));
+		}
+		if (entry.status === 'delivered' && entry.payloadDamage > 0) {
+			detail.appendChild(summaryRow('CARGO ARRIVED', Math.round((1 - entry.payloadDamage) * 100) + ' %'));
+		}
 		detail.appendChild(summaryRow('CASH', 'revenue ' + money(entry.revenue) +
 			(entry.rewardPerKg > 0 ? ' ($' + entry.rewardPerKg.toFixed(2) + '/kg' + (entry.contractId ? ' · contract' : '') + ')' : '') +
 			' · fuel ' + money(entry.fuelCost) + ' · turnaround ' + money(entry.turnaroundCost) +
 			(entry.overhaulCost > 0 ? ' · overhaul ' + money(entry.overhaulCost) : '') +
+			(entry.repairCost > 0 ? ' · repair ' + money(entry.repairCost) : '') +
 			' · fee ' + money(entry.autopilotFee)));
 		detail.appendChild(summaryRow('NET', (entry.cashDelta < 0 ? '−' : '+') + money(Math.abs(entry.cashDelta))));
 		card.appendChild(detail);

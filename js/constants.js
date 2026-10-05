@@ -52,17 +52,17 @@
 		defaultEngineId: 'e-standard',
 		defaultTankId: 't-standard',
 		engines: [
-			{ id: 'e-standard', label: 'Standard engine', thrustPerFuelMass: 72, ispSea: 265, ispVac: 330, baseMass: 60, thrustToMass: 150, costPerMass: 1, maxThrottleSeconds: 900, reliability: 1, repairPerKg: 0 },
-			{ id: 'e-boost', label: 'Booster engine', thrustPerFuelMass: 88, ispSea: 255, ispVac: 310, baseMass: 80, thrustToMass: 145, costPerMass: 1.2, maxThrottleSeconds: 600, reliability: 1, repairPerKg: 0 },
-			{ id: 'e-vac', label: 'Vacuum engine', thrustPerFuelMass: 58, ispSea: 235, ispVac: 355, baseMass: 52, thrustToMass: 165, costPerMass: 1.4, maxThrottleSeconds: 1200, reliability: 1, repairPerKg: 0 }
+			{ id: 'e-standard', label: 'Standard engine', thrustPerFuelMass: 72, ispSea: 265, ispVac: 330, baseMass: 60, thrustToMass: 150, costPerMass: 1, maxThrottleSeconds: 900, reliability: 1, repairPerKg: 0.6 },
+			{ id: 'e-boost', label: 'Booster engine', thrustPerFuelMass: 88, ispSea: 255, ispVac: 310, baseMass: 80, thrustToMass: 145, costPerMass: 1.2, maxThrottleSeconds: 600, reliability: 1, repairPerKg: 0.7 },
+			{ id: 'e-vac', label: 'Vacuum engine', thrustPerFuelMass: 58, ispSea: 235, ispVac: 355, baseMass: 52, thrustToMass: 165, costPerMass: 1.4, maxThrottleSeconds: 1200, reliability: 1, repairPerKg: 0.5 }
 		],
 		tanks: [
-			{ id: 't-standard', label: 'Standard tank', massPerFuelMass: 0.075, costPerMass: 1, maxFlights: 12, repairPerKg: 0 },
-			{ id: 't-light', label: 'Light tank', massPerFuelMass: 0.06, costPerMass: 1.1, maxFlights: 6, repairPerKg: 0 },
-			{ id: 't-heavy', label: 'Reinforced tank', massPerFuelMass: 0.09, costPerMass: 0.9, maxFlights: 24, repairPerKg: 0 }
+			{ id: 't-standard', label: 'Standard tank', massPerFuelMass: 0.075, costPerMass: 1, maxFlights: 12, repairPerKg: 0.5 },
+			{ id: 't-light', label: 'Light tank', massPerFuelMass: 0.06, costPerMass: 1.1, maxFlights: 6, repairPerKg: 0.6 },
+			{ id: 't-heavy', label: 'Reinforced tank', massPerFuelMass: 0.09, costPerMass: 0.9, maxFlights: 24, repairPerKg: 0.4 }
 		],
 		fairings: [
-			{ id: 'f-standard', label: 'Standard fairing', mass: 40, costPerMass: 1, dragFraction: 0.6, repairPerKg: 0 }
+			{ id: 'f-standard', label: 'Standard fairing', mass: 40, costPerMass: 1, dragFraction: 0.6, repairPerKg: 0.4 }
 		]
 	};
 
@@ -96,6 +96,66 @@
 		maxContractTurns: 4,
 		minContractTurns: 2,
 		distanceBonus: 1.7
+	};
+
+	// Damage and failures (0.5.1). A stage is rated against the world's own
+	// certified flight envelope — the limits the autopilot flies — times a
+	// margin for how strongly it was built. Inside them a flight costs
+	// nothing; the excess is what damages the stack, and damage is what
+	// fails. `experiments/failure.js` is the Monte Carlo these were tuned on.
+	constants.damage = {
+		// The seed `experiments/failure.js` starts its buckets from; a flight
+		// is seeded from the mission id, so this is only a measurement tool.
+		seed: 20261005,
+		// How far past the certified envelope a well-built stage is rated.
+		structureMargin: 1.35,
+		// Stress per second: the excess over a stage's rating is squared, so
+		// a small overload is nearly free and a large one is not, and a load
+		// inside the rating still costs a little fatigue every second. Stress
+		// is a fraction, and 1 is beyond repair.
+		stressRate: 0.06,
+		fatigueWeight: 0.02,
+		// Failure rate per second: on the square of the stress a stage
+		// carries, plus the square of how far an engine is past its useful
+		// burn time. Sampling is `1 - exp(-rate * dt)`, so the odds do not
+		// depend on the step. Overload is not itself a failure — it is what
+		// adds to the stress that fails later.
+		failureRate: 0.10,
+		failureExponent: 2,
+		wearRate: 0.004,
+		maxFailureRate: 3,
+		// A stage this damaged is beyond economical repair: the turnaround
+		// replaces it whole. A tank this damaged with fuel aboard ruptures.
+		scrapStress: 0.75,
+		ruptureStress: 1,
+		// Separating a stage shakes the stack a little.
+		separationStress: 0.01,
+		// Touchdown. The 0.3.3 reference band (2.7-3.8 m/s down) is the zero
+		// point and the planet's crash limits are the far end; the soft
+		// threshold sits between them.
+		softLandingFraction: 0.5,
+		landingStress: 0.06,
+		payloadLandingDamage: 0.05,
+		// Sustained load the cargo takes, in g. Fragile cargo is rated
+		// lower, and its damage is the fraction of the payout that is lost.
+		payloadGLoad: 5,
+		fragileGLoad: 4,
+		payloadStressRate: 0.04,
+		// Once a fairing is lost in the airstream, the cargo takes the air.
+		payloadPressure: 20000,
+		// An engine near its rated burn time is the likeliest thing to fail
+		// on a stack that has been flying for a while: the risk starts here,
+		// as a fraction of the rating, and is at its worst when the overhaul
+		// gate is about to stop the leg.
+		wearStart: 0.8,
+		// What a failure does. A partial failure keeps half the thrust and
+		// most of the efficiency; a leak starts small and accelerates.
+		enginePartialHealth: 0.5,
+		engineIspLoss: 0.12,
+		leakRate: 0.8,
+		leakGrowth: 0.2,
+		// How long a failure stays on the HUD after it happens.
+		alarmSeconds: 5
 	};
 
 	// Operations deck: bounded in-session history and the visible window an

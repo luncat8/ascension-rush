@@ -13,7 +13,12 @@
 // (buying fuel it never burns) is therefore visible in the number, and a leg
 // that flies on the previous leg's leftover fuel is visibly cheaper.
 //
-// Usage: node experiments/balance.js [baseSeed] [legsPerBucket] [repetitions]
+// Usage: node experiments/balance.js [baseSeed] [legsPerBucket] [repetitions] [damage]
+//
+// `damage` flies the chain with the 0.5.1 damage model on: the same price paths
+// and the same flights, with the repair bills and the failures they bring. The
+// recorded run in experiments/logs/0.4.4-balance.txt is the 0.4 economy, flown
+// without it.
 
 var harness = require('./harness.js');
 
@@ -26,6 +31,9 @@ var repetitions = Number(process.argv[4] || 2);
 var frameDt = 1 / 120;
 var timeScale = 4;
 var profileId = settings.autopilotProfiles[0].id;
+// Damage is off by default (the harness switches it off for every baseline);
+// the last argument turns it on.
+R.damage.enabled = process.argv.indexOf('damage') >= 0;
 var stageCounts = [1, 2, 3];
 var payloadPercents = settings.market.payloadLadder;
 var buckets = [];
@@ -439,20 +447,25 @@ function overbuildReport() {
 	}
 }
 
-// A posted contract this rocket could fly right now: the same hop, the same
-// payload, still open. The board is the market's, so the rate on it is the
-// market's pricing, not a number this script made up.
-function openContract(fromPadId, toPadId, payloadMass) {
+// A posted contract this rocket could fly right now: the same hop, still open,
+// and the heaviest cargo on it the build can lift. The board's rungs are
+// fractions of the pad's appetite, not of a build's bay, so the reference
+// payload is not always on it. The rate is the market's pricing either way.
+function openContract(fromPadId, toPadId, payloadLimit) {
 	var contracts = market.state.contracts;
+	var best = null;
 	var i;
 
 	for (i = 0; i < contracts.length; i += 1) {
-		if (contracts[i].status === 'open' && contracts[i].fromPadId === fromPadId &&
-			contracts[i].toPadId === toPadId && contracts[i].payloadMass === payloadMass) {
-			return contracts[i];
+		if (contracts[i].status !== 'open' || contracts[i].fromPadId !== fromPadId ||
+			contracts[i].toPadId !== toPadId || contracts[i].payloadMass > payloadLimit) {
+			continue;
+		}
+		if (!best || contracts[i].payloadMass > best.payloadMass) {
+			best = contracts[i];
 		}
 	}
-	return null;
+	return best;
 }
 
 // Flies a service on one hop for `legs` legs and books every leg that delivered
@@ -466,6 +479,7 @@ function flyServiceChain(type, source, target, takeContracts, legs) {
 	var from = source;
 	var to = target;
 	var contract;
+	var payloadLimit;
 	var order;
 	var entry;
 	var label;
@@ -473,14 +487,15 @@ function flyServiceChain(type, source, target, takeContracts, legs) {
 
 	R.game = game;
 	R.operations.createRocket(type, source);
+	payloadLimit = Math.floor(R.operations.typeStats(type).payloadLimit);
 	for (leg = 0; leg < legs; leg += 1) {
-		contract = takeContracts ? openContract(from.id, to.id, type.nominalPayload) : null;
+		contract = takeContracts ? openContract(from.id, to.id, payloadLimit) : null;
 		order = R.operations.dispatch({
 			source: from.id,
 			destination: to.id,
 			mode: 'oneway',
 			fuelPolicy: 'refuel',
-			outboundPayload: type.nominalPayload,
+			outboundPayload: contract ? contract.payloadMass : type.nominalPayload,
 			returnPayload: 0,
 			typeId: type.id,
 			profileId: profileId,
@@ -650,6 +665,7 @@ R.planets.list.forEach(function(world) {
 	}
 });
 
+console.log('damage ' + (R.damage.enabled ? 'on' : 'off'));
 console.log('balance Monte Carlo · base seed ' + baseSeed + ' · ' + legsPerBucket + ' legs × ' +
 	repetitions + ' repetitions per bucket · ' + buckets.length + ' buckets · starting cash $' +
 	settings.economy.startingCash + ' · overhaulFactor ' + settings.parts.overhaulFactor +
