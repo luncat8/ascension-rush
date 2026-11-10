@@ -183,51 +183,117 @@
 		expectedCargoLoss: 0.04,
 		reputationPerDelivery: 1,
 		reputationLoss: 2,
-		noticeReputation: 65,
 		noticedSkillGrowth: 0.01,
 		maxFlightSeconds: 300
 	};
 
-	// Milestones (0.6). A world has an ordered ladder of named thresholds; the
-	// active one is checked on every deck settlement. Rewards pay cash, unlock
-	// features or mark progress toward the inter-world arc. `kind` picks the
-	// counter; `target` is the threshold. `requires` gates access to later
-	// worlds; `unlocks` gates a feature. `fromStart` measures cash from the
-	// opening balance so a loss never pushes progress below zero.
+	// Milestones and the inter-world arc (0.6). Every world has an ordered
+	// ladder; only the first unmet milestone is active and it is checked when
+	// a delivered player leg settles on the deck. `kind` picks the measure and
+	// `target` its threshold:
+	//   deliveries       delivered legs
+	//   contracts        delivered board contracts
+	//   contractTo       delivered board contracts to `padName`
+	//   fragile          delivered fragile contracts
+	//   cargoKg          surviving cargo, kg
+	//   netCash          cash above the opening balance, never below zero
+	//   reputationClean  reputation, counted only after `cleanLegs` legs
+	//                    without a crash or lost cargo
+	//   dominant         more cash than the rival and every pad served at
+	//                    least as often, and at least `dominantMinPerPad` times
+	// A reward pays `cash`, opens an `unlock` ('profile:<id>' or 'world:<id>')
+	// that travels with the campaign, or makes the rival take notice. Grants
+	// are sized in legs of the world's own trade, so a ladder never decides
+	// the cash race against the rival on its own.
 	constants.campaign = {
-		seed: 20261007,
 		startReputation: 50,
 		carryReputationCap: 60,
+		// The rival opens a world this much more skilled per point of
+		// reputation the player brings above the default: it has heard of you.
+		rivalSkillPerCarriedReputation: 0.005,
+		dominantMinPerPad: 3,
+		storageKey: 'ascension-rush.campaign',
 		worlds: {
-			verdant: {
-				name: 'Verdant',
-				ladder: [
-					{ id: 'first-receipt', title: 'First receipt',
-						kind: 'deliveries', target: 1,
-						reward: { cash: 2000 },
-						detail: 'Complete your first profitable delivery.' },
-					{ id: 'on-the-board', title: 'On the board',
-						kind: 'contracts', target: 3,
-						reward: { unlock: 'gentle-profile' },
-						detail: 'Complete three posted contracts.' },
-					{ id: 'haulier', title: 'Haulier',
-						kind: 'cargoKg', target: 400,
-						reward: { cash: 5000 },
-						detail: 'Deliver 400 kg of surviving cargo.' },
-					{ id: 'reliable', title: 'Reliable service',
-						kind: 'reputationClean', target: 65, cleanWindow: 5,
-						reward: { cash: 8000, rivalNotice: true },
-						detail: 'Reach reputation 65 without a crash in the last 5 legs.' },
-					{ id: 'long-reach', title: 'Long reach',
-						kind: 'contractTo', target: 1, padName: 'Farport',
-						reward: { cash: 10000, unlock: 'tinmoon' },
-						detail: 'Complete one contract to Farport.' },
-					{ id: 'dominant', title: 'Dominant courier – Verdant',
-						kind: 'dominant', target: 1,
-						reward: { settlement: 'verdant' },
-						detail: 'Hold more cash than Skybolt and serve every pad at least as often.' }
-				]
-			}
+			verdant: [
+				{ id: 'first-receipt', title: 'First receipt', kind: 'deliveries', target: 1,
+					reward: { cash: 1000 },
+					detail: 'Deliver one leg to any pad.' },
+				{ id: 'on-the-board', title: 'On the board', kind: 'contracts', target: 3,
+					reward: { unlock: 'profile:gentle' },
+					detail: 'Deliver three contracts from the board.' },
+				{ id: 'haulier', title: 'Haulier', kind: 'cargoKg', target: 1000,
+					reward: { cash: 1500 },
+					detail: 'Deliver 1,000 kg of surviving cargo.' },
+				{ id: 'reliable', title: 'Reliable service', kind: 'reputationClean', target: 65, cleanLegs: 5,
+					reward: { cash: 2000, rivalNotice: true },
+					detail: 'Reach reputation 65 with no crash or lost cargo in the last 5 legs.' },
+				{ id: 'long-reach', title: 'Long reach', kind: 'contractTo', target: 1, padName: 'Farport',
+					reward: { cash: 2500, unlock: 'world:tinmoon' },
+					detail: 'Deliver one contract to Farport.' },
+				{ id: 'dominant', title: 'Dominant courier', kind: 'dominant', target: 1,
+					reward: {},
+					detail: 'Hold more cash than Skybolt and serve every pad at least as often, and at least three times.' }
+			],
+			tinmoon: [
+				{ id: 'first-receipt', title: 'First dust', kind: 'deliveries', target: 1,
+					reward: { cash: 250 },
+					detail: 'Deliver one leg to any pad.' },
+				{ id: 'on-the-board', title: 'Rock runner', kind: 'contracts', target: 3,
+					reward: { cash: 400 },
+					detail: 'Deliver three contracts from the board.' },
+				{ id: 'haulier', title: 'Ore train', kind: 'cargoKg', target: 1000,
+					reward: { cash: 500 },
+					detail: 'Deliver 1,000 kg of surviving cargo.' },
+				{ id: 'in-the-black', title: 'In the black', kind: 'netCash', target: 5000,
+					reward: { cash: 600, rivalNotice: true },
+					detail: 'Hold $5,000 above the opening balance.' },
+				{ id: 'long-reach', title: 'Far side', kind: 'contractTo', target: 1, padName: 'Rim Relay',
+					reward: { cash: 750, unlock: 'world:cinder' },
+					detail: 'Deliver one contract to Rim Relay.' },
+				{ id: 'dominant', title: 'Dominant courier', kind: 'dominant', target: 1,
+					reward: {},
+					detail: 'Hold more cash than Skybolt and serve every pad at least as often, and at least three times.' }
+			],
+			cinder: [
+				{ id: 'first-receipt', title: 'First heat', kind: 'deliveries', target: 1,
+					reward: { cash: 5000 },
+					detail: 'Deliver one leg to any pad.' },
+				{ id: 'on-the-board', title: 'Forge trade', kind: 'contracts', target: 3,
+					reward: { cash: 8000 },
+					detail: 'Deliver three contracts from the board.' },
+				{ id: 'fragile', title: 'Careful hands', kind: 'fragile', target: 2,
+					reward: { cash: 10000 },
+					detail: 'Deliver two fragile contracts intact.' },
+				{ id: 'reliable', title: 'Reliable service', kind: 'reputationClean', target: 75, cleanLegs: 6,
+					reward: { cash: 12000, rivalNotice: true },
+					detail: 'Reach reputation 75 with no crash or lost cargo in the last 6 legs.' },
+				{ id: 'long-reach', title: 'Across the fire', kind: 'contractTo', target: 1, padName: 'Slagworks',
+					reward: { cash: 15000, unlock: 'world:gossamer' },
+					detail: 'Deliver one contract to Slagworks.' },
+				{ id: 'dominant', title: 'Dominant courier', kind: 'dominant', target: 1,
+					reward: {},
+					detail: 'Hold more cash than Skybolt and serve every pad at least as often, and at least three times.' }
+			],
+			gossamer: [
+				{ id: 'first-receipt', title: 'First drift', kind: 'deliveries', target: 1,
+					reward: { cash: 1200 },
+					detail: 'Deliver one leg to any pad.' },
+				{ id: 'on-the-board', title: 'Sky trade', kind: 'contracts', target: 4,
+					reward: { cash: 1800 },
+					detail: 'Deliver four contracts from the board.' },
+				{ id: 'haulier', title: 'Heavy air', kind: 'cargoKg', target: 1200,
+					reward: { cash: 2200 },
+					detail: 'Deliver 1,200 kg of surviving cargo.' },
+				{ id: 'fragile', title: 'Feather touch', kind: 'fragile', target: 3,
+					reward: { cash: 2600, rivalNotice: true },
+					detail: 'Deliver three fragile contracts intact.' },
+				{ id: 'long-reach', title: 'Long haul', kind: 'contractTo', target: 1, padName: 'Halcyon',
+					reward: { cash: 3200 },
+					detail: 'Deliver one contract to Halcyon.' },
+				{ id: 'dominant', title: 'Dominant courier', kind: 'dominant', target: 1,
+					reward: {},
+					detail: 'Hold more cash than Skybolt and serve every pad at least as often, and at least three times.' }
+			]
 		}
 	};
 
@@ -278,13 +344,13 @@
 		// must brake sideways and hold altitude at once), and an angle-of-attack
 		// limit never leaves less than this multiple of the thrust that holds
 		// the rocket's weight when flying sideways.
-	minThrustToWeight: 1.7,
-	weightSupportMargin: 1.3,
-	// Staging on authority: separate a stage that cannot hold the rocket up
-	// for the whole burn it has left when a later stage can, instead of
-	// flying it dry and landing with an engine that cannot stop the fall.
-	stageOnAuthority: true
-};
+		minThrustToWeight: 1.7,
+		weightSupportMargin: 1.3,
+		// Staging on authority: separate a stage that cannot hold the rocket up
+		// for the whole burn it has left when a later stage can, instead of
+		// flying it dry and landing with an engine that cannot stop the fall.
+		stageOnAuthority: true
+	};
 
 	// Autopilot profiles are named global multipliers on a planet's envelope
 	// limits. The first entry is the default.

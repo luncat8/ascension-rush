@@ -29,6 +29,8 @@ require('../js/physics.js');
 require('../js/trajectory.js');
 require('../js/autopilot.js');
 require('../js/operations.js');
+require('../js/competitor.js');
+require('../js/campaign.js');
 require('../js/builder.js');
 require('../js/deck.js');
 require('../js/controls.js');

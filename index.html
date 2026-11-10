@@ -46,11 +46,24 @@
         aria-controls="view-log" aria-selected="false" tabindex="-1">Flight log</button>
     </nav>
 
+    <section id="milestone-strip" class="milestone-strip" aria-label="Company milestones">
+      <button id="milestone-toggle" class="milestone-head" type="button"
+        aria-expanded="false" aria-controls="milestone-ladder">
+        <span id="milestone-label">MILESTONE</span>
+        <strong id="milestone-title">—</strong>
+        <small id="milestone-progress"></small>
+        <span id="milestone-dots" class="milestone-dots" aria-hidden="true"></span>
+      </button>
+      <ol id="milestone-ladder" class="milestone-ladder" hidden></ol>
+    </section>
+
     <section id="view-dispatch" class="deck-view" role="tabpanel" aria-labelledby="tab-dispatch" tabindex="0">
       <section id="dispatch-report" class="builder-report" aria-live="polite" hidden>
         <strong id="dispatch-report-title"></strong>
         <p id="dispatch-report-detail"></p>
       </section>
+
+      <section id="dispatch-milestones" class="milestone-award" aria-live="polite" hidden></section>
 
       <section id="dispatch-offer" class="offer-card" aria-live="polite" hidden>
         <p id="dispatch-offer-text"></p>
@@ -138,14 +151,6 @@
     </section>
 
     <section id="view-market" class="deck-view" role="tabpanel" aria-labelledby="tab-market" tabindex="0" hidden>
-      <section id="milestone-strip" class="milestone-strip" aria-label="Milestone progress" hidden>
-        <div class="milestone-head">
-          <span id="milestone-label">MILESTONE</span>
-          <strong id="milestone-title">—</strong>
-          <small id="milestone-progress">0 / 0</small>
-        </div>
-        <div id="milestone-dots" class="milestone-dots" aria-hidden="true"></div>
-      </section>
       <section id="market-scoreboard" class="market-scoreboard" aria-label="Company standings" hidden>
         <div class="score-company">
           <span>YOUR COMPANY</span>
@@ -330,14 +335,30 @@
     </section>
   </div>
 
+  <div id="settlement-dialog" class="dialog" hidden>
+    <section class="dialog-panel settlement-panel" role="dialog" aria-modal="true" aria-labelledby="settlement-title">
+      <p class="eyebrow" id="settlement-eyebrow">DOMINANT COURIER</p>
+      <h2 id="settlement-title"></h2>
+      <p id="settlement-summary"></p>
+      <dl id="settlement-detail" class="route-detail"></dl>
+      <p id="settlement-next" class="builder-hint"></p>
+      <button id="settlement-close" class="launch-button" type="button">Keep flying</button>
+      <button id="settlement-worlds" class="ghost-button wide" type="button">Choose a world…</button>
+    </section>
+  </div>
+
   <div id="planet-menu" class="planet-menu" hidden>
     <section class="planet-menu-panel" aria-label="Choose a world">
       <p class="eyebrow">ASCENSION RUSH / DELIVERY NETWORK</p>
       <h1>Choose a world</h1>
       <p class="planet-menu-note">Small worlds on purpose: one pad-to-pad hop should fly in about 20–40 s of
         game time. Use the time scale to slow down for landing (0.5x) or shorten the cruise (4x).</p>
+      <p id="planet-menu-campaign" class="planet-menu-note"></p>
       <div id="planet-list" class="planet-list"></div>
-      <button id="planet-menu-close" class="ghost-button" type="button">Keep flying the current run</button>
+      <div class="planet-menu-actions">
+        <button id="planet-menu-close" class="ghost-button" type="button">Keep flying the current run</button>
+        <button id="planet-menu-reset" class="ghost-button" type="button">Start a new campaign</button>
+      </div>
     </section>
   </div>
 

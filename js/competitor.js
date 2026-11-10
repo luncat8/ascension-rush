@@ -7,6 +7,7 @@
 	var randomState = 1;
 	var running = false;
 	var simulationGame = null;
+	var noCarry = { reputation: 0, skill: 0, noticed: false };
 	var profile = {
 		enabled: false,
 		profileId: '',
@@ -37,7 +38,7 @@
 			types: [],
 			fleet: [],
 			routes: [],
-			playerStats: { deliveries: 0, reputation: 50 },
+			playerStats: { deliveries: 0, reputation: R.constants.campaign.startReputation },
 			mission: null,
 			offer: null,
 			countdown: 0,
@@ -89,22 +90,25 @@
 		};
 	}
 
+	// `carry` is what the campaign brings to this world's rival: a reputation
+	// and skill head start, and whether the player has already been noticed.
 	competitor.initialize = function(seed, carry) {
 		var playerOperations = R.operations.state;
 		var planet = R.world.planet;
 		var home = R.world.pads[0];
 		var operationState = createOperationsState(planet.id);
 		var rivalSeed = (typeof seed === 'number' ? seed : (R.market.state ? R.market.state.seed : settings.seed));
-		var skillOffset = carry && carry.rivalSkillOffset ? carry.rivalSkillOffset : 0;
 
+		carry = carry || noCarry;
 		competitor.state = {
 			id: settings.id,
 			name: settings.name,
 			planetId: planet.id,
 			cash: settings.startingCash,
 			deliveries: 0,
-			reputation: 50,
-			skill: settings.initialSkill + skillOffset,
+			reputation: R.constants.campaign.startReputation + carry.reputation,
+			skill: settings.initialSkill + carry.skill,
+			noticed: carry.noticed,
 			turns: 0,
 			contractsAccepted: 0,
 			failedFlights: 0,
@@ -287,7 +291,8 @@
 		if (report && report.status === 'delivered') {
 			state.deliveries += 1;
 			state.reputation = Math.min(100, state.reputation + settings.reputationPerDelivery);
-			state.skill = Math.min(settings.maxSkill, state.skill + settings.skillPerDelivery);
+			state.skill = Math.min(settings.maxSkill, state.skill + settings.skillPerDelivery +
+				(state.noticed ? settings.noticedSkillGrowth : 0));
 			state.lastAction = 'delivered';
 		} else {
 			state.failedFlights += 1;

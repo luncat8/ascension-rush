@@ -161,13 +161,12 @@
 			if (R.competitor) {
 				R.competitor.afterPlayerLeg(game, result);
 			}
+			// Milestones move here and nowhere else: on the deck, after the leg
+			// and the rival's answer to it have both settled.
 			if (R.campaign) {
-				result.milestone = R.campaign.onLegSettled(result);
-				if (result.milestone) {
-					game.lastReport.milestone = result.milestone;
-					if (R.deck && R.deck.announce) {
-						R.deck.announce('Milestone reached: ' + result.milestone.milestone.title + '.');
-					}
+				game.lastReport.milestones = R.campaign.onLegSettled(result);
+				if (R.deck.onMilestones) {
+					R.deck.onMilestones(game.lastReport.milestones);
 				}
 			}
 		}

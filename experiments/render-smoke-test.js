@@ -283,6 +283,19 @@ assert.ok(drawnText.indexOf('EARLY') >= 0, 'the HUD marks the frame an authority
 R.autopilot.stagedEarly = false;
 R.autopilot.setEnabled(false);
 
+// The page restores its campaign from storage before the first run; the suite
+// hands it an empty store, so a start here is always a fresh company.
+var campaignStore = {};
+
+global.localStorage = {
+	getItem: function(key) {
+		return Object.prototype.hasOwnProperty.call(campaignStore, key) ? campaignStore[key] : null;
+	},
+	setItem: function(key, value) {
+		campaignStore[key] = String(value);
+	}
+};
+
 var main = require('../js/main.js');
 main.start();
 
@@ -326,6 +339,50 @@ assert.equal(fixture.getElementById('dispatch-maintenance').hidden, false, 'the 
 assert.ok(fixture.getElementById('dispatch-maintenance-text').textContent.indexOf('S1 0/' +
 	R.constants.parts.engines[0].maxThrottleSeconds + ' s') >= 0, 'with the seconds on its engine');
 assert.equal(fixture.getElementById('dispatch-maintenance-buy').hidden, true, 'and nothing to buy yet');
+
+// The milestone strip sits above every tab: the active rung, its progress and
+// one dot per rung. Opened, it lists the whole ladder with its rewards.
+var milestoneToggle = fixture.getElementById('milestone-toggle');
+var milestoneLadder = fixture.getElementById('milestone-ladder');
+
+assert.equal(fixture.getElementById('milestone-label').textContent, 'MILESTONE 1 / 6', 'the strip numbers the active milestone');
+assert.equal(fixture.getElementById('milestone-title').textContent, R.constants.campaign.worlds.verdant[0].title,
+	'and names it');
+assert.equal(fixture.getElementById('milestone-progress').textContent, '0 / 1 delivered', 'with its progress');
+assert.equal(fixture.getElementById('milestone-dots').childNodes.length, 6, 'one dot per rung');
+assert.equal(milestoneLadder.hidden, true, 'the ladder starts folded');
+milestoneToggle.click();
+R.deck.sync(game);
+assert.equal(milestoneLadder.hidden, false, 'a click on the strip opens it');
+assert.equal(milestoneToggle.getAttribute('aria-expanded'), 'true');
+assert.equal(milestoneLadder.querySelectorAll('li').length, 6, 'with every milestone of the world');
+assert.ok(milestoneLadder.textContent.indexOf('$1,000 grant') >= 0, 'their rewards');
+assert.ok(milestoneLadder.textContent.indexOf('Tinmoon opened') >= 0, 'and the world the ladder opens');
+milestoneToggle.click();
+R.deck.sync(game);
+assert.equal(milestoneLadder.hidden, true, 'and a second click folds it');
+
+// Gentle is listed but locked until its milestone, and the hint names it.
+var profileOptions = fixture.getElementById('dispatch-profile').options;
+
+assert.equal(profileOptions[0].disabled, false, 'the default profile is always selectable');
+assert.equal(profileOptions[1].disabled, true, 'a profile the campaign has not opened is disabled');
+assert.ok(profileOptions[1].textContent.indexOf('locked') >= 0, 'and says so');
+assert.ok(fixture.getElementById('dispatch-profile-hint').textContent.indexOf('On the board (Verdant)') >= 0,
+	'the hint names the milestone that opens it');
+
+// The world menu shows where the company stands, and a locked world cannot be
+// started from its card or by any other route into the menu.
+var planetCards = fixture.getElementById('planet-list').querySelectorAll('.planet-card');
+
+assert.equal(planetCards.length, R.planets.list.length, 'the menu lists every world');
+assert.ok(planetCards[0].textContent.indexOf('0 / 6 MILESTONES') >= 0, 'an open world shows its ladder progress');
+assert.equal(planetCards[1].disabled, true, 'a locked world is disabled');
+assert.ok(planetCards[1].textContent.indexOf('LOCKED · CLEAR LONG REACH (VERDANT)') >= 0, 'and names the milestone that opens it');
+planetCards[1].click();
+assert.equal(R.world.planet.id, 'verdant', 'a click that reaches a locked card changes nothing');
+assert.equal(R.menu.selectWorld('tinmoon'), false, 'the gate is in the menu, not only on the button');
+assert.equal(R.game, game, 'and the run is untouched');
 
 // A worn engine is a decision the card puts in front of the player: the reason,
 // the price, and the one button that authorizes this leg to buy it.
@@ -405,6 +462,21 @@ while (game.phase === 'flying' && frames < 4000) {
 }
 assert.equal(game.phase, 'deck', 'the frame loop flies the leg to its end');
 assert.equal(R.flightLog.entries.length, 1, 'and the finished leg is in the log');
+
+// The delivered leg cleared the first milestone: the award sits under the
+// debrief with the next goal, the strip has moved on, and the record is saved.
+var awardCard = fixture.getElementById('dispatch-milestones');
+
+assert.equal(game.lastReport.status, 'delivered', 'the reference leg delivers');
+assert.equal(awardCard.hidden, false, 'the debrief shows the milestone the leg cleared');
+assert.ok(awardCard.textContent.indexOf('MILESTONE 1 REACHED · First receipt') >= 0, 'by number and name');
+assert.ok(awardCard.textContent.indexOf('$1,000 grant') >= 0, 'with its reward');
+assert.ok(awardCard.textContent.indexOf('Next: On the board') >= 0, 'and the goal that is now active');
+assert.equal(fixture.getElementById('milestone-label').textContent, 'MILESTONE 2 / 6', 'the strip moves to the next rung');
+assert.ok(fixture.getElementById('deck-announcer').textContent.indexOf('Milestone reached: First receipt') >= 0,
+	'and the award is announced');
+assert.equal(JSON.parse(campaignStore[R.constants.campaign.storageKey]).completed['verdant:first-receipt'], true,
+	'the settled leg saved the campaign record');
 R.deck.setTab('log');
 R.deck.sync(game);
 assert.ok(fixture.getElementById('log-list').textContent.indexOf('NET') >= 0,
@@ -459,5 +531,61 @@ fixture.getElementById('dispatch-contract-clear').click();
 R.deck.sync(game);
 assert.equal(fixture.getElementById('dispatch-contract').hidden, true, 'clearing it drops back to a standing service');
 
+// An opened world starts from its card: a fresh run on that world, with the
+// deck, the strip and the menu all following it.
+R.campaign.record.unlocks['world:tinmoon'] = true;
+R.menu.show();
+planetCards = fixture.getElementById('planet-list').querySelectorAll('.planet-card');
+assert.equal(planetCards[1].disabled, false, 'an opened world is selectable');
+assert.ok(planetCards[0].textContent.indexOf('1 / 6 MILESTONES') >= 0, 'and the menu counts what was cleared');
+planetCards[1].click();
+assert.equal(R.world.planet.id, 'tinmoon', 'its card starts a run there');
+assert.notEqual(R.game, game, 'on a new game record');
+game = R.game;
+assert.equal(game.phase, 'deck', 'at the deck');
+assert.equal(game.cash, R.constants.economy.startingCash, 'with the opening balance');
+assert.equal(fixture.getElementById('planet-menu').hidden, true, 'the menu closes');
+R.deck.sync(game);
+assert.equal(fixture.getElementById('deck-world').textContent, 'Tinmoon', 'the deck header follows the world');
+assert.equal(fixture.getElementById('milestone-title').textContent, R.constants.campaign.worlds.tinmoon[0].title,
+	'and the strip shows the new world\'s ladder');
+
+// A world won in flight opens the settlement card at the deck: the standing it
+// was won on, and a way straight to the world menu.
+R.deck.onMilestones([{
+	milestone: R.constants.campaign.worlds.tinmoon[5],
+	number: 6,
+	rewardText: 'Dominant courier of Tinmoon',
+	settlement: { cashLead: 4321, deliveries: 20, deliveryLead: 12, reputation: 80, legs: 20 },
+	arcComplete: false
+}]);
+R.operations.touch();
+R.deck.sync(game);
+assert.equal(R.deck.dialog, 'settlement', 'a settlement opens its card');
+assert.equal(fixture.getElementById('settlement-dialog').hidden, false);
+assert.equal(fixture.getElementById('settlement-title').textContent, 'Dominant courier — Tinmoon', 'naming the world');
+assert.ok(fixture.getElementById('settlement-summary').textContent.indexOf('$4,321') >= 0, 'the cash lead');
+assert.ok(fixture.getElementById('settlement-detail').textContent.indexOf('REP 80') >= 0, 'and the reputation at the finish');
+assert.equal(R.operations.blocked, true, 'automation holds while the card is up');
+fixture.getElementById('settlement-worlds').click();
+assert.equal(R.deck.dialog, null, 'the card closes');
+assert.equal(fixture.getElementById('planet-menu').hidden, false, 'onto the world menu');
+R.menu.hide();
+R.deck.sync(game);
+assert.equal(R.deck.dialog, null, 'and it is shown once, not on every render');
+
+// Starting over asks twice, then erases the record and returns to the first world.
+var resetButton = fixture.getElementById('planet-menu-reset');
+
+R.menu.show();
+resetButton.click();
+assert.equal(R.campaign.worldUnlocked('tinmoon'), true, 'one click only arms the reset');
+assert.ok(resetButton.textContent.indexOf('Erase') >= 0, 'and says what a second one does');
+resetButton.click();
+assert.equal(R.campaign.worldUnlocked('tinmoon'), false, 'the second click erases the campaign');
+assert.equal(R.campaign.completedCount('verdant'), 0);
+assert.equal(R.world.planet.id, R.planets.defaultId, 'and starts again on the first world');
+
+delete global.localStorage;
 delete global.document;
 console.log('Render and app startup smoke test passed.');

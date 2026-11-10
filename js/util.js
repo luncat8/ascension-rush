@@ -20,6 +20,10 @@
 		return from + (to - from) * amount;
 	};
 
+	util.money = function(value) {
+		return '$' + Math.round(value).toLocaleString('en-US');
+	};
+
 	if (typeof module !== 'undefined' && module.exports) {
 		module.exports = util;
 	}

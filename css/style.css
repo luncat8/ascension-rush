@@ -443,6 +443,33 @@ input[type="range"] {
 	border-color: rgba(244, 199, 106, 0.6);
 }
 
+.planet-card.is-locked {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+
+.planet-card.is-locked:hover {
+	border-color: rgba(150, 180, 194, 0.18);
+	background: rgba(18, 39, 53, 0.7);
+}
+
+.planet-card b {
+	color: #c9a14f;
+	font: 10px ui-monospace, SFMono-Regular, Menlo, monospace;
+	letter-spacing: 0.04em;
+}
+
+.planet-card.is-dominant b {
+	color: #f4c76a;
+}
+
+.planet-menu-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	gap: 8px;
+}
+
 .planet-card strong {
 	font-size: 16px;
 }
@@ -672,25 +699,32 @@ input[type="range"] {
 }
 
 .milestone-strip {
-	margin: 0 0 10px;
-	padding: 9px 10px;
+	margin: 0 0 12px;
 	border: 1px solid rgba(244, 199, 106, 0.3);
 	border-radius: 9px;
 	background: rgba(244, 199, 106, 0.08);
 }
 
-.milestone-strip[hidden] {
-	display: none;
-}
-
 .milestone-head {
 	display: grid;
 	grid-template-columns: auto 1fr auto;
-	gap: 8px;
+	gap: 4px 8px;
 	align-items: baseline;
+	width: 100%;
+	padding: 9px 10px;
+	border: 0;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
 }
 
-.milestone-head span {
+.milestone-head:hover strong {
+	color: #ffd98a;
+}
+
+.milestone-head > span:first-child {
 	color: #c9a14f;
 	font: 9px ui-monospace, SFMono-Regular, Menlo, monospace;
 }
@@ -704,22 +738,25 @@ input[type="range"] {
 }
 
 .milestone-head small {
+	grid-column: 1 / 3;
 	color: #cfd8dc;
-	font: 9px ui-monospace, SFMono-Regular, Menlo, monospace;
+	font: 10px ui-monospace, SFMono-Regular, Menlo, monospace;
+	line-height: 1.4;
 }
 
 .milestone-dots {
 	display: flex;
+	grid-column: 3;
+	grid-row: 1 / 3;
+	align-self: center;
 	gap: 4px;
-	margin-top: 6px;
 }
 
 .milestone-dots span {
-	width: 10px;
-	height: 10px;
+	width: 9px;
+	height: 9px;
 	border-radius: 50%;
 	border: 1px solid rgba(244, 199, 106, 0.4);
-	background: transparent;
 }
 
 .milestone-dots span.done {
@@ -729,6 +766,123 @@ input[type="range"] {
 
 .milestone-dots span.active {
 	background: rgba(244, 199, 106, 0.35);
+}
+
+.milestone-ladder[hidden] {
+	display: none;
+}
+
+.milestone-ladder {
+	display: grid;
+	gap: 7px;
+	margin: 0;
+	padding: 9px 10px 10px;
+	border-top: 1px solid rgba(244, 199, 106, 0.2);
+	list-style: none;
+}
+
+.milestone-ladder li {
+	display: grid;
+	grid-template-columns: 16px 1fr;
+	gap: 1px 6px;
+	color: #8da6b1;
+	font-size: 11px;
+	line-height: 1.4;
+}
+
+.milestone-ladder li > * {
+	grid-column: 2;
+}
+
+.milestone-ladder li > b {
+	grid-column: 1;
+	grid-row: 1;
+	color: #c9a14f;
+	font: 10px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.milestone-ladder strong {
+	color: #b8cbd1;
+	font-size: 12px;
+}
+
+.milestone-ladder em {
+	color: #c9a14f;
+	font: 10px ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-style: normal;
+}
+
+.milestone-ladder li.done strong,
+.milestone-ladder li.done b {
+	color: #9be6d7;
+}
+
+.milestone-ladder li.active strong {
+	color: #f4c76a;
+}
+
+.milestone-ladder li.active span {
+	color: #dbe7ec;
+}
+
+.milestone-award[hidden] {
+	display: none;
+}
+
+.milestone-award {
+	display: grid;
+	gap: 5px;
+	margin: 0 0 12px;
+	padding: 10px 11px;
+	border: 1px solid rgba(244, 199, 106, 0.55);
+	border-radius: 9px;
+	background: rgba(244, 199, 106, 0.14);
+}
+
+.milestone-award strong {
+	color: #ffd98a;
+	font-size: 12px;
+}
+
+.milestone-award span {
+	color: #e8d6ab;
+	font-size: 11px;
+	line-height: 1.45;
+}
+
+.settlement-panel {
+	border-color: rgba(244, 199, 106, 0.5);
+	text-align: center;
+}
+
+.settlement-panel .eyebrow {
+	color: #c9a14f;
+}
+
+.settlement-panel h2 {
+	margin: 6px 0 10px;
+	color: #f4c76a;
+	font-size: 22px;
+	letter-spacing: -0.02em;
+}
+
+.settlement-panel p {
+	margin: 0 0 12px;
+	color: #dbe7ec;
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.settlement-panel .route-detail {
+	margin: 0 0 12px;
+	padding: 10px 12px;
+	border: 1px solid rgba(244, 199, 106, 0.2);
+	border-radius: 9px;
+	text-align: left;
+}
+
+.settlement-panel .launch-button {
+	margin-bottom: 8px;
 }
 
 .market-scoreboard {

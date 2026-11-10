@@ -2,11 +2,12 @@
 	'use strict';
 
 	var R = root.R || (root.R = {});
-	var main = {};
+	var main = R.main || (R.main = {});
 	var game = null;
 
-	// A run is one world's operations save. Nothing crosses a planet change:
-	// fleet, routes and pad ids are all rebuilt with the world.
+	// A run is one world's operations save: fleet, routes, cash and pad ids are
+	// all rebuilt with the world. Only the campaign record crosses a planet
+	// change, and operations.initialize reads it.
 	function createRun() {
 		var timeIndex = R.constants.time.defaultIndex;
 		var home = R.world.currentPadId;
@@ -71,6 +72,7 @@
 		}
 
 		R.world.initialize();
+		R.campaign.restore();
 		game = createRun();
 
 		R.render.initialize(context);

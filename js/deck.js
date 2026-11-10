@@ -23,11 +23,14 @@
 	var review = { routeId: null, logId: null, spec: null };
 	var typePickerRouteId = null;
 	var lastCountdownSecond = -1;
+	// A world won in flight is celebrated on the deck, once the leg is over.
+	var pendingSettlement = null;
 
 	deck.tab = 'dispatch';
 	deck.revision = -1;
 	deck.phase = '';
 	deck.openOverride = false;
+	deck.ladderOpen = false;
 
 	function el(tag, className, text) {
 		var node = doc.createElement(tag);
@@ -47,9 +50,7 @@
 		}
 	}
 
-	function money(value) {
-		return '$' + Math.round(value).toLocaleString('en-US');
-	}
+	var money = R.util.money;
 
 	function mass(value) {
 		return Math.round(value).toLocaleString('en-US') + ' kg';
@@ -117,14 +118,15 @@
 
 	deck.showDialog = function(name) {
 		var panel = ui.dialogs[name];
+		var key;
 
 		if (!panel) {
 			return;
 		}
 		deck.lastFocus = doc.activeElement;
-		ui.dialogs.workshop.hidden = name !== 'workshop';
-		ui.dialogs['route-type'].hidden = name !== 'route-type';
-		ui.dialogs['route-review'].hidden = name !== 'route-review';
+		for (key in ui.dialogs) {
+			ui.dialogs[key].hidden = key !== name;
+		}
 		deck.dialog = name;
 		// Automation never pulls the player out of a form they are editing.
 		R.operations.blocked = true;
@@ -166,6 +168,113 @@
 		ui.world.textContent = R.world.planet.name;
 		ui.cash.textContent = money(game.cash);
 		ui.fleetCount.textContent = available + ' of ' + fleet.length + ' ready';
+	}
+
+	// ------------------------------------------------------------- milestones
+
+	function ladderRow(milestone, index, state) {
+		var done = index < state.activeIndex;
+		var active = index === state.activeIndex;
+		var row = el('li', done ? 'done' : (active ? 'active' : null));
+
+		row.appendChild(el('b', null, done ? '✓' : String(index + 1)));
+		row.appendChild(el('strong', null, milestone.title));
+		row.appendChild(el('span', null, milestone.detail + (active ? ' Now: ' + R.campaign.progressText() + '.' : '')));
+		row.appendChild(el('em', null, R.campaign.rewardText(milestone)));
+		return row;
+	}
+
+	// The strip is on every tab: the active milestone, its progress and one dot
+	// per rung. Opened, it lists the whole ladder with thresholds and rewards.
+	function renderMilestones() {
+		var state = R.campaign.state;
+		var ladder = state.ladder;
+		var active = R.campaign.activeMilestone();
+		var settlement = R.campaign.settlement(state.planetId);
+		var i;
+
+		ui.milestoneLabel.textContent = active ? 'MILESTONE ' + (state.activeIndex + 1) + ' / ' + ladder.length :
+			'LADDER COMPLETE';
+		ui.milestoneTitle.textContent = active ? active.title : 'Dominant courier — ' + R.world.planet.name;
+		ui.milestoneProgress.textContent = active ? R.campaign.progressText() :
+			'Settled ahead by ' + money(settlement.cashLead) + ' · free play';
+		ui.milestoneToggle.setAttribute('aria-expanded', String(deck.ladderOpen));
+		ui.milestoneLadder.hidden = !deck.ladderOpen;
+		ui.milestoneDots.innerHTML = '';
+		ui.milestoneLadder.innerHTML = '';
+		for (i = 0; i < ladder.length; i += 1) {
+			ui.milestoneDots.appendChild(el('span', i < state.activeIndex ? 'done' : (i === state.activeIndex ? 'active' : null)));
+			if (deck.ladderOpen) {
+				ui.milestoneLadder.appendChild(ladderRow(ladder[i], i, state));
+			}
+		}
+	}
+
+	// What the leg that just landed cleared, under its debrief, with the goal
+	// that is now in front of the player.
+	function renderAwards(report) {
+		var awards = report && report.milestones ? report.milestones : null;
+		var next = R.campaign.activeMilestone();
+		var i;
+
+		ui.awards.hidden = !awards || awards.length === 0;
+		ui.awards.innerHTML = '';
+		if (ui.awards.hidden) {
+			return;
+		}
+		for (i = 0; i < awards.length; i += 1) {
+			ui.awards.appendChild(el('strong', null, 'MILESTONE ' + awards[i].number + ' REACHED · ' + awards[i].milestone.title));
+			ui.awards.appendChild(el('span', null, awards[i].rewardText));
+		}
+		if (next) {
+			ui.awards.appendChild(el('span', null, 'Next: ' + next.title + ' — ' + next.detail));
+		}
+	}
+
+	deck.onMilestones = function(awards) {
+		var text = '';
+		var i;
+
+		for (i = 0; i < awards.length; i += 1) {
+			text += 'Milestone reached: ' + awards[i].milestone.title + '. ' + awards[i].rewardText + '. ';
+			pendingSettlement = awards[i].settlement ? awards[i] : pendingSettlement;
+		}
+		if (text) {
+			deck.announce(text);
+		}
+	};
+
+	function settlementNext(award) {
+		var next = R.campaign.nextWorld();
+
+		if (award.arcComplete) {
+			return 'Every world on the network is settled in your favour. Ascension Rush — thank you for flying. ' +
+				'All of them stay open for free play.';
+		}
+		if (!next) {
+			return 'The deck stays open: keep flying here for as long as you like.';
+		}
+		return next.name + ' is open. Reputation travels with the company, up to REP ' +
+			R.constants.campaign.carryReputationCap + '; cash, fleet and routes start fresh on every world.';
+	}
+
+	function openSettlement(award) {
+		var settlement = award.settlement;
+		var rival = R.competitor.state;
+		var planet = R.world.planet;
+
+		ui.settlementEyebrow.textContent = award.arcComplete ? 'CAMPAIGN COMPLETE' : 'DOMINANT COURIER';
+		ui.settlementTitle.textContent = award.arcComplete ? 'Dominant on every world' : 'Dominant courier — ' + planet.name;
+		ui.settlementSummary.textContent = planet.name + ' is yours: every pad served at least as often as ' + rival.name +
+			', and ' + money(settlement.cashLead) + ' more in the bank.';
+		ui.settlementDetail.innerHTML = '';
+		ui.settlementDetail.appendChild(summaryRow('CASH LEAD', money(settlement.cashLead)));
+		ui.settlementDetail.appendChild(summaryRow('DELIVERIES', settlement.deliveries + ' · ' + rival.name + ' ' +
+			(settlement.deliveries - settlement.deliveryLead)));
+		ui.settlementDetail.appendChild(summaryRow('REPUTATION', 'REP ' + settlement.reputation));
+		ui.settlementDetail.appendChild(summaryRow('LEGS FLOWN', String(settlement.legs)));
+		ui.settlementNext.textContent = settlementNext(award);
+		deck.showDialog('settlement');
 	}
 
 	// --------------------------------------------------------------- dispatch
@@ -232,25 +341,37 @@
 		form.rocketId = found ? Number(select.value) : null;
 	}
 
+	// A profile the campaign has not opened is listed, disabled, so the player
+	// can see it exists; a form that held one falls back to the default.
 	function fillProfiles(select, selectedId) {
 		var profiles = R.constants.autopilotProfiles;
-		var campaignOn = R.campaign && R.campaign.state;
 		var option;
 		var locked;
 		var i;
 
 		select.innerHTML = '';
 		for (i = 0; i < profiles.length; i += 1) {
-			locked = campaignOn && !R.campaign.unlocked(profiles[i].id + '-profile');
-			option = el('option', null, profiles[i].label + (locked ? ' (locked)' : ''));
+			locked = !!R.operations.profileLock(profiles[i].id);
+			option = el('option', null, profiles[i].label + (locked ? ' — locked' : ''));
 			option.value = profiles[i].id;
 			option.disabled = locked;
 			select.appendChild(option);
 		}
-		if (campaignOn && !R.campaign.unlocked(selectedId + '-profile')) {
-			selectedId = 'balanced';
+		select.value = R.operations.profileLock(selectedId) ? profiles[0].id : selectedId;
+	}
+
+	function lockedProfilesHint() {
+		var profiles = R.constants.autopilotProfiles;
+		var hint = '';
+		var i;
+
+		for (i = 0; i < profiles.length; i += 1) {
+			if (R.operations.profileLock(profiles[i].id)) {
+				hint += ' ' + profiles[i].label + ' unlocks at milestone ' +
+					R.campaign.unlockSource('profile:' + profiles[i].id) + '.';
+			}
 		}
-		select.value = selectedId;
+		return hint;
 	}
 
 	function summaryRow(label, value) {
@@ -377,6 +498,7 @@
 			ui.reportDetail.textContent = game.lastReport.detail;
 			ui.report.dataset.status = game.lastReport.status;
 		}
+		renderAwards(game.lastReport);
 
 		ui.offer.hidden = !offer;
 		if (offer) {
@@ -438,8 +560,11 @@
 
 		fillTypes(ui.type, form.typeId);
 		fillRockets(ui.rocket, form.typeId, form.sourcePadId, form.rocketId);
+		if (R.operations.profileLock(form.profileId)) {
+			form.profileId = R.constants.autopilotProfiles[0].id;
+		}
 		fillProfiles(ui.profile, form.profileId);
-		ui.profileHint.textContent = R.autopilot.profileById(form.profileId).description;
+		ui.profileHint.textContent = R.autopilot.profileById(form.profileId).description + lockedProfilesHint();
 
 		ui.build.hidden = !type;
 		if (type) {
@@ -619,46 +744,6 @@
 		return card;
 	}
 
-	function renderMilestones(game) {
-		var state = R.campaign && R.campaign.state;
-		var active;
-		var ladder;
-		var amount;
-		var target;
-		var dot;
-		var i;
-
-		if (!ui.milestoneStrip || !state) {
-			return;
-		}
-		ui.milestoneStrip.hidden = false;
-		active = R.campaign.activeMilestone();
-		ladder = state.ladder;
-		if (!active) {
-			ui.milestoneLabel.textContent = 'CAMPAIGN COMPLETE';
-			ui.milestoneTitle.textContent = ladder.length ? ladder[ladder.length - 1].title : '—';
-			ui.milestoneProgress.textContent = 'all milestones met';
-			amount = ladder.length;
-			target = ladder.length;
-		} else {
-			amount = R.campaign.progress(active);
-			target = active.target;
-			ui.milestoneLabel.textContent = 'MILESTONE ' + (state.activeIndex + 1) + ' / ' + ladder.length;
-			ui.milestoneTitle.textContent = active.title;
-			ui.milestoneProgress.textContent = amount + ' / ' + target;
-		}
-		ui.milestoneDots.innerHTML = '';
-		for (i = 0; i < ladder.length; i += 1) {
-			dot = doc.createElement('span');
-			if (i < state.activeIndex) {
-				dot.className = 'done';
-			} else if (i === state.activeIndex) {
-				dot.className = 'active';
-			}
-			ui.milestoneDots.appendChild(dot);
-		}
-	}
-
 	function renderScoreboard(game) {
 		var rival = R.competitor && R.competitor.state;
 		var player = R.operations.state.playerStats;
@@ -678,7 +763,6 @@
 		var pads = R.world.pads;
 		var i;
 
-		renderMilestones(game);
 		renderScoreboard(game);
 		ui.marketList.innerHTML = '';
 		for (i = 0; i < pads.length; i += 1) {
@@ -1019,7 +1103,10 @@
 	}
 
 	deck.render = function(game) {
+		var award = pendingSettlement;
+
 		renderHeader(game);
+		renderMilestones();
 		updateSelection(game);
 		renderFlightStrip(game);
 		ui.panel.hidden = game.phase === 'flying' && !deck.openOverride;
@@ -1039,6 +1126,10 @@
 			renderRoutes();
 		} else {
 			renderLog();
+		}
+		if (award && game.phase === 'deck' && !deck.dialog) {
+			pendingSettlement = null;
+			openSettlement(award);
 		}
 	};
 
@@ -1086,6 +1177,8 @@
 		form.overhaul = false;
 		deck.tab = 'dispatch';
 		deck.openOverride = false;
+		deck.ladderOpen = false;
+		pendingSettlement = null;
 		deck.revision = -1;
 		deck.phase = '';
 		R.operations.touch();
@@ -1112,7 +1205,8 @@
 		ui.viewMarket = doc.getElementById('view-market');
 		ui.marketList = doc.getElementById('market-list');
 		ui.marketScoreboard = doc.getElementById('market-scoreboard');
-		ui.milestoneStrip = doc.getElementById('milestone-strip');
+		ui.milestoneToggle = doc.getElementById('milestone-toggle');
+		ui.milestoneLadder = doc.getElementById('milestone-ladder');
 		ui.milestoneLabel = doc.getElementById('milestone-label');
 		ui.milestoneTitle = doc.getElementById('milestone-title');
 		ui.milestoneProgress = doc.getElementById('milestone-progress');
@@ -1127,6 +1221,7 @@
 		ui.report = doc.getElementById('dispatch-report');
 		ui.reportTitle = doc.getElementById('dispatch-report-title');
 		ui.reportDetail = doc.getElementById('dispatch-report-detail');
+		ui.awards = doc.getElementById('dispatch-milestones');
 		ui.offer = doc.getElementById('dispatch-offer');
 		ui.offerText = doc.getElementById('dispatch-offer-text');
 		ui.offerSend = doc.getElementById('dispatch-offer-send');
@@ -1175,8 +1270,14 @@
 		ui.dialogs = {
 			workshop: doc.getElementById('workshop'),
 			'route-type': doc.getElementById('route-type-dialog'),
-			'route-review': doc.getElementById('route-review-dialog')
+			'route-review': doc.getElementById('route-review-dialog'),
+			settlement: doc.getElementById('settlement-dialog')
 		};
+		ui.settlementEyebrow = doc.getElementById('settlement-eyebrow');
+		ui.settlementTitle = doc.getElementById('settlement-title');
+		ui.settlementSummary = doc.getElementById('settlement-summary');
+		ui.settlementDetail = doc.getElementById('settlement-detail');
+		ui.settlementNext = doc.getElementById('settlement-next');
 		ui.typeList = doc.getElementById('route-type-list');
 		ui.typeWarning = doc.getElementById('route-type-warning');
 		ui.reviewTitle = doc.getElementById('route-review-title');
@@ -1198,6 +1299,17 @@
 		ui.routeSave = doc.getElementById('route-review-save');
 
 		on(ui.planetButton, 'click', function() {
+			R.menu.show();
+		});
+		on(ui.milestoneToggle, 'click', function() {
+			deck.ladderOpen = !deck.ladderOpen;
+			R.operations.touch();
+		});
+		on(doc.getElementById('settlement-close'), 'click', function() {
+			deck.hideDialog();
+		});
+		on(doc.getElementById('settlement-worlds'), 'click', function() {
+			deck.hideDialog();
 			R.menu.show();
 		});
 		on(ui.tabDispatch, 'click', function() {

@@ -43,7 +43,7 @@
 		TYPE_FLYING: 'A ROCKET OF THIS TYPE IS FLYING',
 		CONTRACT_GONE: 'CONTRACT IS NO LONGER ON THE BOARD',
 		CONTRACT_MISMATCH: 'CONTRACT NEEDS ITS OWN PADS AND PAYLOAD',
-		LOCKED_PROFILE: 'PROFILE LOCKED — COMPLETE ITS MILESTONE TO UNLOCK'
+		LOCKED_PROFILE: 'PROFILE LOCKED · MILESTONE '
 	};
 	operations.autoLaunchSeconds = R.constants.operations.autoLaunchSeconds;
 	// Set while a dialog or the workshop is open: automation must never pull the
@@ -550,6 +550,15 @@
 		return true;
 	};
 
+	// The lock reason for a profile the campaign has not opened yet, naming the
+	// milestone that opens it; empty when the profile can be flown.
+	operations.profileLock = function(profileId) {
+		if (!R.campaign || R.campaign.profileUnlocked(profileId)) {
+			return '';
+		}
+		return operations.reasons.LOCKED_PROFILE + R.campaign.unlockSource('profile:' + profileId).toUpperCase();
+	};
+
 	operations.dispatch = function(spec) {
 		var game = R.game;
 		var order;
@@ -575,8 +584,10 @@
 			return { ok: false, reason: operations.reasons.CONTRACT_MISMATCH };
 		}
 		operations.forgetDismissal();
-		if (spec.profileId && R.campaign && !R.campaign.unlocked(spec.profileId + '-profile')) {
-			return { ok: false, reason: operations.reasons.LOCKED_PROFILE };
+		// The campaign gates the player's profiles; the rival flies by its own rules.
+		refusal = spec.operatorId && spec.operatorId !== 'player' ? '' : operations.profileLock(spec.profileId);
+		if (refusal) {
+			return { ok: false, reason: refusal };
 		}
 		evaluation = operations.evaluateLeg(spec.typeId, spec.source, spec.outboundPayload, true,
 			spec.rocketId, spec.overhaul, spec.destination);
@@ -858,6 +869,10 @@
 		if (!type || type.archived) {
 			return { ready: false, reason: operations.reasons.NO_TYPE };
 		}
+		refusal = operations.profileLock(route.profileId);
+		if (refusal) {
+			return { ready: false, reason: refusal };
+		}
 		operations.typeStats(type);
 		refusal = cargoReason(checkCargo(stats.payloadLimit, route.mode, route.source, route.destination,
 			route.outboundPayload, route.returnPayload));
@@ -1126,9 +1141,8 @@
 		};
 	};
 
-	operations.initialize = function(carry) {
+	operations.initialize = function() {
 		var planetId = R.world.planet.id;
-		var reputation;
 		var state = {
 			planetId: planetId,
 			nextId: 1,
@@ -1144,12 +1158,10 @@
 			dismissedRouteId: null
 		};
 
+		// The campaign record outlives the run: it decides where this world's
+		// ladder resumes and the reputation the company arrives with.
 		if (R.campaign) {
-			R.campaign.initialize(carry);
-			reputation = R.campaign.state.reputationCarry;
-			if (typeof reputation === 'number' && reputation > 0) {
-				state.playerStats.reputation = reputation;
-			}
+			state.playerStats.reputation = R.campaign.initialize().startReputation;
 		}
 		operations.state = state;
 		R.flightLog.reset();
@@ -1159,7 +1171,7 @@
 		operations.referenceType();
 		operations.createRocket(state.types[0], R.world.pads[0]);
 		if (R.competitor) {
-			R.competitor.initialize(carry);
+			R.competitor.initialize(R.market.state.seed, R.campaign ? R.campaign.rivalCarry() : null);
 		}
 		return state;
 	};

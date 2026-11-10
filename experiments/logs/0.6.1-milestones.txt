@@ -1,0 +1,56 @@
+=== Verdant · reference player · up to 40 legs · market seed 1842843656 · arrives REP 50 · Skybolt Logistics REP 50 skill 0.250 ===
+ leg  route                     cargo            profile   result        cash Δ     cash    rival  REP  milestone
+   1  Homeport → Farport        120 kg standing  balanced  delivered      $4625   $44625   $40000   51  1 First receipt ($1,000 grant)
+   2  Farport → Westport        120 kg contract  balanced  delivered       $754   $45379   $42446   52  
+   3  Westport → Eastport       120 kg contract  balanced  delivered       $923   $46302   $43250   53  
+   4  Eastport → Westport       120 kg standing  balanced  delivered       $852   $47154   $44503   54  
+   5  Westport → Homeport       120 kg contract  balanced  delivered       $602   $47756   $44503   55  2 On the board (Gentle profile unlocked)
+   6  Homeport → Farport        120 kg standing  balanced  delivered      $2106   $49862   $44503   56  
+   7  Farport → Homeport        120 kg standing  balanced  delivered       $605   $50467   $44503   57  
+   8  Homeport → Farport        120 kg standing  balanced  delivered       $909   $51376   $44503   58  
+   9  Farport → Homeport        120 kg standing  balanced  delivered      $2202   $53578   $44503   59  3 Haulier ($1,500 grant)
+  10  Homeport → Farport        120 kg standing  balanced  delivered       $818   $54396   $47532   60  
+  11  Farport → Homeport        120 kg standing  balanced  delivered       $814   $55209   $47532   61  
+  12  Homeport → Farport        120 kg standing  balanced  delivered       $608   $55817   $47725   62  
+  13  Farport → Homeport        120 kg standing  balanced  delivered       $785   $56602   $47725   63  
+  14  Homeport → Farport        120 kg standing  balanced  delivered       $609   $57212   $47725   64  
+  15  Farport → Homeport        120 kg standing  balanced  delivered      $1629   $58841   $47725   65  4 Reliable service ($2,000 grant · Skybolt Logistics takes notice)
+  16  Homeport → Eastport       120 kg standing  balanced  delivered       $175   $59016   $48043   66  
+  17  Eastport → Farport         60 kg fragile   gentle    delivered      $2831   $61847   $48043   67  5 Long reach ($2,500 grant · Tinmoon opened)
+  18  Farport → Westport        120 kg standing  balanced  delivered      $1346   $63193   $48043   68  
+  19  Westport → Eastport       120 kg standing  balanced  delivered      $2152   $65346   $49872   69  6 Dominant courier (Dominant courier of Verdant)
+  20  Eastport → Westport       120 kg standing  balanced  delivered       $808   $66153   $49872   70  
+  21  Westport → Eastport       120 kg standing  balanced  delivered       $910   $67064   $50900   71  
+  22  Eastport → Westport       120 kg standing  balanced  delivered       $880   $67943   $50900   72  
+  23  Westport → Eastport       120 kg standing  balanced  delivered       $608   $68551   $50900   73  
+  24  Eastport → Westport       120 kg standing  balanced  delivered       $750   $69302   $50900   74  
+  25  Westport → Eastport       120 kg standing  balanced  delivered       $626   $69928   $50900   75  
+  26  Eastport → Westport       120 kg standing  balanced  delivered       $927   $70855   $50900   76  
+  27  Westport → Eastport       120 kg standing  balanced  delivered       $649   $71504   $50900   77  
+  28  Eastport → Westport       120 kg standing  balanced  delivered       $885   $72389   $50900   78  
+  29  Westport → Eastport       120 kg standing  balanced  delivered       $580   $72969   $50900   79  
+  30  Eastport → Westport       120 kg standing  balanced  delivered      $-608   $72361   $50900   80  
+  31  Westport → Eastport       120 kg standing  balanced  delivered       $662   $73023   $50900   81  
+  32  Eastport → Westport       120 kg standing  balanced  delivered       $656   $73679   $51559   82  
+  33  Westport → Eastport       120 kg fragile   gentle    delivered      $1584   $75263   $52840   83  
+  34  Eastport → Westport       120 kg standing  balanced  delivered       $734   $75996   $52954   84  
+  35  Westport → Eastport       120 kg standing  balanced  delivered       $483   $76479   $53878   85  
+  36  Eastport → Westport       120 kg standing  balanced  delivered       $746   $77225   $53878   86  
+  37  Westport → Farport        120 kg contract  balanced  delivered       $742   $77967   $54930   87  
+  38  Farport → Homeport        120 kg standing  balanced  delivered      $1748   $79715   $54930   88  
+  39  Homeport → Farport        120 kg standing  balanced  delivered       $891   $80607   $54930   89  
+  40  Farport → Homeport        120 kg standing  balanced  delivered       $435   $81042   $55614   90  
+
+Verdant ladder after 40 legs:
+  1 First receipt        leg 1
+  2 On the board         leg 5
+  3 Haulier              leg 9
+  4 Reliable service     leg 15
+  5 Long reach           leg 17
+  6 Dominant courier     leg 19
+  player $81042 · 40 deliveries · REP 90 | Skybolt Logistics $55614 · 14 deliveries · REP 64 · skill 0.690 · failed 0
+  Homeport     player 8 · rival 4
+  Eastport     player 11 · rival 5
+  Farport      player 9 · rival 2
+  Westport     player 12 · rival 3
+

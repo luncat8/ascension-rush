@@ -96,6 +96,20 @@ pad's rival delivery count and kilograms. The rival is seeded per world; its
 contracts remain ordinary shared-board contracts, so a player cannot dispatch
 cargo the rival has already taken.
 
+The **0.6** campaign gives the company named goals. Every world has a ladder of
+six milestones — a first delivery, board contracts, cargo hauled, a clean
+reputation run or a cash target, a contract to the far pad — shown in a strip
+under the deck's tabs that expands into the whole ladder. A milestone clears
+only when a delivered leg settles on the deck; it pays a grant, unlocks the
+*Gentle* profile, or opens the next world (Verdant → Tinmoon → Cinder →
+Gossamer). The last milestone is the settlement against Skybolt: more cash, and
+every pad served at least as often and at least three times, makes the company
+**dominant courier** of that world. Reputation carries to the next world,
+clamped to 60, and Skybolt arrives there a little more skilled for it; cash,
+fleet and routes start over. The world menu shows each world as locked (with
+the milestone that opens it), in progress or dominant, and the campaign is kept
+in the browser's local storage until "Start a new campaign" erases it.
+
 ## Plans (subject-numbered, not version sequence)
 Active:
 - [`0.6-plan.md`](./0.6-plan.md) — Milestones & campaign arc: company milestones, rewards, world unlocks and a dominant-courier end condition.
@@ -103,6 +117,8 @@ Active:
 - [`0.4-plan.md`](./0.4-plan.md) — Economy balance, parts catalog with service/repair, market prices & contract board.
 
 Increments of the active plans, recorded in `archive/` as they land:
+- [`archive/0.6.2-worklog.md`](./archive/0.6.2-worklog.md) — Campaign record, four world ladders, gated world menu, settlement card, measured reference runs (0.6.2).
+- [`archive/0.6.1-worklog.md`](./archive/0.6.1-worklog.md) — Company milestones on Verdant and the Gentle-profile lock (0.6.1).
 - [`archive/0.5.2-worklog.md`](./archive/0.5.2-worklog.md) — Rival bidding, isolated autopilot flights, market pressure and scoreboard (0.5.2).
 - [`archive/0.5.1-worklog.md`](./archive/0.5.1-worklog.md) — Damage & failures: stress, failure modes, landing damage, repair bills (0.5.1).
 - [`archive/0.4.1-worklog.md`](./archive/0.4.1-worklog.md) — Pad markets & contract board (0.4.1).
@@ -141,6 +157,9 @@ node experiments/market-test.js             # pad prices, contracts, quotes, fra
 node experiments/damage-test.js             # stress, failure modes, landing damage, repair
 node experiments/competitor-test.js         # rival bids, shared pressure and isolated flights
 node experiments/competitor-sweep.js 20 20261006 # seeded rival-tuning run
+node experiments/campaign-test.js           # milestones, unlocks, world switch, persistence
+node experiments/campaign-sweep.js 40 verdant    # reference player up one world's ladder
+node experiments/campaign-sweep.js 60 campaign   # the four worlds in order
 node experiments/envelope.js verdant 0      # flight envelope per planet/build
 node experiments/envelope.js cinder 0 gentle 30 4   # profile (or `off`), fps, time scale
 node experiments/build-sweep.js 300 1       # random builds: dry baseline vs limits off and profiles
@@ -170,3 +189,8 @@ prices recorded. `experiments/logs/0.5.2-balance-pressure.txt` records the
 steady-service economy with delivered-volume pricing enabled; every established
 margin band still passes. The damage-on repeat is in
 `experiments/logs/0.5.2-balance-pressure-damage.txt` and passes too.
+`experiments/logs/0.6.1-milestones.txt` is a reference player's 40 legs on
+Verdant with the damage model on: milestones on legs 1, 5, 9, 15, 17 and 19.
+`experiments/logs/0.6.2-campaign.txt` is the same player through all four
+worlds, each settled within 20 legs. Both are reproduced by
+`campaign-test.js`.
