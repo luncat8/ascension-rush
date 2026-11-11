@@ -30,4 +30,15 @@ improve parts (virtual): think main parts, cost, srvice cost, repair cost
 
 improve damage and failures: low build strength (quality), too fast landing. repair cost.
 
-add competitor company who also build and lunch 
+add competitor company who also build and lunch
+
+## gameplay oriented self-explained GUI
+
+refactor current or make current collapsible and add new panels.
+
+player want to see clear, and better without read help text:
+1. what available delivery and where to get profit. see and understand that more payload or build new rocket will give ore profit or make possible more variants that is not fit to weak rocket.
+2. how to select launcher pad. how to build rocket, see delta-v vs payload plot.
+3. how to launch rocket manually and by autopilot. i see button autopilot but cant find manual procedure in current version.
+4. in fly hud : how to aim, thrust, stage of multistage rockets, see fuel and delta-v remain, vertical speed, cargo
+5. plan auto route, see predicted profit per time
