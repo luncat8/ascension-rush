@@ -1418,9 +1418,14 @@
 			return;
 		}
 		route = mission && mission.routeId ? R.operations.findRoute(mission.routeId) : null;
+		// The strip names who is flying in the same words the HUD header uses,
+		// so the button beside it is read as the control that changes it.
 		ui.flightStripText.textContent = 'LEG ' + flight.leg + ' OF ' + flight.legCount + ' · ' +
 			padName(flight.departedPadId) + ' → ' + padName(flight.targetPadId) + ' · ' +
-			(route ? route.name : (R.autopilot.enabled ? 'autopilot' : 'manual flight'));
+			(route ? route.name + ' · ' : '') +
+			(R.autopilot.enabled ?
+				'AUTOPILOT · ' + R.autopilot.profileById(R.autopilot.profileId).label :
+				'MANUAL · YOU FLY');
 		if (ui.flightStripPilot) {
 			ui.flightStripPilot.textContent = R.autopilot.enabled ?
 				'Take over (A)' : 'Hand back to autopilot (A)';

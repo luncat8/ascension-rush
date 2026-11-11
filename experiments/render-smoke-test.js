@@ -532,6 +532,167 @@ fixture.getElementById('dispatch-contract-clear').click();
 R.deck.sync(game);
 assert.equal(fixture.getElementById('dispatch-contract').hidden, true, 'clearing it drops back to a standing service');
 
+// The self-explained deck: the stepper, the ranked trades, the pad picker,
+// the type comparison and the capacity bar all render from the same
+// evaluation the send buttons use. First settle the leg the service block
+// left in the air, so the deck is free to dispatch again.
+var openPad = R.world.findPadById(game.flight.targetPadId);
+
+game.rocket.wx = openPad.wx;
+game.rocket.wy = 0;
+game.rocket.vx = 0;
+game.rocket.vy = -2;
+R.mission.touchdown(game);
+R.deck.setTab('dispatch');
+R.deck.sync(game);
+assert.equal(game.phase, 'deck', 'the deck is free again');
+assert.equal(fixture.getElementById('dispatch-step-pads').className, 'done', 'the stepper checks off the chosen pads');
+assert.equal(fixture.getElementById('dispatch-step-mode').className, 'done', 'and the picked pilot');
+var opportunityRows = fixture.getElementById('dispatch-opportunities').querySelectorAll('.opportunity-row');
+
+assert.ok(opportunityRows.length > 0, 'the dispatch opens with ranked trades');
+assert.ok(fixture.getElementById('dispatch-opportunities').textContent.indexOf('/min') >= 0,
+	'each ranked by profit per minute');
+assert.ok(fixture.getElementById('dispatch-compare').querySelectorAll('.compare-row').length ===
+	R.operations.state.types.length + 1, 'the comparison lists every type plus the workshop row');
+assert.ok(fixture.getElementById('dispatch-capacity').textContent.indexOf('bay') >= 0,
+	'the capacity bar names the bay');
+assert.ok(fixture.getElementById('dispatch-capacity').textContent.indexOf('wants') >= 0,
+	'and what the destination will take');
+
+// A From/To pair from the pad picker writes the same form state the selects do.
+var padCards = fixture.getElementById('dispatch-pads').querySelectorAll('.pad-card');
+var pickedPad = R.world.pads[2].id === fixture.getElementById('dispatch-from').value ?
+	R.world.pads[3] : R.world.pads[2];
+
+assert.equal(padCards.length, R.world.pads.length, 'the picker shows one card per pad');
+assert.ok(padCards[0].textContent.indexOf('fuel $') >= 0, 'each card quotes fuel');
+assert.ok(padCards[0].textContent.indexOf('served') >= 0, 'and what the pad has served');
+padCards[R.world.padIndex(pickedPad.id)].querySelectorAll('button')[1].click();
+R.deck.sync(game);
+assert.equal(fixture.getElementById('dispatch-to').value, pickedPad.id, 'the To button sets the destination');
+
+// A ranked row loads the same route into the dispatch form.
+opportunityRows = fixture.getElementById('dispatch-opportunities').querySelectorAll('.opportunity-row');
+opportunityRows[opportunityRows.length - 1].click();
+R.deck.sync(game);
+assert.notEqual(fixture.getElementById('dispatch-from').value, fixture.getElementById('dispatch-to').value,
+	'a clicked trade loads its pads into the form');
+assert.equal(fixture.getElementById('dispatch-contract').hidden, true, 'a standing trade loads no contract');
+
+// The workshop plot: the caption quotes the design point, the bay limit and
+// the launch TWR, and follows the design payload slider.
+var dispatchRocket = R.operations.state.fleet[0];
+var manualFrom = dispatchRocket.padId;
+var manualTo = manualFrom === R.world.pads[0].id ? R.world.pads[1].id : R.world.pads[0].id;
+
+R.builder.open(game, { typeId: R.operations.state.types[0].id, padId: manualFrom });
+assert.equal(fixture.getElementById('workshop').hidden, false, 'the workshop opens from the deck');
+assert.ok(fixture.getElementById('workshop-plot-caption').textContent.indexOf('bay limit') >= 0,
+	'the plot caption quotes the bay limit');
+assert.ok(fixture.getElementById('workshop-plot-caption').textContent.indexOf('design') >= 0,
+	'the design payload point');
+assert.ok(fixture.getElementById('workshop-plot-caption').textContent.indexOf('launch TWR') >= 0,
+	'and the launch TWR');
+var workshopPayload = fixture.getElementById('workshop-payload');
+
+workshopPayload.value = '200';
+workshopPayload.dispatch('input', {});
+assert.ok(fixture.getElementById('workshop-plot-caption').textContent.indexOf('design 200 kg') >= 0,
+	'moving the design payload redraws the caption');
+fixture.getElementById('workshop-close').click();
+assert.equal(fixture.getElementById('workshop').hidden, true, 'and the workshop closes');
+
+// Manual launch: the send button that names it starts the leg cold, with no
+// guidance, no throttle and no autopilot fee on the account.
+fromSelect.value = manualFrom;
+fromSelect.dispatch('change', {});
+var toSelect = fixture.getElementById('dispatch-to');
+
+toSelect.value = manualTo;
+toSelect.dispatch('change', {});
+fixture.getElementById('dispatch-pilot-manual').dispatch('change', {});
+R.deck.sync(game);
+assert.ok(fixture.getElementById('dispatch-pilot-hint').textContent.indexOf('no 10% fee') >= 0,
+	'the pilot choice names what manual flight saves');
+assert.equal(fixture.getElementById('dispatch-profile').disabled, true, 'manual flight has no profile to gate');
+assert.equal(fixture.getElementById('dispatch-send').className, 'ghost-button wide',
+	'the autopilot button stands down');
+assert.equal(fixture.getElementById('dispatch-send-manual').className, 'launch-button',
+	'and the manual button takes the launch styling');
+var ledgerMark = game.ledger.length;
+
+fixture.getElementById('dispatch-send-manual').click();
+assert.equal(game.phase, 'flying', 'the manual button sends the leg');
+assert.equal(game.flight.manual, true, 'the flight knows it was sent by hand');
+assert.equal(game.flight.usedAutopilot, false, 'and that no guidance was bought');
+assert.equal(R.autopilot.enabled, false, 'the autopilot stays off');
+assert.equal(game.rocket.throttle, 0, 'the rocket starts cold on the pad');
+assert.ok(game.ledger.slice(ledgerMark).every(function(entry) {
+	return entry.type !== 'autopilot';
+}), 'nothing on the ledger paid for guidance');
+R.deck.sync(game);
+assert.ok(fixture.getElementById('deck-announcer').textContent.indexOf('manual launch') >= 0,
+	'the launch procedure is announced');
+assert.equal(fixture.getElementById('flight-strip').hidden, false, 'the flight strip is up');
+assert.ok(fixture.getElementById('flight-strip-text').textContent.indexOf('MANUAL · YOU FLY') >= 0,
+	'and names who is flying');
+assert.equal(fixture.getElementById('flight-strip-pilot').textContent, 'Hand back to autopilot (A)',
+	'with the button that hands the rocket over');
+
+// The flight HUD answers the pilot's questions while the manual leg sits on
+// the pad: who flies, how to launch, where the cargo and delta-v stand, and
+// which key stages the next slot.
+drawnText.length = 0;
+R.render.draw(game);
+assert.ok(drawnText.indexOf('HOLD SHIFT TO LIFT OFF') >= 0, 'the pad callout says how to light the engine');
+assert.ok(drawnText.indexOf('MANUAL · YOU FLY') >= 0, 'the HUD names the pilot');
+assert.ok(drawnText.indexOf('V-SPEED') >= 0, 'the HUD shows vertical speed');
+assert.ok(drawnText.indexOf('CARGO') >= 0, 'cargo');
+assert.ok(drawnText.indexOf('DELTA-V LEFT') >= 0, 'delta-v remaining');
+assert.ok(drawnText.indexOf('TOTAL FUEL') >= 0, 'total fuel');
+assert.ok(drawnText.indexOf('BURNING') >= 0, 'the burning stage');
+assert.ok(drawnText.indexOf('NEXT · SPACE') >= 0, 'and the key that lights the next one');
+assert.ok(drawnText.indexOf('MOUSE CURSOR') >= 0, 'aim names the mouse');
+assert.ok(drawnText.indexOf('SHIFT ▲ / CTRL ▼') >= 0, 'thrust names its keys');
+assert.ok(drawnText.indexOf('A · HAND TO AUTOPILOT') >= 0, 'and the pilot row names the handoff key');
+
+// The strip button is the autopilot toggle it looks like.
+fixture.getElementById('flight-strip-pilot').click();
+assert.equal(R.autopilot.enabled, true, 'one click hands the rocket to the autopilot');
+assert.equal(game.flight.usedAutopilot, true, 'and the flight records who flies it');
+R.deck.sync(game);
+assert.equal(fixture.getElementById('flight-strip-pilot').textContent, 'Take over (A)',
+	'the button flips to taking over');
+assert.ok(fixture.getElementById('flight-strip-text').textContent.indexOf('AUTOPILOT · Balanced') >= 0,
+	'the strip names the guidance and profile');
+drawnText.length = 0;
+R.render.draw(game);
+assert.ok(drawnText.indexOf('AUTOPILOT · Balanced') >= 0, 'the HUD header follows the handoff');
+assert.ok(drawnText.indexOf('A · TAKE OVER') >= 0, 'the pilot row flips its key hint');
+assert.equal(drawnText.indexOf('HOLD SHIFT TO LIFT OFF'), -1, 'and the launch callout is gone');
+fixture.getElementById('flight-strip-pilot').click();
+assert.equal(R.autopilot.enabled, false, 'a second click hands it back');
+assert.equal(game.flight.usedAutopilot, false, 'so the leg ends as the player flew it');
+
+// Adjudicated where it says it landed: a manual delivery pays its quote and
+// no guidance fee, whatever the pad was named.
+var rewardQuote = game.flight.rewardQuote;
+var settlePad = R.world.findPadById(game.flight.targetPadId);
+
+game.rocket.wx = settlePad.wx;
+game.rocket.wy = 0;
+game.rocket.vx = 0;
+game.rocket.vy = -2;
+R.mission.touchdown(game);
+assert.equal(game.phase, 'deck', 'the manual leg settles at its pad');
+assert.equal(game.lastReport.status, 'delivered', 'as a delivery');
+assert.equal(game.lastReport.reward, rewardQuote, 'paying the full quote');
+assert.ok(game.lastReport.detail.indexOf('Autopilot fee') < 0, 'with no autopilot fee line');
+assert.ok(game.ledger.slice(ledgerMark).every(function(entry) {
+	return entry.type !== 'autopilot';
+}), 'and no guidance spend anywhere on the leg');
+
 // An opened world starts from its card: a fresh run on that world, with the
 // deck, the strip and the menu all following it.
 R.campaign.record.unlocks['world:tinmoon'] = true;

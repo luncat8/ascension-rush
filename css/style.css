@@ -1108,6 +1108,19 @@ input[type="range"] {
 	display: none;
 }
 
+/* The handoff button is the control the strip exists for: amber like the
+   manual HUD state, so it reads as the pilot toggle it is. */
+#flight-strip-pilot {
+	margin-top: 0;
+	border-color: rgba(244, 199, 106, 0.55);
+	color: #f4c76a;
+}
+
+#flight-strip-pilot:hover {
+	border-color: rgba(244, 199, 106, 0.9);
+	color: #ffe1a1;
+}
+
 .dialog[hidden] {
 	display: none;
 }

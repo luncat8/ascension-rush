@@ -260,7 +260,8 @@
 		if (ui.plotCaption) {
 			ui.plotCaption.textContent = '0 kg: ' + formatMass(emptyDv) + ' m/s · design ' +
 				formatMass(builder.draft.nominalPayload) + ' kg: ' + formatMass(stats.deltaV) +
-				' m/s · bay limit ' + formatMass(capacity) + ' kg: ' + formatMass(limitDv) + ' m/s';
+				' m/s · bay limit ' + formatMass(capacity) + ' kg: ' + formatMass(limitDv) +
+				' m/s · launch TWR ' + R.operations.typeTwr(builder.draft, builder.draft.nominalPayload).toFixed(2) + ' : 1';
 		}
 		if (!ui.plot || !ui.plot.getContext) {
 			return;

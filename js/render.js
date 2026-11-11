@@ -42,6 +42,26 @@
 	var stageLabels = ['S1', 'S2', 'S3'];
 	var dashAim = [4, 4];
 	var dashSolid = [];
+	// Pilot mode label for the HUD header; rebuilt only when the pilot or the
+	// profile changes, never per frame.
+	var modeCacheKey = '';
+	var modeCacheText = '';
+	// The cold manual start is the one moment a procedure prompt earns its
+	// place: the rocket does not move until the player lights the engine.
+	var launchPrompt = 'HOLD SHIFT TO LIFT OFF';
+	var launchPromptDetail = 'mouse aims · space stages · A = autopilot';
+
+	function pilotModeLabel() {
+		var key = R.autopilot.enabled ? 'a:' + R.autopilot.profileId : 'manual';
+
+		if (key !== modeCacheKey) {
+			modeCacheKey = key;
+			modeCacheText = R.autopilot.enabled ?
+				'AUTOPILOT · ' + R.autopilot.profileById(R.autopilot.profileId).label :
+				'MANUAL · YOU FLY';
+		}
+		return modeCacheText;
+	}
 
 	function drawPanel(context, x, y, width, height) {
 		var radius = 10;
@@ -668,7 +688,7 @@
 		var margin = Math.min(24, render.width * 0.05);
 		var panelWidth = 250;
 		var stageRows = rocket.stageCount;
-		var panelHeight = 202 + stageRows * 26;
+		var panelHeight = 220 + stageRows * 26;
 		var x = margin;
 		var y = 172;
 		var safeVy = rocket.fragileCargo ?
@@ -702,7 +722,7 @@
 		context.fillText('PILOT & CARGO', x + 16, y + 22);
 		context.textAlign = 'right';
 		context.fillStyle = R.autopilot.enabled ? '#7de0ca' : '#f4c76a';
-		context.fillText(R.autopilot.enabled ? 'AUTOPILOT' : 'MANUAL · YOU FLY', x + panelWidth - 16, y + 22);
+		context.fillText(pilotModeLabel(), x + panelWidth - 16, y + 22);
 
 		// Vertical speed against the world or fragile touchdown limit.
 		context.textAlign = 'left';
@@ -815,7 +835,32 @@
 		context.textAlign = 'right';
 		context.fillStyle = nextIndex >= 0 && !R.autopilot.enabled ? '#f4c76a' : '#e7eff6';
 		context.fillText(nextIndex >= 0 ? (R.autopilot.enabled ? 'AUTO STAGE' : 'SPACE SEPARATES') : 'FINAL STAGE',
-			x + panelWidth - 16, rowY + 36);
+		x + panelWidth - 16, rowY + 36);
+
+		// How to switch pilots is a control row like the three above it: the
+		// key named here is the same one the flight strip button presses.
+		context.textAlign = 'left';
+		context.fillStyle = '#a8bac2';
+		context.fillText('PILOT', x + 16, rowY + 54);
+		context.textAlign = 'right';
+		context.fillStyle = '#e7eff6';
+		context.fillText(R.autopilot.enabled ? 'A · TAKE OVER' : 'A · HAND TO AUTOPILOT',
+		x + panelWidth - 16, rowY + 54);
+	}
+
+	// A cold manual start sits on the pad until the player lights the engine,
+	// so the prompt is drawn attached to the rocket and disappears on thrust.
+	function drawLaunchPrompt(context, rx, ry) {
+		var y = ry - 118;
+
+		drawPanel(context, rx - 148, y, 296, 44);
+		context.textAlign = 'center';
+		context.fillStyle = '#f4c76a';
+		context.font = '600 11px ui-monospace, SFMono-Regular, Menlo, monospace';
+		context.fillText(launchPrompt, rx, y + 18);
+		context.fillStyle = '#c8ddd9';
+		context.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
+		context.fillText(launchPromptDetail, rx, y + 34);
 	}
 
 	function drawFlightGuides(context, game) {
@@ -867,6 +912,11 @@
 			context.textAlign = 'center';
 			context.fillStyle = '#f4c76a';
 			context.fillText(deltaX > 0 ? 'TARGET ►' : '◄ TARGET', rx, ry - 46);
+		}
+		// A cold manual start sits at pad level with the engine unlit, and the
+		// rocket does not move until the player throttles up.
+		if (!R.autopilot.enabled && rocket.throttle <= 0 && rocket.wy <= 0) {
+			drawLaunchPrompt(context, rx, ry);
 		}
 		context.restore();
 	}
