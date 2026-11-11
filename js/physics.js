@@ -26,6 +26,43 @@
 		return planet.seaLevelDensity * Math.exp(-Math.max(0, altitude) / planet.atmosphereScaleHeight);
 	};
 
+	// The inverse-square field above is the derivative of this potential, so
+	// an escape-speed readout cannot disagree with the integrator.
+	physics.gravitationalParameter = function() {
+		var planet = R.world.planet;
+
+		return planet.surfaceGravity * planet.radius * planet.radius;
+	};
+
+	physics.escapeSpeedAtAltitude = function(altitude) {
+		var r = R.world.planet.radius + Math.max(0, altitude);
+
+		return Math.sqrt(2 * physics.gravitationalParameter() / r);
+	};
+
+	physics.circularSpeedAtAltitude = function(altitude) {
+		var r = R.world.planet.radius + Math.max(0, altitude);
+
+		return Math.sqrt(physics.gravitationalParameter() / r);
+	};
+
+	// Where the exponential atmosphere has thinned to the space fraction;
+	// an airless world has no ceiling line at all.
+	physics.atmosphereTop = function() {
+		var planet = R.world.planet;
+
+		if (planet.seaLevelDensity <= 0) {
+			return 0;
+		}
+		return planet.atmosphereScaleHeight * Math.log(1 / R.constants.sky.atmosphereDensityFraction);
+	};
+
+	physics.isUnbound = function(rocket) {
+		var speed = Math.sqrt(rocket.vx * rocket.vx + rocket.vy * rocket.vy);
+
+		return rocket.wy > physics.atmosphereTop() && speed >= physics.escapeSpeedAtAltitude(rocket.wy);
+	};
+
 	physics.step = function(game, dt) {
 		var state = game.rocket;
 		var planet = R.world.planet;

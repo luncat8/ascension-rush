@@ -57,11 +57,12 @@ experiments/logs/0.5.2-balance-pressure-damage.txt - the same balance bands with
 git push returns "Invalid username or token" is ok, no need to investigate or report - i will apply manually
 
 ## Workflow
+- **Plan names**: short descriptive filenames, e.g. `flight-sky-plan.md`,
+  `market-parts-plan.md`, `campaign-plan.md`. Subject numbers (0.3.7, 0.5.2)
+  live inside the document and in worklog names, not in plan filenames.
 - **Worklog**: record development steps and its validation in `archive/*-worklog.md`, end job with a next step suggestion.
 example:
-0.1.x-draft.md
-archive/0.1.0-plan.md
+draft.txt
+archive/world-render-plan.md
 archive/0.1.0-worklog.md
-0.1.1-plan.md
-0.1.3-draft.md - you may also write user prompts as draft files to store reference of global task
-0.1.2-plan.md
+archive/flight-controls-plan.md

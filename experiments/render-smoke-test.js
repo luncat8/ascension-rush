@@ -17,7 +17,7 @@ var canvas;
 var contextMethods = [
 	'clearRect', 'fillRect', 'beginPath', 'moveTo', 'lineTo', 'quadraticCurveTo',
 	'closePath', 'fill', 'stroke', 'arc', 'fillText', 'save', 'translate',
-	'rotate', 'restore'
+	'rotate', 'restore', 'clip'
 ];
 var i;
 
@@ -103,6 +103,8 @@ require('../js/mission.js');
 require('../js/aerodynamics.js');
 require('../js/physics.js');
 require('../js/trajectory.js');
+require('../js/sky.js');
+require('../js/flight-path.js');
 require('../js/autopilot.js');
 require('../js/planner.js');
 require('../js/operations.js');
@@ -129,6 +131,17 @@ R.render.draw({
 	targetPadId: R.world.targetPadId,
 	rocket: R.rocket.create(R.world.findPadById(R.world.currentPadId))
 });
+
+// The inter-planet sky is drawn from the same world record: a labelled star,
+// the atmosphere ceiling, and a surface escape speed from GM.
+assert.ok(drawnText.indexOf('HELIOS') >= 0, 'the star is labelled in the sky');
+assert.ok(drawnText.indexOf('LUNE') >= 0, 'a moon is labelled in the sky');
+assert.ok(drawnText.some(function(text) {
+	return text.indexOf('ATMOSPHERE TOP') >= 0;
+}), 'the atmosphere ceiling is labelled');
+assert.ok(drawnText.indexOf('ESCAPE SPEED') >= 0, 'the deck quotes surface escape speed');
+assert.equal(R.sky.view.planetId, 'verdant', 'the sky view is seeded for the live world');
+assert.equal(R.camera.ceiling, R.world.planet.maxAltitude, 'the deck keeps the planet log range');
 
 R.input.pointerActive = true;
 R.input.pointerX = 620;

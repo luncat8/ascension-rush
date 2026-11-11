@@ -4,10 +4,12 @@
 	var R = root.R || (root.R = {});
 	var coords = R.coords || (R.coords = {});
 
+	// Log-radial cylinder: wrap-X is a longitude, log-Y is altitude above the
+	// surface. Both directions read the camera's live scale, so an eased zoom
+	// stays invertible at every frame.
 	coords.worldToScreen = function(wx, wy, camera, out) {
-		var planet = R.world.planet;
-		var altitude = R.util.clamp(wy, 0, planet.maxAltitude);
-		var altitudeFraction = Math.log1p(altitude / planet.logAltitudeScale) / camera.altitudeLogRange;
+		var altitude = R.util.clamp(wy, 0, camera.ceiling);
+		var altitudeFraction = Math.log1p(altitude / camera.logScale) / camera.altitudeLogRange;
 
 		out.x = (wx - camera.leftWx) * camera.pixelsPerMeterX;
 		out.y = camera.groundY - camera.usableHeight * altitudeFraction;
@@ -15,12 +17,11 @@
 	};
 
 	coords.screenToWorld = function(sx, sy, camera, out) {
-		var planet = R.world.planet;
 		var altitudeExponent = (camera.groundY - sy) * camera.altitudeLogRange / camera.usableHeight;
 
 		out.x = camera.leftWx + sx / camera.pixelsPerMeterX;
-		out.y = planet.logAltitudeScale * Math.expm1(altitudeExponent);
-		out.y = R.util.clamp(out.y, 0, planet.maxAltitude);
+		out.y = camera.logScale * Math.expm1(altitudeExponent);
+		out.y = R.util.clamp(out.y, 0, camera.ceiling);
 		return out;
 	};
 

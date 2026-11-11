@@ -100,7 +100,7 @@ factor, engine dry mass `60 kg + thrust / 150 N/kg`, sea/vacuum Isp `265/330 s`,
 drag coefficient `0.22` on a `1.6 m²` reference area. Prices start at `$1.40/kg`
 fuel, `$2.50/kg` dry structure and `$60/kg` delivered payload, with `$30,000`
 starting cash. Circumference, gravity, atmosphere, pad layout, prices and the
-reference build are per-planet (`archive/0.3.0-plan.md`); the sizes are the balance lever,
+reference build are per-planet (`archive/autopilot-planets-plan.md`); the sizes are the balance lever,
 so a world is tuned by moving its pads closer, not by inflating its rockets.
 
 Tune the values and measure with `node experiments/envelope.js <planet>` rather

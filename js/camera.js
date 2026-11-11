@@ -10,10 +10,26 @@
 	camera.groundY = 1;
 	camera.usableHeight = 1;
 	camera.pixelsPerMeterX = 1;
+	camera.logScale = 0;
+	camera.ceiling = 0;
 	camera.altitudeLogRange = 1;
+	camera.planetId = '';
 
-	// Recompute every derived value from the active planet and viewport.
-	// Called again after a planet switch, when the circumference changes.
+	camera.applyRange = function() {
+		camera.altitudeLogRange = Math.log1p(camera.ceiling / camera.logScale);
+	};
+
+	// The only writer of the altitude transform. sky.js eases these values;
+	// coords.js reads them for both the forward and the inverse projection.
+	camera.setRange = function(logScale, ceiling) {
+		camera.logScale = Math.max(1e-3, logScale);
+		camera.ceiling = Math.max(camera.logScale, ceiling);
+		camera.applyRange();
+	};
+
+	// Recompute derived values from the active planet and viewport. A planet
+	// change resets the range to that world's defaults; a resize keeps the
+	// eased range so the view does not jump when the window changes.
 	camera.configure = function() {
 		var planet = R.world.planet;
 		var view = R.constants.view;
@@ -21,7 +37,12 @@
 		camera.pixelsPerMeterX = camera.width / planet.circumference;
 		camera.groundY = camera.height * (1 - view.groundFraction);
 		camera.usableHeight = camera.groundY;
-		camera.altitudeLogRange = Math.log1p(planet.maxAltitude / planet.logAltitudeScale);
+		if (camera.planetId !== planet.id) {
+			camera.planetId = planet.id;
+			camera.setRange(planet.logAltitudeScale, planet.maxAltitude);
+			return;
+		}
+		camera.applyRange();
 	};
 
 	camera.resize = function(width, height) {

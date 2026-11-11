@@ -79,7 +79,7 @@ so they also run under node (for experiments/). Use single-tab indent, LF.
 For 0.1 the planet has only these parameters (see `constants.js`):
 - `C` circumference (m). The default world is 20 000 m: small on purpose, so a
   hop between pads is a few kilometres and a circumnavigation is still a real
-  flight. See the preset table in `archive/0.3.0-plan.md`.
+  flight. See the preset table in `archive/autopilot-planets-plan.md`.
 - `g0` surface gravity (m/s²), default 9.81.
 - `R` implied radius = `C / (2π)` (informational, used later for gravity
   falloff and atmospheric density).

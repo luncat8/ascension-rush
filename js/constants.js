@@ -7,7 +7,43 @@
 	// Viewport layout shared by every planet.
 	constants.view = {
 		groundFraction: 0.1,
-		cameraAnchorFraction: 1 / 3
+		cameraAnchorFraction: 1 / 3,
+		// A world switch morphs the visual gravity / radius / log scale over
+		// this many real seconds; the physics switches at the run boundary.
+		transformSeconds: 1.1,
+		// The celestial dome occupies the top share of the usable height, and
+		// its azimuth is clamped to this angle from local vertical (rad).
+		skyBandFraction: 0.55,
+		skyHorizonAngle: 1.45,
+		minBodyRadius: 2,
+		maxBodyRadius: 46
+	};
+
+	// Inter-planet sky. Distances and radii are in active-planet radii, so one
+	// catalog reads correctly on every world. Bodies are visual in 0.3.7: they
+	// add no force to the point-mass integrator.
+	constants.sky = {
+		atmosphereDensityFraction: 1e-4,
+		approachLogSpan: 2.2,
+		ceilingMargin: 1.25,
+		bodyScaleFraction: 0.22,
+		easeTau: 0.35,
+		trailInterval: 0.2,
+		trailCapacity: 320,
+		traceStrideSteps: 42,
+		traceCapacity: 256,
+		bodies: [
+			{ id: 'helios', name: 'Helios', kind: 'star', color: '#ffe6ae', shade: '#8a6a3a',
+				distanceRadii: 2600, radiusRadii: 170, longitude: 0.06, orbitRate: 0 },
+			{ id: 'vesper', name: 'Vesper', kind: 'planet', color: '#8fa9d8', shade: '#2b3f68',
+				distanceRadii: 430, radiusRadii: 30, longitude: -0.19, orbitRate: 0.0009 },
+			{ id: 'ember', name: 'Ember', kind: 'planet', color: '#d98b6a', shade: '#5b2c25',
+				distanceRadii: 1180, radiusRadii: 62, longitude: 0.23, orbitRate: 0.0004 },
+			{ id: 'lune', name: 'Lune', kind: 'moon', color: '#d6ded9', shade: '#3d4a4d',
+				distanceRadii: 24, radiusRadii: 2.1, longitude: 0.13, orbitRate: 0.0022 },
+			{ id: 'pale', name: 'Pale', kind: 'moon', color: '#a9b6c8', shade: '#364150',
+				distanceRadii: 58, radiusRadii: 3.2, longitude: -0.09, orbitRate: 0.0013 }
+		]
 	};
 
 	constants.rocket = {

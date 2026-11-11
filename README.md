@@ -2,8 +2,8 @@
 
 A small 2D rocket-delivery game: wrap-around planets, staged rockets, manual
 flight or autopilot, pad-to-pad delivery, fuel/hull/payload economics, a
-logarithmic altitude view, in-flight damage and failures, and a competing
-logistics company.
+logarithmic altitude view with an adaptive inter-planet sky, in-flight damage
+and failures, and a competing logistics company.
 
 ## Status
 The 0.1 world/render scaffold, the 0.2 playable flight slice, the 0.3
@@ -110,11 +110,29 @@ fleet and routes start over. The world menu shows each world as locked (with
 the milestone that opens it), in progress or dominant, and the campaign is kept
 in the browser's local storage until "Start a new campaign" erases it.
 
-## Plans (subject-numbered, not version sequence)
+The **0.3.7** inter-planet sky slice puts a visual system above the atmosphere:
+a star, two planets and two moons placed by an azimuthal projection from their
+orbit geometry, a labelled atmosphere ceiling, adaptive decade altitude marks,
+and a solid flown trail beside the dashed engine-off coast trace. Surface and
+current escape speeds come from `sqrt(2 * g0 * R^2 / r)`, the same GM the
+integrator uses, and an above-atmosphere rocket at that speed is marked
+`UNBOUND`. As the rocket climbs toward a body the camera's log knee and ceiling
+ease toward it; a world switch morphs gravity, radius, air ceiling and scale
+over about a second instead of snapping. No force, route, price or flight
+report changes. The 0.3.8 gravity / Lagrange-point work is an experiment phase
+in the plan, not wired into the flight loop.
+
+Plans now use short descriptive filenames (`flight-sky-plan.md`,
+`market-parts-plan.md`, …); subject numbers like 0.3.7 stay inside the
+documents and in worklog names.
+
+## Plans (subject numbers inside, short descriptive filenames)
 Active:
-- [`0.6-plan.md`](./0.6-plan.md) — Milestones & campaign arc: company milestones, rewards, world unlocks and a dominant-courier end condition.
-- [`0.5-plan.md`](./0.5-plan.md) — Damage & failures (0.5.1) and competitor pressure (0.5.2), both shipped.
-- [`0.4-plan.md`](./0.4-plan.md) — Economy balance, parts catalog with service/repair, market prices & contract board.
+- [`flight-sky-plan.md`](./flight-sky-plan.md) — Aerodynamics, safer guidance, flight diagnostics (0.3.1–0.3.4) and the inter-planet sky / escape-speed / adaptive-projection phase (0.3.7, with 0.3.8 as a gravity experiment).
+- [`campaign-plan.md`](./campaign-plan.md) — Milestones & campaign arc: company milestones, rewards, world unlocks and a dominant-courier end condition.
+- [`deck-hud-plan.md`](./deck-hud-plan.md) — Self-explained deck & HUD.
+- [`damage-rivals-plan.md`](./damage-rivals-plan.md) — Damage & failures (0.5.1) and competitor pressure (0.5.2), both shipped.
+- [`market-parts-plan.md`](./market-parts-plan.md) — Economy balance, parts catalog with service/repair, market prices & contract board.
 
 Increments of the active plans, recorded in `archive/` as they land:
 - [`archive/0.6.2-worklog.md`](./archive/0.6.2-worklog.md) — Campaign record, four world ladders, gated world menu, settlement card, measured reference runs (0.6.2).
@@ -124,13 +142,12 @@ Increments of the active plans, recorded in `archive/` as they land:
 - [`archive/0.4.1-worklog.md`](./archive/0.4.1-worklog.md) — Pad markets & contract board (0.4.1).
 - [`archive/0.3.6-worklog.md`](./archive/0.3.6-worklog.md) — Operations deck review fixes (0.3.6).
 
-Implemented, kept in `archive/` next to their worklogs (the completed 0.3.x
-umbrella plan remains at the repository root):
-- [`0.3.x-plan.md`](./0.3.x-plan.md) — Aerodynamics, Q / acceleration-aware autopilot, drag-aware impact prediction, flight diagnostics, and staging authority (0.3.1–0.3.4).
-- [`archive/0.3.5-plan-Autopilot-Operations.md`](./archive/0.3.5-plan-Autopilot-Operations.md) — Operations deck: pad-to-pad dispatch, return flights, fleet availability, flight log, reusable automatic routes.
-- [`archive/0.1.0-plan.md`](./archive/0.1.0-plan.md) — World, canvas scaffold, log-Y wrap-X planet, launch pads, triangle rocket.
-- [`archive/0.2.0-plan.md`](./archive/0.2.0-plan.md) — Rocket physics, stage builder, manual flight controls, time scale, first-pass economy & landing.
-- [`archive/0.3.0-plan.md`](./archive/0.3.0-plan.md) — Autopilot (pad-to-pad + landing) and planet presets (gravity / atmo / size / reference build).
+Shipped earlier increments, kept beside their worklogs (the 0.3.x umbrella
+plan is active again at the repository root for the sky phase):
+- [`archive/operations-deck-plan.md`](./archive/operations-deck-plan.md) — Operations deck: pad-to-pad dispatch, return flights, fleet availability, flight log, reusable automatic routes.
+- [`archive/world-render-plan.md`](./archive/world-render-plan.md) — World, canvas scaffold, log-Y wrap-X planet, launch pads, triangle rocket.
+- [`archive/flight-controls-plan.md`](./archive/flight-controls-plan.md) — Rocket physics, stage builder, manual flight controls, time scale, first-pass economy & landing.
+- [`archive/autopilot-planets-plan.md`](./archive/autopilot-planets-plan.md) — Autopilot (pad-to-pad + landing) and planet presets (gravity / atmo / size / reference build).
 - [`archive/0.3.3-worklog.md`](./archive/0.3.3-worklog.md), [`archive/0.3.4-worklog.md`](./archive/0.3.4-worklog.md), [`archive/0.3.5-worklog.md`](./archive/0.3.5-worklog.md) — the 0.3.x follow-ups: aero loads, envelope autopilot, coast-impact prediction and debrief, staging authority, operations deck.
 
 Original draft is preserved verbatim in
@@ -144,6 +161,7 @@ tags, `file://`-friendly). Node smoke/regression tests:
 
 ```sh
 node experiments/coords-test.js
+node experiments/sky-test.js               # escape speed, sky projection, adaptive log scale
 node experiments/aerodynamics-test.js
 node experiments/flight-test.js
 node experiments/builder-test.js            # rocket-type workshop, snapshots

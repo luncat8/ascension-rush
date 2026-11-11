@@ -3,12 +3,16 @@
 
 	var R = root.R || (root.R = {});
 	var render = R.render || (R.render = {});
+	// Decade ladder; only marks inside the camera's live ceiling are drawn, so
+	// a zoom never stacks clamped labels on the top edge.
 	var altitudeMarks = [
+		{ altitude: 10, label: '10 m' },
 		{ altitude: 100, label: '100 m' },
 		{ altitude: 1000, label: '1 km' },
 		{ altitude: 10000, label: '10 km' },
 		{ altitude: 100000, label: '100 km' },
-		{ altitude: 1000000, label: '1,000 km' }
+		{ altitude: 1000000, label: '1,000 km' },
+		{ altitude: 10000000, label: '10,000 km' }
 	];
 
 	render.context = null;
@@ -22,8 +26,13 @@
 		rocket: { x: 0, y: 0 },
 		explosion: { x: 0, y: 0 },
 		crosshair: { x: 0, y: 0 },
-		coast: { x: 0, y: 0 }
+		coast: { x: 0, y: 0 },
+		marker: { x: 0, y: 0 },
+		path: { x: 0, y: 0 }
 	};
+	// Cached so the atmosphere label does not build a string per frame.
+	render.airLabel = { key: -1, text: 'ATMOSPHERE TOP' };
+	render.airY = 0;
 	render.timeLabel = { index: -1, text: 'x1' };
 	// The pad pair the map highlights: the leg in flight, a mission waiting for
 	// its return, or the dispatch form's selection. Filled in place per frame.
@@ -252,6 +261,188 @@
 		context.globalAlpha = 1;
 	}
 
+	// Space above the atmosphere ceiling is darker than the air column below
+	// it. Both read the eased ceiling, so a world switch moves the line instead
+	// of replacing it.
+	function drawSkyShade(context) {
+		var camera = R.camera;
+		var point = render.scratch.marker;
+
+		R.camera.project(0, R.sky.view.atmosphereTop, point);
+		render.airY = R.util.clamp(point.y, 0, camera.groundY);
+		context.fillStyle = 'rgba(3, 8, 20, 0.34)';
+		context.fillRect(0, 0, render.width, render.airY);
+	}
+
+	function drawAirBand(context) {
+		var camera = R.camera;
+		var airTop = R.sky.view.atmosphereTop;
+		var key = Math.round(airTop / 100);
+		var y = render.airY;
+		var label;
+
+		if (y >= camera.groundY) {
+			return;
+		}
+		context.fillStyle = 'rgba(36, 84, 112, 0.20)';
+		context.fillRect(0, y, render.width, camera.groundY - y);
+		context.fillStyle = 'rgba(150, 205, 224, 0.34)';
+		context.fillRect(0, y, render.width, 1);
+		if (key !== render.airLabel.key) {
+			render.airLabel.key = key;
+			label = key >= 10 ? (key / 10).toFixed(1) + ' km' : Math.round(airTop) + ' m';
+			render.airLabel.text = 'ATMOSPHERE TOP  ·  ' + label;
+		}
+		context.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
+		context.textAlign = 'left';
+		context.fillStyle = 'rgba(174, 216, 230, 0.82)';
+		context.fillText(render.airLabel.text, 20, y - 6);
+	}
+
+	function drawSkyBody(context, body, projection) {
+		var x = projection.x;
+		var y = projection.y;
+		var r = projection.radius;
+		var angle;
+		var i;
+
+		context.save();
+		if (body.kind === 'star') {
+			for (i = 4; i >= 1; i -= 1) {
+				context.globalAlpha = 0.05 + (5 - i) * 0.045;
+				context.beginPath();
+				context.arc(x, y, r * (1 + i * 0.65), 0, Math.PI * 2);
+				context.fillStyle = body.color;
+				context.fill();
+			}
+			context.globalAlpha = 1;
+			context.strokeStyle = 'rgba(255, 231, 174, 0.55)';
+			context.lineWidth = 1;
+			for (i = 0; i < 8; i += 1) {
+				angle = i * Math.PI / 4;
+				context.beginPath();
+				context.moveTo(x + Math.cos(angle) * r * 1.25, y + Math.sin(angle) * r * 1.25);
+				context.lineTo(x + Math.cos(angle) * r * 1.7, y + Math.sin(angle) * r * 1.7);
+				context.stroke();
+			}
+		}
+		context.beginPath();
+		context.arc(x, y, r, 0, Math.PI * 2);
+		context.clip();
+		context.fillStyle = body.color;
+		context.fillRect(x - r, y - r, r * 2, r * 2);
+		context.fillStyle = body.shade;
+		context.globalAlpha = 0.72;
+		context.beginPath();
+		context.arc(x + (1 - projection.shade) * r * 1.7, y - r * 0.18, r * 1.12, 0, Math.PI * 2);
+		context.fill();
+		context.restore();
+		context.globalAlpha = 1;
+		context.beginPath();
+		context.arc(x, y, r, 0, Math.PI * 2);
+		context.lineWidth = 1;
+		context.strokeStyle = 'rgba(226, 240, 247, 0.35)';
+		context.stroke();
+		if (render.width >= 650) {
+			context.font = '600 9px ui-monospace, SFMono-Regular, Menlo, monospace';
+			context.textAlign = 'center';
+			context.fillStyle = 'rgba(211, 228, 235, 0.82)';
+			context.fillText(body.name.toUpperCase(), x, y - r - 9);
+		}
+	}
+
+	function drawSkyBodies(context, game) {
+		var bodies = R.constants.sky.bodies;
+		var projection = R.sky.projection;
+		var i;
+
+		for (i = 0; i < bodies.length; i += 1) {
+			R.sky.projectBody(bodies[i], game, projection);
+			if (projection.visible) {
+				drawSkyBody(context, bodies[i], projection);
+			}
+		}
+	}
+
+	// One periodic copy per point: a path that crosses the world seam breaks
+	// instead of drawing a line straight across the viewport.
+	function projectPathPoint(wx, wy, out) {
+		return R.camera.project(
+			R.coords.nearestPeriodicX(wx, R.camera.leftWx, R.world.planet.circumference),
+			wy, out);
+	}
+
+	function drawCoastTrace(context) {
+		var trace = R.trajectory.trace;
+		var point = render.scratch.path;
+		var previousX = 0;
+		var began = false;
+		var i;
+
+		if (!trace || trace.count < 2) {
+			return;
+		}
+		context.save();
+		context.setLineDash(dashAim);
+		context.lineWidth = 1.4;
+		context.strokeStyle = 'rgba(100, 213, 194, 0.5)';
+		context.beginPath();
+		for (i = 0; i < trace.count; i += 1) {
+			projectPathPoint(trace.points[i * 2], trace.points[i * 2 + 1], point);
+			if (!began || Math.abs(point.x - previousX) > render.width * 0.5) {
+				context.moveTo(point.x, point.y);
+			} else {
+				context.lineTo(point.x, point.y);
+			}
+			began = true;
+			previousX = point.x;
+		}
+		context.stroke();
+		context.setLineDash(dashSolid);
+		context.restore();
+	}
+
+	function drawTrailRange(context, first, length, alpha) {
+		var path = R.flightPath;
+		var point = render.scratch.path;
+		var start = (path.head - path.count + path.capacity) % path.capacity;
+		var previousX = 0;
+		var began = false;
+		var index;
+		var i;
+
+		context.globalAlpha = alpha;
+		context.lineWidth = 1.8;
+		context.strokeStyle = '#f4c76a';
+		context.beginPath();
+		for (i = first; i < first + length; i += 1) {
+			index = (start + i) % path.capacity;
+			projectPathPoint(path.points[index * 2], path.points[index * 2 + 1], point);
+			if (!began || Math.abs(point.x - previousX) > render.width * 0.5) {
+				context.moveTo(point.x, point.y);
+			} else {
+				context.lineTo(point.x, point.y);
+			}
+			began = true;
+			previousX = point.x;
+		}
+		context.stroke();
+		context.globalAlpha = 1;
+	}
+
+	function drawTrajectories(context) {
+		var count = R.flightPath.count;
+		var tail;
+
+		drawCoastTrace(context);
+		if (count < 2) {
+			return;
+		}
+		drawTrailRange(context, 0, count, 0.26);
+		tail = Math.max(2, Math.floor(count * 0.35));
+		drawTrailRange(context, count - tail, tail, 0.85);
+	}
+
 	function drawGround(context) {
 		var groundY = R.camera.groundY;
 		var height = render.height - groundY;
@@ -268,6 +459,8 @@
 
 	function drawAltitudeScale(context) {
 		var marks = altitudeMarks;
+		var camera = R.camera;
+		var point = render.scratch.marker;
 		var i;
 		var y;
 
@@ -277,10 +470,13 @@
 		context.fillText('ALTITUDE  /  LOG SCALE', 24, 173);
 
 		for (i = 0; i < marks.length; i += 1) {
-			R.camera.project(0, marks[i].altitude, render.scratch.pad);
-			y = render.scratch.pad.y;
-			if (y < 12) {
-				y = 12;
+			if (marks[i].altitude > camera.ceiling) {
+				continue;
+			}
+			R.camera.project(0, marks[i].altitude, point);
+			y = point.y;
+			if (y < 20 || y > camera.groundY - 16) {
+				continue;
 			}
 			context.fillStyle = 'rgba(190, 215, 224, 0.26)';
 			context.fillRect(20, y, 12, 1);
@@ -397,7 +593,7 @@
 	function drawWorldPanel(context) {
 		var margin = Math.min(24, render.width * 0.05);
 		var panelWidth = 230;
-		var panelHeight = 93;
+		var panelHeight = 112;
 		var x = render.width - panelWidth - margin;
 		var y = 20;
 		var world = R.world.planet;
@@ -428,6 +624,13 @@
 		context.fillStyle = '#d3e0e1';
 		context.fillText(world.surfaceGravity, x + panelWidth - 55, y + 83);
 		context.fillText('m/s²', x + panelWidth - 16, y + 83);
+		context.textAlign = 'left';
+		context.fillStyle = '#93aebc';
+		context.fillText('ESCAPE SPEED', x + 16, y + 101);
+		context.textAlign = 'right';
+		context.fillStyle = '#f4c76a';
+		context.fillText(Math.round(R.physics.escapeSpeedAtAltitude(0)), x + panelWidth - 55, y + 101);
+		context.fillText('m/s', x + panelWidth - 16, y + 101);
 	}
 
 	function drawBar(context, x, y, width, fraction, color) {
@@ -451,7 +654,7 @@
 		var coastError;
 		var margin = Math.min(24, render.width * 0.05);
 		var panelWidth = 230;
-		var panelHeight = 427;
+		var panelHeight = 452;
 		var x = render.width - panelWidth - margin;
 		var y = 20;
 
@@ -676,10 +879,26 @@
 		context.fillStyle = '#e7eff6';
 		context.fillText(timeLabel(game), x + panelWidth - 16, y + 398);
 
+		// Escape speed is read from the same GM the integrator uses. Above the
+		// atmosphere a faster rocket is unbound in this model, which is a
+		// readout, not a mission result.
+		context.textAlign = 'left';
+		context.fillStyle = '#a8bac2';
+		context.fillText('ESCAPE', x + 16, y + 416);
+		if (R.physics.isUnbound(rocket)) {
+			context.fillStyle = '#f4c76a';
+			context.fillText('UNBOUND', x + 74, y + 416);
+		}
+		context.textAlign = 'right';
+		context.fillStyle = '#e7eff6';
+		context.fillText(Math.round(R.physics.escapeSpeedAtAltitude(rocket.wy)), x + panelWidth - 38, y + 416);
+		context.fillStyle = '#a8bac2';
+		context.fillText('m/s', x + panelWidth - 16, y + 416);
+
 		context.fillStyle = '#829ba6';
 		context.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
 		context.textAlign = 'left';
-		context.fillText('A  AUTOPILOT    [ ]  TIME    SHIFT/CTRL  THROTTLE', x + 16, y + 416);
+		context.fillText('A  AUTOPILOT    [ ]  TIME    SHIFT/CTRL  THROTTLE', x + 16, y + 438);
 	}
 
 	function drawPilotHud(context, game) {
@@ -913,6 +1132,12 @@
 			context.fillStyle = '#f4c76a';
 			context.fillText(deltaX > 0 ? 'TARGET ►' : '◄ TARGET', rx, ry - 46);
 		}
+		if (R.physics.isUnbound(rocket)) {
+			context.font = '700 10px ui-monospace, SFMono-Regular, Menlo, monospace';
+			context.textAlign = 'center';
+			context.fillStyle = '#f4c76a';
+			context.fillText('ESCAPE', rx, ry - 62);
+		}
 		// A cold manual start sits at pad level with the engine unlit, and the
 		// rocket does not move until the player throttles up.
 		if (!R.autopilot.enabled && rocket.throttle <= 0 && rocket.wy <= 0) {
@@ -1123,11 +1348,16 @@
 		context.clearRect(0, 0, render.width, render.height);
 		context.fillStyle = render.skyGradient;
 		context.fillRect(0, 0, render.width, render.height);
+		R.sky.ensure();
+		drawSkyShade(context);
 		drawStars(context);
+		drawAirBand(context);
+		drawSkyBodies(context, game);
 		drawAltitudeScale(context);
 		drawGround(context);
 		drawLegArc(context, game);
 		drawPads(context, game);
+		drawTrajectories(context);
 		drawCoastMarker(context, game);
 
 		R.camera.project(rocket.wx, rocket.wy, render.scratch.rocket);

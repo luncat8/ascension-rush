@@ -52,6 +52,10 @@
 		// The coast-impact marker is a forecast for whoever is flying: it says
 		// where the engine-off trajectory from this state reaches the ground.
 		R.trajectory.update(game);
+		// The sky view eases on real frame time; the trail samples on the
+		// simulation clock so a time-scale change keeps the same shape.
+		R.sky.update(game, dt);
+		R.flightPath.sample(game);
 		// Route scheduling and its cancellable countdown run on the deck's own
 		// clock, in real seconds, never inside the physics budget.
 		R.operations.run(game, Math.min(Math.max(0, dt), R.constants.rocket.maxFrameStep));
@@ -126,6 +130,10 @@
 		R.builder.refresh(game);
 		R.deck.reset(game);
 		R.camera.follow(game.rocket.wx);
+		// Begin the gravity / scale morph before the immediate redraw, so a
+		// world switch never snaps the camera to the new values first.
+		R.sky.update(game, 0);
+		R.flightPath.reset();
 		R.render.draw(game);
 	};
 
