@@ -42,3 +42,6 @@ player want to see clear, and better without read help text:
 3. how to launch rocket manually and by autopilot. i see button autopilot but cant find manual procedure in current version.
 4. in fly hud : how to aim, thrust, stage of multistage rockets, see fuel and delta-v remain, vertical speed, cargo
 5. plan auto route, see predicted profit per time
+
+## inter-planet
+draw trajectory above atmosphere. add other moons and planets and star and proper escape speed and log scale that change approaching to body. use proper projection and smooth transform when change body gravity . i dont know can we easy implement L points and proper gravity and visual transformations so experiment this will be next plan phase
