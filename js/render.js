@@ -39,6 +39,9 @@
 	var coastColors = ['#f28b82', '#f4c76a', '#64d5c2'];
 	// Distance unit and side of the pad, so the HUD never builds a string.
 	var coastUnits = [' m W', ' m E', ' km W', ' km E'];
+	var stageLabels = ['S1', 'S2', 'S3'];
+	var dashAim = [4, 4];
+	var dashSolid = [];
 
 	function drawPanel(context, x, y, width, height) {
 		var radius = 10;
@@ -656,7 +659,216 @@
 		context.fillStyle = '#829ba6';
 		context.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
 		context.textAlign = 'left';
-		context.fillText('A  AUTOPILOT    [ ]  TIME    SHIFT/CTRL  THROTTLE', x + 16, y + 378);
+		context.fillText('A  AUTOPILOT    [ ]  TIME    SHIFT/CTRL  THROTTLE', x + 16, y + 416);
+	}
+
+	function drawPilotHud(context, game) {
+		var rocket = game.rocket;
+		var flight = game.flight;
+		var margin = Math.min(24, render.width * 0.05);
+		var panelWidth = 250;
+		var stageRows = rocket.stageCount;
+		var panelHeight = 202 + stageRows * 26;
+		var x = margin;
+		var y = 172;
+		var safeVy = rocket.fragileCargo ?
+			R.world.planet.landingVerticalSpeed * R.constants.market.fragileSpeedFactor :
+			R.world.planet.landingVerticalSpeed;
+		var dvLeft = R.rocket.remainingDeltaV(rocket);
+		var dvMax = flight.launchDeltaV > 0 ? flight.launchDeltaV : Math.max(dvLeft, 1);
+		var fuelTotal = 0;
+		var fuelCap = 0;
+		var activeIndex = R.rocket.nextAliveStageIndex(rocket, rocket.currentStage);
+		var nextIndex = activeIndex >= 0 ? R.rocket.nextAliveStageIndex(rocket, activeIndex + 1) : -1;
+		var st;
+		var rowY;
+		var i;
+
+		if (render.width < 650) {
+			return;
+		}
+		for (i = 0; i < stageRows; i += 1) {
+			st = rocket.stages[i];
+			fuelCap += st.fuelMax;
+			if (st.alive) {
+				fuelTotal += st.fuelMass;
+			}
+		}
+
+		drawPanel(context, x, y, panelWidth, panelHeight);
+		context.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
+		context.textAlign = 'left';
+		context.fillStyle = R.constants.render.mutedText;
+		context.fillText('PILOT & CARGO', x + 16, y + 22);
+		context.textAlign = 'right';
+		context.fillStyle = R.autopilot.enabled ? '#7de0ca' : '#f4c76a';
+		context.fillText(R.autopilot.enabled ? 'AUTOPILOT' : 'MANUAL · YOU FLY', x + panelWidth - 16, y + 22);
+
+		// Vertical speed against the world or fragile touchdown limit.
+		context.textAlign = 'left';
+		context.fillStyle = '#a8bac2';
+		context.fillText('V-SPEED', x + 16, y + 44);
+		context.fillStyle = '#829ba6';
+		context.fillText('MAX', x + 76, y + 44);
+		context.fillText(safeVy.toFixed(1), x + 101, y + 44);
+		context.textAlign = 'right';
+		context.fillStyle = rocket.vy < -safeVy ? '#f1a89d' : (rocket.vy < 0 ? '#7de0ca' : '#e7eff6');
+		context.fillText(rocket.vy >= 0 ? '▲' : '▼', x + panelWidth - 82, y + 44);
+		context.fillText(Math.abs(rocket.vy).toFixed(1), x + panelWidth - 42, y + 44);
+		context.fillStyle = '#a8bac2';
+		context.fillText('m/s', x + panelWidth - 16, y + 44);
+
+		// Cargo mass, fragile warning and payout aboard.
+		context.textAlign = 'left';
+		context.fillStyle = '#a8bac2';
+		context.fillText('CARGO', x + 16, y + 64);
+		if (rocket.fragileCargo) {
+			context.fillStyle = '#f4c76a';
+			context.fillText('FRAGILE', x + 64, y + 64);
+		}
+		if (flight.rewardQuote > 0) {
+			context.fillStyle = '#91e3d3';
+			context.fillText('$', x + 124, y + 64);
+			context.fillText(Math.round(flight.rewardQuote), x + 132, y + 64);
+		}
+		context.textAlign = 'right';
+		context.fillStyle = '#e7eff6';
+		context.fillText(Math.round(rocket.payloadMass), x + panelWidth - 38, y + 64);
+		context.fillStyle = '#a8bac2';
+		context.fillText('kg', x + panelWidth - 16, y + 64);
+
+		// Remaining ideal staged delta-v.
+		context.textAlign = 'left';
+		context.fillStyle = '#a8bac2';
+		context.fillText('DELTA-V LEFT', x + 16, y + 85);
+		context.textAlign = 'right';
+		context.fillStyle = '#e7eff6';
+		context.fillText(Math.round(dvLeft), x + panelWidth - 44, y + 85);
+		context.fillStyle = '#a8bac2';
+		context.fillText('m/s', x + panelWidth - 16, y + 85);
+		drawBar(context, x + 16, y + 92, panelWidth - 32, dvLeft / dvMax, '#64d5c2');
+
+		// Total fuel left across all attached stages.
+		context.textAlign = 'left';
+		context.fillStyle = '#a8bac2';
+		context.fillText('TOTAL FUEL', x + 16, y + 114);
+		context.textAlign = 'right';
+		context.fillStyle = '#e7eff6';
+		context.fillText(Math.round(fuelTotal), x + panelWidth - 38, y + 114);
+		context.fillStyle = '#a8bac2';
+		context.fillText('kg', x + panelWidth - 16, y + 114);
+		drawBar(context, x + 16, y + 121, panelWidth - 32, fuelCap > 0 ? fuelTotal / fuelCap : 0, '#65d5c1');
+
+		// One row per stage so multistage burns and separations are readable at a glance.
+		for (i = 0; i < stageRows; i += 1) {
+			st = rocket.stages[i];
+			rowY = y + 144 + i * 26;
+			context.textAlign = 'left';
+			context.fillStyle = i === activeIndex ? '#e7eff6' : '#829ba6';
+			context.fillText(stageLabels[i], x + 16, rowY);
+			if (!st.alive) {
+				context.fillStyle = '#829ba6';
+				context.fillText('SPENT', x + 44, rowY);
+			} else if (i === activeIndex) {
+				context.fillStyle = st.fuelMass <= 0 && nextIndex >= 0 ? '#f4c76a' : '#7de0ca';
+				context.fillText(st.fuelMass <= 0 && nextIndex >= 0 ? 'EMPTY · SPACE!' : 'BURNING', x + 44, rowY);
+			} else if (i === nextIndex) {
+				context.fillStyle = '#c8ddd9';
+				context.fillText(R.autopilot.enabled ? 'NEXT · AUTO' : 'NEXT · SPACE', x + 44, rowY);
+			} else {
+				context.fillStyle = '#829ba6';
+				context.fillText('UPPER', x + 44, rowY);
+			}
+			context.textAlign = 'right';
+			context.fillStyle = st.alive ? '#e7eff6' : '#829ba6';
+			if (st.alive) {
+				context.fillText(Math.round(st.fuelMass), x + panelWidth - 38, rowY);
+				context.fillStyle = '#a8bac2';
+				context.fillText('kg', x + panelWidth - 16, rowY);
+			} else {
+				context.fillText('—', x + panelWidth - 16, rowY);
+			}
+			drawBar(context, x + 16, rowY + 6, panelWidth - 32,
+				st.alive && st.fuelMax > 0 ? st.fuelMass / st.fuelMax : 0,
+				i === activeIndex ? '#65d5c1' : '#4a6b78');
+		}
+
+		// Explicit controls legend inside the HUD.
+		rowY = y + 146 + stageRows * 26;
+		context.textAlign = 'left';
+		context.fillStyle = '#a8bac2';
+		context.fillText('AIM', x + 16, rowY);
+		context.textAlign = 'right';
+		context.fillStyle = '#e7eff6';
+		context.fillText(R.autopilot.enabled ? 'AUTO GUIDANCE' : 'MOUSE CURSOR', x + panelWidth - 16, rowY);
+
+		context.textAlign = 'left';
+		context.fillStyle = '#a8bac2';
+		context.fillText('THRUST', x + 16, rowY + 18);
+		context.textAlign = 'right';
+		context.fillStyle = '#e7eff6';
+		context.fillText(R.autopilot.enabled ? 'AUTO THROTTLE' : 'SHIFT ▲ / CTRL ▼', x + panelWidth - 16, rowY + 18);
+
+		context.textAlign = 'left';
+		context.fillStyle = '#a8bac2';
+		context.fillText('STAGE', x + 16, rowY + 36);
+		context.textAlign = 'right';
+		context.fillStyle = nextIndex >= 0 && !R.autopilot.enabled ? '#f4c76a' : '#e7eff6';
+		context.fillText(nextIndex >= 0 ? (R.autopilot.enabled ? 'AUTO STAGE' : 'SPACE SEPARATES') : 'FINAL STAGE',
+			x + panelWidth - 16, rowY + 36);
+	}
+
+	function drawFlightGuides(context, game) {
+		var rocket = game.rocket;
+		var rx = render.scratch.rocket.x;
+		var ry = render.scratch.rocket.y;
+		var speed = Math.hypot(rocket.vx, rocket.vy);
+		var vLen;
+		var vxDir;
+		var vyDir;
+		var target = R.world.findPadById(game.targetPadId);
+		var deltaX = target ? R.util.wrapDelta(target.wx - rocket.wx, R.world.planet.circumference) : 0;
+
+		// Aim tick ahead of the nose, and dashed line to cursor in manual flight.
+		context.save();
+		context.strokeStyle = 'rgba(244, 199, 106, 0.75)';
+		context.lineWidth = 1.5;
+		context.setLineDash(dashAim);
+		context.beginPath();
+		context.moveTo(rx + Math.sin(rocket.heading) * 34, ry - Math.cos(rocket.heading) * 34);
+		if (!R.autopilot.enabled && R.input.pointerActive) {
+			context.lineTo(R.input.pointerX, R.input.pointerY);
+		} else {
+			context.lineTo(rx + Math.sin(rocket.heading) * 62, ry - Math.cos(rocket.heading) * 62);
+		}
+		context.stroke();
+		context.setLineDash(dashSolid);
+
+		// Prograde velocity vector so drift and sink direction are drawn directly.
+		if (speed > 2) {
+			vLen = R.util.clamp(speed * 0.25, 20, 66);
+			vxDir = rocket.vx / speed;
+			vyDir = -rocket.vy / speed;
+			context.strokeStyle = 'rgba(100, 213, 194, 0.85)';
+			context.lineWidth = 1.8;
+			context.beginPath();
+			context.moveTo(rx, ry - 12);
+			context.lineTo(rx + vxDir * vLen, ry - 12 + vyDir * vLen);
+			context.stroke();
+			context.beginPath();
+			context.arc(rx + vxDir * vLen, ry - 12 + vyDir * vLen, 3, 0, Math.PI * 2);
+			context.fillStyle = '#64d5c2';
+			context.fill();
+		}
+
+		// Target-pad horizontal bearing above the rocket.
+		if (Math.abs(deltaX) > 60) {
+			context.font = '600 9px ui-monospace, SFMono-Regular, Menlo, monospace';
+			context.textAlign = 'center';
+			context.fillStyle = '#f4c76a';
+			context.fillText(deltaX > 0 ? 'TARGET ►' : '◄ TARGET', rx, ry - 46);
+		}
+		context.restore();
 	}
 
 	// Cached so the frame loop does not build a new string every tick.
@@ -869,11 +1081,18 @@
 		drawCoastMarker(context, game);
 
 		R.camera.project(rocket.wx, rocket.wy, render.scratch.rocket);
+		if (game.phase === 'flying') {
+			drawFlightGuides(context, game);
+		}
 		R.rocket.draw(context, render.scratch.rocket.x, render.scratch.rocket.y, rocket.heading, flameThrottle);
 		drawExplosion(context, game);
 		drawMissionPanel(context, game);
 		if (game.phase === 'flying') {
+			drawPilotHud(context, game);
 			drawFlightTelemetry(context, game);
+			if (render.width >= 650) {
+				drawStatusStrip(context, game);
+			}
 		} else {
 			drawWorldPanel(context);
 			drawStatusStrip(context, game);

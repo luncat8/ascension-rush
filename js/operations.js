@@ -584,8 +584,10 @@
 			return { ok: false, reason: operations.reasons.CONTRACT_MISMATCH };
 		}
 		operations.forgetDismissal();
-		// The campaign gates the player's profiles; the rival flies by its own rules.
-		refusal = spec.operatorId && spec.operatorId !== 'player' ? '' : operations.profileLock(spec.profileId);
+		// The campaign gates the player's profiles; the rival flies by its own
+		// rules, and a manual flight has no profile to gate.
+		refusal = spec.operatorId && spec.operatorId !== 'player' ? '' :
+			(spec.manual ? '' : operations.profileLock(spec.profileId));
 		if (refusal) {
 			return { ok: false, reason: refusal };
 		}
@@ -612,6 +614,7 @@
 			type: snapshotType(operations.findType(spec.typeId)),
 			rocketId: evaluation.rocket.id,
 			profileId: spec.profileId,
+			manual: !!spec.manual,
 			overhaul: !!spec.overhaul,
 			contractId: contract ? contract.id : null,
 			operatorId: spec.operatorId || 'player',

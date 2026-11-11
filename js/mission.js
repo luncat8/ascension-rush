@@ -83,6 +83,7 @@
 			rewardPerKg: charges.rewardPerKg,
 			fragileSpeed: charges.fragileSpeed,
 			launchMass: R.rocket.totalMass(state),
+			launchDeltaV: R.rocket.remainingDeltaV(state),
 			dryMass: charges.structureMass,
 			fuelAboard: fuelAboard(state),
 			fuelUsed: 0,
@@ -107,8 +108,9 @@
 			peakAngleOfAttackDynamicPressure: 0,
 			peakThrustAcceleration: 0,
 			peakAppliedThrustAcceleration: 0,
-			usedAutopilot: true,
-			autopilotProfile: order.profileId
+			usedAutopilot: !order.manual,
+			autopilotProfile: order.profileId,
+			manual: !!order.manual
 		};
 		game.lastReport = null;
 		game.phase = 'flying';
@@ -121,8 +123,16 @@
 		R.controls.reset();
 		R.economy.beginFlight(game, charges);
 		R.autopilot.setProfile(order.profileId);
-		R.autopilot.setEnabled(true);
 		R.autopilot.reset();
+		if (order.manual) {
+			// A manual launch starts cold: no guidance, no throttle, nose up.
+			// The pilot lights it with Shift and aims with the mouse.
+			R.autopilot.setEnabled(false);
+			state.throttle = 0;
+			state.heading = 0;
+			return game.flight;
+		}
+		R.autopilot.setEnabled(true);
 		// An autopilot launch lights the engine at the throttle the guidance
 		// wants, so an acceleration cap holds from the first step.
 		R.autopilot.update(game);

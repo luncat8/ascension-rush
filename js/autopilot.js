@@ -222,8 +222,8 @@
 	// start and end) leaves the flag alone.
 	autopilot.toggle = function() {
 		autopilot.setEnabled(!autopilot.enabled);
-		if (!autopilot.enabled && R.game && R.game.flight) {
-			R.game.flight.usedAutopilot = false;
+		if (R.game && R.game.flight) {
+			R.game.flight.usedAutopilot = autopilot.enabled;
 		}
 		return autopilot.enabled;
 	};

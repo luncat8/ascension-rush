@@ -16,6 +16,7 @@
 
   <div id="flight-strip" class="flight-strip" hidden>
     <span id="flight-strip-text"></span>
+    <button id="flight-strip-pilot" class="ghost-button" type="button">Take over (A)</button>
     <button id="flight-strip-deck" class="ghost-button" type="button">Open deck</button>
   </div>
 
@@ -84,6 +85,23 @@
         <button id="dispatch-contract-clear" class="ghost-button" type="button">Clear contract</button>
       </section>
 
+      <ol id="dispatch-steps" class="dispatch-steps" aria-label="Launch steps">
+        <li id="dispatch-step-pads"><b>1</b><span>Pick pads</span></li>
+        <li id="dispatch-step-rocket"><b>2</b><span>Rocket ready</span></li>
+        <li id="dispatch-step-mode"><b>3</b><span>Pick pilot</span></li>
+        <li id="dispatch-step-launch"><b>4</b><span>Launch</span></li>
+      </ol>
+
+      <details class="deck-details" open>
+        <summary>Best deliveries — tap to load</summary>
+        <div id="dispatch-opportunities" class="opportunity-list"></div>
+      </details>
+
+      <details class="deck-details">
+        <summary>Pads — tap From / To</summary>
+        <div id="dispatch-pads" class="pad-picker"></div>
+      </details>
+
       <div class="pad-row">
         <div class="builder-control">
           <label for="dispatch-from">From</label>
@@ -121,6 +139,10 @@
         <label for="dispatch-type">Rocket type</label>
         <select id="dispatch-type"></select>
       </div>
+      <details class="deck-details" open>
+        <summary>Compare types on this route</summary>
+        <div id="dispatch-compare" class="type-compare"></div>
+      </details>
       <div class="builder-control">
         <label for="dispatch-rocket">Rocket at this pad</label>
         <select id="dispatch-rocket"></select>
@@ -134,6 +156,13 @@
         <button id="dispatch-maintenance-buy" class="ghost-button" type="button">Add overhaul to this leg</button>
       </section>
 
+      <fieldset class="segmented" id="dispatch-pilot">
+        <legend>Pilot</legend>
+        <label><input id="dispatch-pilot-auto" type="radio" name="dispatch-pilot" checked> Autopilot flies</label>
+        <label><input id="dispatch-pilot-manual" type="radio" name="dispatch-pilot"> I fly (manual)</label>
+      </fieldset>
+      <p class="builder-hint" id="dispatch-pilot-hint">Autopilot flies the whole leg and charges 10% of the payout. Manual starts cold: Shift lights the engine, mouse aims, Space stages, A hands back.</p>
+
       <div class="builder-control builder-row autopilot-profile">
         <label for="dispatch-profile">Autopilot profile</label>
         <select id="dispatch-profile"></select>
@@ -141,13 +170,15 @@
       <p class="builder-hint" id="dispatch-profile-hint"></p>
 
       <section class="build-summary" id="dispatch-summary" aria-label="Dispatch summary"></section>
+      <div id="dispatch-capacity" class="capacity-bar" aria-label="Payload against bay and demand"></div>
       <p id="dispatch-blocked" class="builder-warning" aria-live="polite" hidden></p>
       <button id="dispatch-send" class="launch-button" type="button">Send on autopilot</button>
+      <button id="dispatch-send-manual" class="ghost-button wide" type="button">Fly it yourself — manual launch</button>
       <div class="deck-actions">
         <button id="dispatch-save-route" class="ghost-button" type="button">Save as route…</button>
         <button id="dispatch-workshop" class="ghost-button" type="button">Rocket workshop…</button>
       </div>
-      <p class="builder-help">Mouse aims · Shift/Ctrl throttle · Space stages · A autopilot · [ ] time scale</p>
+      <p class="builder-help">Manual: mouse aims · Shift throttle up · Ctrl throttle down · Space stages · A autopilot · [ ] time scale</p>
     </section>
 
     <section id="view-market" class="deck-view" role="tabpanel" aria-labelledby="tab-market" tabindex="0" hidden>
@@ -165,6 +196,10 @@
       </section>
       <p class="builder-hint">Prices drift with every finished leg. A contract pays its posted rate per kg
         wherever it is flown; a standing service sells at the destination's current price.</p>
+      <details class="deck-details" open>
+        <summary>Best trades now — tap to load</summary>
+        <div id="market-opportunities" class="opportunity-list"></div>
+      </details>
       <div id="market-list" class="card-list"></div>
     </section>
 
@@ -262,6 +297,12 @@
         <p id="workshop-structure-detail" class="builder-hint"></p>
       </section>
 
+      <figure class="workshop-plot">
+        <figcaption>Delta-v vs payload — dot is the design payload, line is the bay limit</figcaption>
+        <canvas id="workshop-plot" width="640" height="360" aria-label="Delta-v versus payload plot"></canvas>
+        <p id="workshop-plot-caption" class="builder-hint"></p>
+      </figure>
+
       <p id="workshop-fleet" class="builder-hint"></p>
       <p id="workshop-warning" class="builder-warning" aria-live="polite"></p>
       <button id="workshop-save" class="launch-button" type="button">
@@ -330,6 +371,7 @@
       <label class="builder-toggle"><input id="route-enabled" type="checkbox"> Enabled — the scheduler may offer this route</label>
       <label class="builder-toggle"><input id="route-auto-launch" type="checkbox"> Auto-launch when ready, after one delivered leg</label>
 
+      <p id="route-profit" class="builder-hint" aria-live="polite"></p>
       <p id="route-warning" class="builder-warning" aria-live="polite"></p>
       <button id="route-review-save" class="launch-button" type="button">Save route</button>
     </section>
@@ -382,6 +424,7 @@
 <script src="js/physics.js"></script>
 <script src="js/trajectory.js"></script>
 <script src="js/autopilot.js"></script>
+<script src="js/planner.js"></script>
 <script src="js/operations.js"></script>
 <script src="js/competitor.js"></script>
 <script src="js/campaign.js"></script>

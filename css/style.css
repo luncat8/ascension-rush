@@ -1195,6 +1195,246 @@ input[type="range"] {
 	white-space: nowrap;
 }
 
+.dispatch-steps {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	gap: 6px;
+	margin: 0 0 12px;
+	padding: 0;
+	list-style: none;
+}
+
+.dispatch-steps li {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 7px 8px;
+	border: 1px solid rgba(150, 180, 194, 0.18);
+	border-radius: 8px;
+	background: rgba(18, 39, 53, 0.6);
+	color: #9db3bd;
+	font-size: 10px;
+}
+
+.dispatch-steps li b {
+	display: grid;
+	place-items: center;
+	width: 18px;
+	height: 18px;
+	border-radius: 50%;
+	background: rgba(150, 180, 194, 0.16);
+	color: #c8ddd9;
+	font: 10px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.dispatch-steps li.done {
+	border-color: rgba(100, 213, 194, 0.5);
+	color: #a9eee2;
+}
+
+.dispatch-steps li.done b {
+	background: #64d5c2;
+	color: #071322;
+}
+
+.deck-details {
+	margin: 0 0 12px;
+	border: 1px solid rgba(150, 180, 194, 0.16);
+	border-radius: 9px;
+	background: rgba(18, 39, 53, 0.45);
+}
+
+.deck-details summary {
+	padding: 9px 11px;
+	color: #c8ddd9;
+	font-size: 12px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.deck-details > div {
+	padding: 0 11px 11px;
+}
+
+.pad-picker {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 8px;
+}
+
+.pad-card {
+	padding: 9px;
+	border: 1px solid rgba(150, 180, 194, 0.18);
+	border-radius: 9px;
+	background: #0b1b28;
+}
+
+.pad-card.is-from {
+	border-color: rgba(244, 199, 106, 0.6);
+}
+
+.pad-card.is-to {
+	border-color: rgba(100, 213, 194, 0.6);
+}
+
+.pad-card strong {
+	display: block;
+	font-size: 12px;
+}
+
+.pad-card small {
+	display: block;
+	margin-top: 3px;
+	color: #9db3bd;
+	font: 10px ui-monospace, SFMono-Regular, Menlo, monospace;
+	line-height: 1.5;
+}
+
+.pad-card .pad-actions {
+	display: flex;
+	gap: 6px;
+	margin-top: 7px;
+}
+
+.pad-card .pad-actions button {
+	flex: 1;
+}
+
+.opportunity-list,
+.type-compare {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.opportunity-row,
+.compare-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	width: 100%;
+	padding: 8px 9px;
+	border: 1px solid rgba(150, 180, 194, 0.18);
+	border-radius: 8px;
+	background: #0b1b28;
+	color: #e7eff6;
+	text-align: left;
+	cursor: pointer;
+}
+
+.opportunity-row:hover,
+.compare-row:hover {
+	border-color: rgba(125, 224, 202, 0.55);
+}
+
+.compare-row.selected {
+	border-color: rgba(100, 213, 194, 0.7);
+	background: rgba(100, 213, 194, 0.08);
+}
+
+.opportunity-row .opp-main,
+.compare-row .opp-main {
+	min-width: 0;
+}
+
+.opportunity-row strong,
+.compare-row strong {
+	display: block;
+	font-size: 12px;
+}
+
+.opportunity-row small,
+.compare-row small {
+	display: block;
+	margin-top: 2px;
+	color: #9db3bd;
+	font: 10px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.opportunity-row .opp-profit,
+.compare-row .opp-profit {
+	text-align: right;
+	font: 600 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+	white-space: nowrap;
+}
+
+.opp-profit.positive {
+	color: #91e3d3;
+}
+
+.opp-profit.negative {
+	color: #f1a89d;
+}
+
+.fit-badge {
+	display: inline-block;
+	margin-top: 3px;
+	padding: 2px 6px;
+	border-radius: 999px;
+	background: rgba(100, 213, 194, 0.14);
+	color: #a9eee2;
+	font: 9px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.fit-badge.blocked {
+	background: rgba(242, 139, 130, 0.16);
+	color: #f1a89d;
+}
+
+.capacity-bar {
+	margin: 8px 0 4px;
+}
+
+.capacity-bar .capacity-track {
+	position: relative;
+	height: 10px;
+	border-radius: 999px;
+	background: rgba(173, 197, 207, 0.14);
+	overflow: hidden;
+}
+
+.capacity-bar .capacity-fill {
+	position: absolute;
+	inset: 0 auto 0 0;
+	background: #64d5c2;
+}
+
+.capacity-bar .capacity-demand {
+	position: absolute;
+	top: -2px;
+	bottom: -2px;
+	width: 2px;
+	background: #f4c76a;
+}
+
+.capacity-bar small {
+	display: block;
+	margin-top: 4px;
+	color: #9db3bd;
+	font: 10px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.workshop-plot {
+	margin: 12px 0 4px;
+}
+
+.workshop-plot figcaption {
+	margin-bottom: 6px;
+	color: #c8ddd9;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.workshop-plot canvas {
+	display: block;
+	width: 100%;
+	height: auto;
+	border: 1px solid rgba(150, 180, 194, 0.18);
+	border-radius: 9px;
+	background: #0b1b28;
+}
+
 @media (prefers-reduced-motion: reduce) {
 	* {
 		transition: none !important;

@@ -229,6 +229,122 @@
 		}
 		ui.warning.textContent = warning;
 		ui.build.disabled = !builder.padId || R.game.cash < estimatedCost;
+		drawPlot(stats, capacity);
+	}
+
+	function drawPlot(stats, capacity) {
+		var curve;
+		var emptyDv;
+		var limitDv;
+		var context;
+		var width;
+		var height;
+		var left = 58;
+		var right = 20;
+		var top = 22;
+		var bottom = 38;
+		var plotW;
+		var plotH;
+		var maxPayload;
+		var maxDv;
+		var x;
+		var y;
+		var k;
+
+		if (!R.planner) {
+			return;
+		}
+		curve = R.planner.deltaVCurve(builder.draft, 16);
+		emptyDv = curve[0].deltaV;
+		limitDv = curve[curve.length - 1].deltaV;
+		if (ui.plotCaption) {
+			ui.plotCaption.textContent = '0 kg: ' + formatMass(emptyDv) + ' m/s · design ' +
+				formatMass(builder.draft.nominalPayload) + ' kg: ' + formatMass(stats.deltaV) +
+				' m/s · bay limit ' + formatMass(capacity) + ' kg: ' + formatMass(limitDv) + ' m/s';
+		}
+		if (!ui.plot || !ui.plot.getContext) {
+			return;
+		}
+		context = ui.plot.getContext('2d');
+		if (!context || !context.stroke) {
+			return;
+		}
+		width = ui.plot.width || 640;
+		height = ui.plot.height || 360;
+		plotW = width - left - right;
+		plotH = height - top - bottom;
+		maxPayload = Math.max(capacity, settings.maxPayloadMass, 100);
+		maxDv = Math.max(1000, Math.ceil(emptyDv / 1000) * 1000);
+
+		context.clearRect(0, 0, width, height);
+		context.fillStyle = '#0b1b28';
+		context.fillRect(0, 0, width, height);
+
+		context.font = '12px ui-monospace, SFMono-Regular, Menlo, monospace';
+		context.strokeStyle = 'rgba(150, 180, 194, 0.16)';
+		context.lineWidth = 1;
+		for (k = 0; k <= 4; k += 1) {
+			y = top + plotH * (1 - k / 4);
+			context.beginPath();
+			context.moveTo(left, y);
+			context.lineTo(left + plotW, y);
+			context.stroke();
+			context.fillStyle = '#9db3bd';
+			context.textAlign = 'right';
+			context.fillText(String(Math.round(maxDv * k / 4)), left - 8, y + 4);
+		}
+		for (k = 0; k <= 4; k += 1) {
+			x = left + plotW * (k / 4);
+			context.beginPath();
+			context.moveTo(x, top);
+			context.lineTo(x, top + plotH);
+			context.stroke();
+			context.fillStyle = '#9db3bd';
+			context.textAlign = 'center';
+			context.fillText(Math.round(maxPayload * k / 4) + ' kg', x, top + plotH + 20);
+		}
+		context.fillStyle = '#9db3bd';
+		context.textAlign = 'left';
+		context.fillText('dV (m/s)', 8, 15);
+
+		// Bay-limit line: past this payload launch TWR drops below the world minimum.
+		x = left + plotW * Math.min(1, capacity / maxPayload);
+		context.strokeStyle = 'rgba(244, 199, 106, 0.75)';
+		context.lineWidth = 1.5;
+		context.beginPath();
+		context.moveTo(x, top);
+		context.lineTo(x, top + plotH);
+		context.stroke();
+		context.fillStyle = '#f4c76a';
+		context.textAlign = x > left + plotW - 90 ? 'right' : 'left';
+		context.fillText('LIMIT ' + capacity + ' kg', x + (x > left + plotW - 90 ? -6 : 6), top + 14);
+
+		// Delta-v vs payload curve across the legal bay.
+		context.beginPath();
+		for (k = 0; k < curve.length; k += 1) {
+			x = left + plotW * (curve[k].payload / maxPayload);
+			y = top + plotH * (1 - Math.min(1, curve[k].deltaV / maxDv));
+			if (k === 0) {
+				context.moveTo(x, y);
+			} else {
+				context.lineTo(x, y);
+			}
+		}
+		context.strokeStyle = '#64d5c2';
+		context.lineWidth = 2.5;
+		context.stroke();
+
+		// Design payload marker.
+		x = left + plotW * (builder.draft.nominalPayload / maxPayload);
+		y = top + plotH * (1 - Math.min(1, stats.deltaV / maxDv));
+		context.beginPath();
+		context.arc(x, y, 5, 0, Math.PI * 2);
+		context.fillStyle = '#f4c76a';
+		context.fill();
+		context.fillStyle = '#e7eff6';
+		context.textAlign = x > left + plotW - 110 ? 'right' : 'left';
+		context.fillText(Math.round(builder.draft.nominalPayload) + ' kg · ' +
+			Math.round(stats.deltaV) + ' m/s', x + (x > left + plotW - 110 ? -9 : 9), Math.max(top + 28, y - 8));
 	}
 
 	// Inputs are read on the way in, never on the way out: a draft loaded from a
@@ -332,6 +448,8 @@
 		ui.capacity = getElement('workshop-capacity');
 		ui.cost = getElement('workshop-cost');
 		ui.structureDetail = getElement('workshop-structure-detail');
+		ui.plot = root.document.getElementById('workshop-plot');
+		ui.plotCaption = root.document.getElementById('workshop-plot-caption');
 		ui.fleet = getElement('workshop-fleet');
 		ui.warning = getElement('workshop-warning');
 		ui.save = getElement('workshop-save');

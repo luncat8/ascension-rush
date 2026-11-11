@@ -389,6 +389,35 @@
 		return stage.thrustMax / Math.max(1, mass);
 	};
 
+	// Ideal staged delta-v left in the attached stack, per stage at the
+	// engine's mean Isp. The HUD bar and the autopilot's fuel budget read
+	// the same shape; this one uses each stage's own engine.
+	rocket.remainingDeltaV = function(state) {
+		var settings = R.constants.rocket;
+		var mass = rocket.totalMass(state);
+		var deltaV = 0;
+		var stage;
+		var finalMass;
+		var i;
+
+		for (i = state.currentStage; i < state.stageCount; i += 1) {
+			stage = state.stages[i];
+			if (!stage.alive) {
+				continue;
+			}
+			finalMass = mass - stage.fuelMass;
+			if (stage.fuelMass > 0 && finalMass > 0) {
+				deltaV += settings.standardGravity * (stage.ispSea + stage.ispVac) * 0.5 *
+					Math.log(mass / finalMass);
+			}
+			mass = finalMass - stage.dryMass;
+			if (mass <= 0) {
+				break;
+			}
+		}
+		return deltaV;
+	};
+
 	// The next stage ignites at `ignitionThrottle`; a player's staging lights it
 	// at full throttle.
 	rocket.separateStage = function(state, ignitionThrottle = 1) {

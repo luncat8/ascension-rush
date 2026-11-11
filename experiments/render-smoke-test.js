@@ -104,6 +104,7 @@ require('../js/aerodynamics.js');
 require('../js/physics.js');
 require('../js/trajectory.js');
 require('../js/autopilot.js');
+require('../js/planner.js');
 require('../js/operations.js');
 require('../js/competitor.js');
 require('../js/campaign.js');
