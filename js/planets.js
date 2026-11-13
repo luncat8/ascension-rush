@@ -22,7 +22,8 @@
 			seaLevelDensity: 1.225,
 			atmosphereScaleHeight: 800,
 			maxAltitude: 20000,
-			logAltitudeScale: 15,
+			logAltitudeScale: 100,
+			ladderSwitch: 11000,
 			landingRadius: 250,
 			landingVerticalSpeed: 12,
 			landingHorizontalSpeed: 25,
@@ -46,7 +47,8 @@
 			seaLevelDensity: 0,
 			atmosphereScaleHeight: 900,
 			maxAltitude: 16000,
-			logAltitudeScale: 10,
+			logAltitudeScale: 70,
+			ladderSwitch: 5000,
 			landingRadius: 180,
 			landingVerticalSpeed: 8,
 			landingHorizontalSpeed: 18,
@@ -70,7 +72,8 @@
 			seaLevelDensity: 1.9,
 			atmosphereScaleHeight: 900,
 			maxAltitude: 24000,
-			logAltitudeScale: 18,
+			logAltitudeScale: 120,
+			ladderSwitch: 12000,
 			landingRadius: 350,
 			landingVerticalSpeed: 15,
 			landingHorizontalSpeed: 30,
@@ -94,7 +97,8 @@
 			seaLevelDensity: 3.4,
 			atmosphereScaleHeight: 2200,
 			maxAltitude: 26000,
-			logAltitudeScale: 20,
+			logAltitudeScale: 140,
+			ladderSwitch: 21000,
 			landingRadius: 400,
 			landingVerticalSpeed: 10,
 			landingHorizontalSpeed: 22,
@@ -137,6 +141,7 @@
 		target.atmosphereScaleHeight = preset.atmosphereScaleHeight;
 		target.maxAltitude = preset.maxAltitude;
 		target.logAltitudeScale = preset.logAltitudeScale;
+		target.ladderSwitch = preset.ladderSwitch;
 		target.landingRadius = preset.landingRadius;
 		target.landingVerticalSpeed = preset.landingVerticalSpeed;
 		target.landingHorizontalSpeed = preset.landingHorizontalSpeed;

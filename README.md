@@ -178,11 +178,7 @@ tags, `file://`-friendly). Node smoke/regression tests:
 ```sh
 node experiments/coords-test.js
 node experiments/sky-test.js               # escape speed, log-polar chart, lens projection, pivot hand-over
-
-Open `experiments/body-hop.html` in a browser (file:// works) to watch the
-chart re-seat: a point with no rocket on it hops between bodies, and the
-pivot change can be scrubbed, paused and slowed down.
-
+node experiments/chart-test.js             # drag pan, wheel zoom, click-to-seat, hover
 node experiments/aerodynamics-test.js
 node experiments/flight-test.js
 node experiments/builder-test.js            # rocket-type workshop, snapshots
@@ -208,6 +204,11 @@ node experiments/balance.js 20261004 4 2    # economy Monte Carlo: margin bands 
 ```
 (`node experiments/balance.js 20261004 4 2 damage` flies the same chains with
 the 0.5.1 damage model on.)
+
+Open `experiments/body-hop.html` in a browser (file:// works) to fly the chart:
+drag to pan, wheel to zoom, click a body to seat the chart on it. The probe
+climbs on its own; below the air the ground holds the camera, above it the
+probe does, so the ground slides off the bottom exactly as far as the climb.
 
 Measurement scripts share `experiments/harness.js`; their recorded output is in
 `experiments/logs/`. `experiments/logs/0.3.5-touchdowns.txt` is the

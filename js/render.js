@@ -237,7 +237,7 @@
 
 		for (i = 0; i < pads.length; i += 1) {
 			pad = pads[i];
-			padWorldX = R.coords.nearestPeriodicX(pad.wx, camera.leftWx, circumference);
+			padWorldX = camera.flat ? R.coords.nearestPeriodicX(pad.wx, camera.leftWx, circumference) : pad.wx;
 			camera.project(padWorldX, 0, render.scratch.pad);
 			sx = render.scratch.pad.x;
 			isCurrent = pad.id === focus.fromPadId;
@@ -286,6 +286,13 @@
 		var y = render.airY;
 		var label;
 
+		// The air column belongs to the deck, where the ground line is the
+		// world's surface. Charted on another body, the world's air is a band at
+		// its own lens, not a wash down to the pivot's ground.
+		if (!camera.flat) {
+			render.airLabel.key = -1;
+			return;
+		}
 		// An airless world has no ceiling line to draw or to name.
 		if (airTop <= 0 || y >= camera.groundY) {
 			render.airLabel.key = -1;
@@ -332,10 +339,15 @@
 		context.closePath();
 	}
 
-	function drawSkyBody(context, body, lens) {
+	// A body is drawn as its true lens when the lens has size, and as a small
+	// disc when the log chart has squeezed it to a hairline: distant bodies stay
+	// visible and clickable without pretending they are wide.
+	function drawSkyBody(context, body, lens, index) {
 		var star = body.kind === 'star';
+		var icon = R.sky.iconRadius(index);
 		var halfWidth;
 		var halfHeight;
+		var thin;
 		var x;
 		var mid;
 		var angle;
@@ -351,8 +363,23 @@
 		if (x < -halfWidth * 4 || x > render.width + halfWidth * 4) {
 			return;
 		}
-		if (mid - halfHeight > R.camera.groundY) {
+		if (mid - halfHeight > R.camera.groundY || mid + halfHeight < 0) {
 			return;
+		}
+		thin = halfWidth < icon || halfHeight < icon;
+		if (thin) {
+			halfWidth = icon;
+			halfHeight = icon;
+			mid = lens.centerY;
+		}
+		if (index === R.input.hoverIndex) {
+			context.beginPath();
+			context.arc(x, mid, Math.max(halfWidth, halfHeight) + 6, 0, Math.PI * 2);
+			context.setLineDash(dashAim);
+			context.lineWidth = 1;
+			context.strokeStyle = 'rgba(244, 199, 106, 0.75)';
+			context.stroke();
+			context.setLineDash(dashSolid);
 		}
 		context.save();
 		if (star) {
@@ -374,29 +401,53 @@
 			}
 		}
 		context.globalAlpha = lens.alpha;
-		lensPath(context, lens);
-		context.fillStyle = body.color;
-		context.fill();
-		// The shaded side is turned away from the star, the same lighting rule
-		// the ship uses.
-		context.save();
-		context.clip();
-		context.globalAlpha = lens.alpha * 0.55;
-		context.fillStyle = body.shade;
-		context.fillRect(x + (1 - lens.shade) * halfWidth * 1.4, mid - halfHeight * 2,
-			halfWidth * 1.6, halfHeight * 4);
-		context.restore();
-		lensPath(context, lens);
-		context.globalAlpha = lens.alpha;
-		context.lineWidth = 1;
-		context.strokeStyle = 'rgba(226, 240, 247, 0.35)';
-		context.stroke();
+		if (thin) {
+			// The disc, lit from the same side as the lens would be.
+			context.beginPath();
+			context.arc(x, mid, icon, 0, Math.PI * 2);
+			context.fillStyle = body.color;
+			context.fill();
+			context.save();
+			context.clip();
+			context.globalAlpha = lens.alpha * 0.5;
+			context.fillStyle = body.shade;
+			context.fillRect(x + (1 - lens.shade) * icon * 1.2, mid - icon,
+				icon * 2, icon * 2);
+			context.restore();
+			context.beginPath();
+			context.arc(x, mid, icon, 0, Math.PI * 2);
+			context.globalAlpha = lens.alpha;
+			context.lineWidth = 1;
+			context.strokeStyle = 'rgba(226, 240, 247, 0.45)';
+			context.stroke();
+		} else {
+			lensPath(context, lens);
+			context.fillStyle = body.color;
+			context.fill();
+			// The shaded side is turned away from the star, the same lighting
+			// rule the ship uses.
+			context.save();
+			context.clip();
+			context.globalAlpha = lens.alpha * 0.55;
+			context.fillStyle = body.shade;
+			context.fillRect(x + (1 - lens.shade) * halfWidth * 1.4, mid - halfHeight * 2,
+				halfWidth * 1.6, halfHeight * 4);
+			context.restore();
+			lensPath(context, lens);
+			context.globalAlpha = lens.alpha;
+			context.lineWidth = 1;
+			context.strokeStyle = 'rgba(226, 240, 247, 0.35)';
+			context.stroke();
+		}
 		context.restore();
 		if (render.width >= 650) {
+			// Above the disc normally; under it when the body is charted close to
+			// the top edge, so the name is never clipped away.
 			context.font = '600 9px ui-monospace, SFMono-Regular, Menlo, monospace';
 			context.textAlign = 'center';
 			context.fillStyle = 'rgba(211, 228, 235, 0.82)';
-			context.fillText(body.name.toUpperCase(), x, Math.max(9, mid - halfHeight - 6));
+			context.fillText(body.name.toUpperCase(), x,
+				mid - halfHeight - 6 > 12 ? mid - halfHeight - 6 : mid + halfHeight + 12);
 		}
 	}
 
@@ -422,6 +473,58 @@
 		context.fillRect(0, Math.min(bottom, y), render.width, 1);
 	}
 
+	// The orbits of the catalog, charted by the same map as the lenses. Each
+	// polyline is drawn in every periodic copy that touches the viewport, and a
+	// sample the chart cannot place (inside the pivot body, or ON the pole)
+	// breaks the path instead of flinging a chord across the screen.
+	function drawOrbits(context, game) {
+		var bodies = R.constants.sky.bodies;
+		var lens = R.sky.orbitShape;
+		var width = render.width;
+		var x;
+		var y;
+		var copy;
+		var copies;
+		var started;
+		var b;
+		var j;
+
+		context.save();
+		context.lineWidth = 1;
+		context.strokeStyle = R.camera.flat ? 'rgba(150, 190, 214, 0.16)' : 'rgba(150, 190, 214, 0.22)';
+		for (b = 0; b < bodies.length; b += 1) {
+			R.sky.orbit(b);
+			if (!lens.valid || lens.count < 2) {
+				continue;
+			}
+			copies = Math.max(1, Math.ceil(width / Math.max(1, lens.period)) + 1);
+			for (copy = -copies; copy <= copies; copy += 1) {
+				started = false;
+				context.beginPath();
+				for (j = 0; j <= lens.xs.length - 1; j += 1) {
+					x = lens.xs[j] + copy * lens.period;
+					y = lens.ys[j];
+					if (!Number.isFinite(x) || !Number.isFinite(y)) {
+						started = false;
+						continue;
+					}
+					if (x < -width * 0.25 || x > width * 1.25) {
+						started = false;
+						continue;
+					}
+					if (!started) {
+						context.moveTo(x, y);
+						started = true;
+					} else {
+						context.lineTo(x, y);
+					}
+				}
+				context.stroke();
+			}
+		}
+		context.restore();
+	}
+
 	function drawSkyBodies(context, game) {
 		var bodies = R.constants.sky.bodies;
 		var lens = R.sky.shape;
@@ -434,16 +537,21 @@
 				continue;
 			}
 			R.sky.outline(i, game);
-			drawSkyBody(context, i < 0 ? R.sky.world : bodies[i], lens);
+			drawSkyBody(context, i < 0 ? R.sky.world : bodies[i], lens, i);
 		}
 	}
 
-	// One periodic copy per point: a path that crosses the world seam breaks
-	// instead of drawing a line straight across the viewport.
+	// On the deck a longitude is wrapped to the copy nearest the viewport, so a
+	// path that crosses the world seam breaks instead of drawing a line across
+	// the whole chart. Away from the world the chart already has the seam built
+	// in (X is an angle), so the longitude goes through untouched.
+	function chartWorldX(wx) {
+		return R.camera.flat ?
+			R.coords.nearestPeriodicX(wx, R.camera.leftWx, R.world.planet.circumference) : wx;
+	}
+
 	function projectPathPoint(wx, wy, out) {
-		return R.camera.project(
-			R.coords.nearestPeriodicX(wx, R.camera.leftWx, R.world.planet.circumference),
-			wy, out);
+		return R.camera.project(chartWorldX(wx), wy, out);
 	}
 
 	function drawCoastTrace(context) {
@@ -538,6 +646,12 @@
 		var i;
 		var y;
 
+		// The ladder is the active world's altimeter. On the deck it is the
+		// chart's own Y axis; seated elsewhere the axis is distance from the
+		// pivot, so a world-relative scale would lie.
+		if (!camera.flat) {
+			return;
+		}
 		context.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
 		context.textAlign = 'left';
 		context.fillStyle = 'rgba(184, 207, 218, 0.72)';
@@ -1232,7 +1346,9 @@
 	function drawStatusStrip(context, game) {
 		var margin = Math.min(24, render.width * 0.05);
 		var width = Math.min(350, render.width - margin * 2);
-		var y = R.camera.groundY - 46;
+		// Above the ground strip normally; held at the bottom of the viewport
+		// when the camera has followed the ship and the ground is off-screen.
+		var y = R.util.clamp(R.camera.groundY - 46, 12, Math.max(12, render.height - 42));
 		var label = game.phase === 'flying' ? 'MOUSE AIM  ·  SHIFT / CTRL THROTTLE  ·  SPACE STAGE  ·  A AUTOPILOT' : 'OPERATIONS DECK  ·  DISPATCH  ·  ROUTES  ·  FLIGHT LOG';
 
 		drawPanel(context, margin, y, width, 30);
@@ -1424,6 +1540,7 @@
 		drawSkyShade(context);
 		drawStars(context);
 		drawAirBand(context);
+		drawOrbits(context, game);
 		drawSkyBodies(context, game);
 		drawAltitudeScale(context);
 		drawGround(context);
@@ -1459,6 +1576,7 @@
 		drawSkyShade(context);
 		drawStars(context);
 		drawAirBand(context);
+		drawOrbits(context, game);
 		drawSkyBodies(context, game);
 		drawAltitudeScale(context);
 		drawGround(context);

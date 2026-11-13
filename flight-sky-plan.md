@@ -339,27 +339,67 @@ What changes is what the player can see and read.
   world's inverse-square field. A body's sphere of influence is not named yet.
 - **One chart for the whole system.** The game's own chart is the projection:
   a log-polar map of the plane with a single shared scale `s`,
-  `x = ox + s·atan2(dx, dy)` and `y = oy − s·ln(distance)`, measured from a
+  `x = ox + s·atan2(dx, dy)` and `y = oy − s·ladder(distance)`, measured from a
   **pivot** body's centre. One scale on both axes is the requirement, not a
   detail: a sphere is round in the plane, so its image is a lens whose width and
   height agree, and a moon thousands of radii away stays a visible shape. A
   vertical-only log altitude with an independent horizontal px/metre squashes
   every distant body into a line, so it cannot be used for this.
+- **One altitude ladder.** `ladder(h) = ln(1 + h/knee)` on the planet's
+  `logAltitudeScale`, and above that planet's `ladderSwitch` altitude the slope
+  drops to `view.ladderFar`: `ladder(h) = q0 + (ln(1 + h/knee) − q0)·ladderFar`.
+  Below the pivot's surface the ladder is a single `ln(R/d)`, which keeps the
+  cutaway shallow. The knee is what spends the chart's height: a metre-scale
+  knee gives the air column most of the deck and compresses the top layers, so
+  distant bodies sit low over the surface instead of spreading to the top edge,
+  and a body-radius knee spreads the catalog by distance ratio once the chart is
+  seated on a body. The knee therefore follows the pole — planet knee while
+  landed, pivot radius away — and both it and `ladderFar` are eased across a
+  hand-over (`sky.view.knee`), so the curve never changes in one frame.
 - **The deck map is the closed form.** With the pivot on the active world,
-  `oy = groundY + s·ln(R)` and `atan2` cancels, leaving
-  `y = groundY − s·ln(1 + wy/R)` and `x = ox + s·wx/R` — the existing wrap-X /
-  log-altitude chart with the world's radius as its log knee. The gameplay
-  projection is therefore unchanged: pads, trails, the altitude ladder and the
-  mouse readout all read the same numbers, and forward and inverse round-trip
-  exactly. `camera.flat` selects the closed form; the general form is used away
-  from the world.
+  `oy = groundY`, `atan2` cancels and the ladder is read straight off the
+  altimeter: `y = groundY − usable·ladder(wy)/ladder(extent)` and
+  `x = (wx − leftWx)·pixelsPerMeter`, one circumference per viewport. Pads,
+  trails, the altitude ladder, the mouse readout and the bodies all read those
+  same numbers, and forward and inverse round-trip exactly. `camera.flat`
+  selects the closed form; the general form is used away from the world.
+  `camera.setRangeUnits` hands the deck the damped range the lenses are drawn
+  with, so the two spellings are the same scale to the last bit.
+- **The charted extent includes the ship.** `sky.maxExtent` takes the farthest
+  far limb of the catalog *and* the ship, and the deck's top edge is that
+  extent. A rocket above the atmosphere therefore widens the ladder instead of
+  leaving the top of the deck; the damped fit makes the change smooth.
+- **Camera target.** The follow owns two things. Horizontally the base longitude
+  keeps the ship at `view.cameraAnchorFraction`. Vertically the ground line
+  holds the camera while the ship is under `camera.airTop`; above it the target
+  becomes the ship, and the chart slides by `camera.trackY` so the hull sits at
+  `view.followHeight` and the ground leaves the bottom exactly as far as the
+  climb. The track eases back to zero on the way down. The wheel zoom is
+  clamped by the ship's own ladder height, so a zoomed-in view pulls back
+  rather than losing the hull.
+- **Gestures.** The pointer owns `camera.panX / panY`, in screen pixels, added
+  to the followed pose — a drag is one pixel per pixel and a follow never
+  undoes it. The wheel scales `camera.zoom`, eased at `view.zoomTau` and clamped
+  to `view.zoomMin / zoomMax`; the deck zooms about the ship and the ground
+  line. A press that moves less than `view.dragSlopPx` is a click, and a click
+  seats the chart on the body under the pointer (`sky.pick`), which also eases
+  the zoom back to the fit. Empty space is a no-op. `js/input.js` holds all of
+  it, so `index.html` and `experiments/body-hop.html` get the same controls.
 - **A body is a lens, not a sprite.** With `D` the distance from the pivot,
   `rho` the body's radius and `alpha = asin(rho/D)`, each ray at offset `psi`
   inside the body's angular radius crosses the sphere twice:
   `half = sqrt(rho² − D²·sin²psi)`, `near = D·cos(psi) − half`,
-  `far = D·cos(psi) + half`. Both limbs are projected through the same map, so
+  `far = D·cos(psi) + half`. Both limbs are projected through the same ladder, so
   the shape is the true silhouette and a close body gets a genuine cutaway.
-  A body containing the pivot has no lens and is skipped.
+  A body containing the pivot has no lens and is skipped. When the lens is
+  thinner than `sky.iconRadius` the body is charted as a disc of that radius
+  instead — visible and clickable without pretending a distant sphere is wide —
+  and the picker uses the same radius, so what is drawn is what is hit.
+- **Orbits.** A catalog body's orbit is sampled around the world's origin
+  (`view.orbitSamples`) and charted by the same map: a curve in the system view,
+  a level lane over the deck. Samples inside the pivot body are dropped, so the
+  log pole never flings a chord across the screen, and every periodic copy that
+  touches the viewport is drawn.
 - **Shared-scale fit.** The farthest surface of the charted system is fitted to
   `view.chartTopFraction` of the viewport, which fixes `s`. The fit is sampled
   at `sky.fitSampleSeconds` and eases outward at `fitGrowTau` and inward at
@@ -556,7 +596,12 @@ aerodynamics helpers instead.
   throttle are unchanged. `build-sweep.js` reports the rule as flights fixed against flights broken against its `dry`
   baseline, and the trade is judged on that ratio rather than on the reference
   builds alone.
-- `node experiments/sky-test.js` passes. Escape speed is `sqrt(2*g0*R^2/r)`
+- `node experiments/sky-test.js` and `node experiments/chart-test.js` pass.
+  The deck's extent is the farthest far limb, the deck and the lens law agree on
+  a body's height, a drag pans one pixel per pixel, a click seats the chart on
+  the body under the pointer, the seated body is not a pick, the wheel zoom is
+  clamped and keeps the ship on its anchor, and the cursor reports a pickable
+  body. Escape speed is `sqrt(2*g0*R^2/r)`
   on every world and decreases with altitude; an airless world reports a zero
   atmosphere ceiling; `coords` round trips hold at every eased `logScale` and
   `ceiling` in both the closed-form and general spellings of the chart; every

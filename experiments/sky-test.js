@@ -49,12 +49,33 @@ function settle(seconds, theGame) {
 // a different point of the plane, and its own motion is the flight.
 var anchorScreen = { x: 0, y: 0 };
 
+// The chart's own Y law, written out independently of coords.js: one log
+// ladder above the surface on the planet's knee with a gentler far-field slope
+// beyond the switch altitude, and a single log below it so the cutaway stays
+// shallow.
+function ladder(height) {
+	var knee = R.camera.logScale;
+	var q = Math.log1p(Math.max(0, height) / knee);
+	var q0 = Math.log1p(R.camera.ladderSwitch / knee);
+
+	return q <= q0 ? q : q0 + (q - q0) * R.camera.ladderFar;
+}
+
+function chartY(distance) {
+	var delta = distance - R.sky.pivot.radius;
+
+	if (delta >= 0) {
+		return R.camera.oy - R.camera.scalePx * ladder(delta);
+	}
+	return R.camera.oy + R.camera.scalePx * Math.log(R.sky.pivot.radius / Math.max(1e-9, distance));
+}
+
 function anchorOf() {
 	var dx = R.sky.pivot.anchorX - R.camera.pivotX;
 	var dy = R.sky.pivot.anchorY - R.camera.pivotY;
 
 	anchorScreen.x = R.camera.ox + R.camera.scalePx * Math.atan2(dx, dy);
-	anchorScreen.y = R.camera.oy - R.camera.scalePx * Math.log(Math.max(1e-9, Math.sqrt(dx * dx + dy * dy)));
+	anchorScreen.y = chartY(Math.sqrt(dx * dx + dy * dy));
 	return anchorScreen;
 }
 
@@ -113,8 +134,30 @@ settle(2, game);
 assert.equal(R.sky.pivot.index, -1, 'a fresh session is seated on the world');
 assert.equal(R.camera.flat, true, 'the deck uses the closed-form chart there');
 close(R.sky.pivot.radius, planet.radius, 1e-6, 'the pivot radius is the world radius');
-close(R.camera.ceiling, planet.maxAltitude, 1e-6, 'the deck keeps the planet log range');
-close(R.camera.logScale, planet.logAltitudeScale, 1e-9, 'and its log knee');
+close(R.camera.logScale, planet.logAltitudeScale, 1e-9, 'the deck keeps its log knee');
+assert.ok(R.camera.ladderQ0 > 0 && R.camera.ladderFar < 1, 'and its far-field compression');
+
+// The deck charts the whole system on its own ladder: the farthest far limb is
+// the deck's top edge, so the bodies sit over the surface instead of being
+// clipped away, and the deck is the same map as the system view.
+var farthest = 0;
+for (i = 0; i < R.constants.sky.bodies.length; i += 1) {
+	farthest = Math.max(farthest, (R.constants.sky.bodies[i].distanceRadii +
+		R.constants.sky.bodies[i].radiusRadii) * planet.radius);
+}
+close(R.camera.ceiling, farthest, farthest * 0.02, 'the deck ceiling is the charted extent');
+R.camera.project(0, farthest, screen);
+close(screen.y, R.camera.topY(), 0.2, 'the far limb is the top edge of the deck');
+
+// The deck's ladder and the lens curve are one law: the altitude the deck
+// places a body's centre at is the height the lens law gives for that
+// distance, and both spellings read it off one scale.
+shape = R.sky.outline(0, game);
+R.camera.project(0, shape.distance - planet.radius, screen);
+close(screen.y, R.sky.distanceY(shape.distance, R.camera.oy, R.camera.scalePx), 1e-6,
+	'the deck and the lens agree on the star');
+close(R.camera.usableHeight / R.camera.altitudeLogRange, R.camera.scalePx, 1e-9,
+	'the deck and the system view share one scale');
 
 // The flat form is the log-polar form with the pivot on the world: for a point
 // on the surface it is exactly the wrap-X map, and the round trip is exact.
@@ -144,8 +187,10 @@ for (i = 0; i < R.constants.sky.bodies.length; i += 1) {
 	close(shape.nearYs[shape.nearYs.length - 1], shape.farYs[shape.farYs.length - 1], 1e-6,
 		'body ' + i + ' limbs meet at the right edge');
 	// And at psi = 0 the near and far limbs are D - rho and D + rho.
-	close(shape.nearY, R.camera.oy - R.camera.scalePx * Math.log(shape.distance - R.sky.bodyRadius(
-		R.sky.bodyOf(i))), 1e-6, 'body ' + i + ' near limb is D - rho');
+	close(shape.nearY, chartY(shape.distance - R.sky.bodyRadius(R.sky.bodyOf(i))), 1e-6,
+		'body ' + i + ' near limb is D - rho');
+	close(shape.farY, chartY(shape.distance + R.sky.bodyRadius(R.sky.bodyOf(i))), 1e-6,
+		'body ' + i + ' far limb is D + rho');
 }
 
 // The body the chart is seated on is the ground, so it is not a lens.

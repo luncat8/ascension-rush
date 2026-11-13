@@ -13,7 +13,29 @@
 		transformSeconds: 1.1,
 		// Top of the charted range: the farthest body's far limb is fitted to
 		// this fraction of the viewport height.
-		chartTopFraction: 0.05
+		chartTopFraction: 0.05,
+		// Drag pan: a press that moves less than this is a click, not a pan.
+		dragSlopPx: 4,
+		// Wheel zoom: the target factor is clamped to this band and eased.
+		zoomMin: 0.2,
+		zoomMax: 5,
+		zoomTau: 0.15,
+		// Share of the ladder kept clear above the ship: 0.08 leaves the hull
+		// eight percent of the height below the top edge.
+		followMargin: 0.08,
+		// Where the ship sits down the viewport once it is above the air: the
+		// camera target follows it from there, so the ground slides off the
+		// bottom instead of the hull leaving the top.
+		followHeight: 0.62,
+		// Easing back to the ground when the ship descends into the air.
+		followCloseTau: 0.5,
+		// The ladder's far-field slope: above a planet's switch altitude one
+		// log unit of the chart covers this many log units of height. Below 1
+		// the top layers are compressed, which is what keeps distant bodies
+		// low over the surface instead of spreading them to the top edge.
+		ladderFar: 0.45,
+		// Orbit polylines: samples per orbit circle.
+		orbitSamples: 128
 	};
 
 	// Inter-planet sky. Distances and radii are in active-planet radii, so one

@@ -126,11 +126,18 @@ R.camera.resize(1280, 720);
 R.camera.follow(0);
 R.render.initialize(context);
 R.render.resize(1280, 720);
-R.render.draw({
+// The chart is fitted from the catalog, so the deck is drawn only after a few
+// sky frames — the same order main.js uses before its first paint.
+var smokeGame = {
 	currentPadId: R.world.currentPadId,
 	targetPadId: R.world.targetPadId,
-	rocket: R.rocket.create(R.world.findPadById(R.world.currentPadId))
-});
+	rocket: R.rocket.create(R.world.findPadById(R.world.currentPadId)),
+	simTime: 0
+};
+for (i = 0; i < 40; i += 1) {
+	R.sky.update(smokeGame, 0.016);
+}
+R.render.draw(smokeGame);
 
 // The inter-planet sky is drawn from the same world record: a labelled star,
 // the atmosphere ceiling, and a surface escape speed from GM.
@@ -141,7 +148,8 @@ assert.ok(drawnText.some(function(text) {
 }), 'the atmosphere ceiling is labelled');
 assert.ok(drawnText.indexOf('ESCAPE SPEED') >= 0, 'the deck quotes surface escape speed');
 assert.equal(R.sky.view.planetId, 'verdant', 'the sky view is seeded for the live world');
-assert.equal(R.camera.ceiling, R.world.planet.maxAltitude, 'the deck keeps the planet log range');
+assert.ok(R.camera.ceiling > R.world.planet.maxAltitude * 10,
+	'the deck charts the whole system, not just the planet\'s altitude band');
 
 R.input.pointerActive = true;
 R.input.pointerX = 620;

@@ -19,6 +19,12 @@
 		gravity: 0,
 		radius: 0,
 		atmosphereTop: 0,
+		// The ladder's knee and far-field slope: a fine metre-scale log over the
+		// landed deck, a body-scale log in the system view (so the catalog
+		// spreads instead of stacking at the top), both eased across a hand-over
+		// so the curve never changes in one frame.
+		knee: 0,
+		ladderFar: 0.45,
 		morph: 1,
 		from: { gravity: 0, radius: 0 }
 	};
@@ -83,14 +89,46 @@
 	// the whole system breathing at the orbit period.
 	var fit = { range: 1, target: 1, at: 0, time: 0, ready: false };
 
+	// One orbit polyline in screen space, reused every frame: sampling a circle
+	// costs no allocation, and the renderer only reads it.
+	var ORBIT_N = viewSettings.orbitSamples;
+	var orbit = {
+		valid: false,
+		count: 0,
+		period: 1,
+		radius: 0,
+		xs: new Float64Array(ORBIT_N + 1),
+		ys: new Float64Array(ORBIT_N + 1)
+	};
+
 	var plane = { x: 0, y: 0 };
 	var starPlane = { x: 0, y: 0 };
 	var chartPoint = { x: 0, y: 0 };
+	var shipPlane = { x: 0, y: 0 };
 
 	sky.view = view;
 	sky.pivot = pivot;
 	sky.world = worldBody;
 	sky.shape = shape;
+	sky.orbitShape = orbit;
+
+	// Screen x per radian. On the deck X is arc length (one circumference per
+	// viewport), so a lens is drawn on that axis and a body sits at the
+	// longitude the ship would see it at; away from the world both axes share
+	// the chart's one scale.
+	function angularScale() {
+		return R.camera.flat ? R.camera.pixelsPerMeterX * view.radius : R.camera.scalePx;
+	}
+
+	// A body's screen x for an angle from the pole, on the same axis its lens
+	// and its orbit are drawn with.
+	function screenX(angle) {
+		if (R.camera.flat) {
+			return R.camera.width * viewSettings.cameraAnchorFraction +
+				angularScale() * angle;
+		}
+		return R.camera.ox + R.camera.scalePx * angle;
+	}
 	sky.fit = fit;
 	sky.bodies = bodies;
 
@@ -108,13 +146,32 @@
 
 	// A catalog body's place in the plane, in metres, from the world's centre.
 	// Its orbit radius and body radius are quoted in active-planet radii, so
-	// one table reads on every world.
+	// one table reads on every world. The plane shares the world's own frame
+	// (angle from the +Y axis), so a body at longitude 0 sits due north of
+	// the ship at wx 0.
 	sky.planePosition = function(body, simTime, out) {
 		var distance = body.distanceRadii * view.radius;
 		var angle = (body.longitude + simTime * body.orbitRate / TWO_PI) * TWO_PI;
 
-		out.x = distance * Math.cos(angle);
-		out.y = distance * Math.sin(angle);
+		out.x = distance * Math.sin(angle);
+		out.y = distance * Math.cos(angle);
+		return out;
+	};
+
+	// The ship's place in the same plane: its radius from the world's centre
+	// at its own longitude. The pole, the anchor and the fit all read it.
+	sky.shipPlane = function(game, out) {
+		var rocket = game && game.rocket;
+		var radius;
+
+		if (!rocket) {
+			out.x = 0;
+			out.y = view.radius;
+			return out;
+		}
+		radius = view.radius + Math.max(0, rocket.wy || 0);
+		out.x = radius * Math.sin((rocket.wx || 0) / view.radius);
+		out.y = radius * Math.cos((rocket.wx || 0) / view.radius);
 		return out;
 	};
 
@@ -126,9 +183,22 @@
 		return index < 0 ? worldBody : bodies[index];
 	};
 
-	// Farthest surface of the whole charted system from the pivot's centre.
-	// The shared scale is set from this so every body fits on one scale.
-	function maxExtent() {
+	// Screen Y of a plane distance from the pivot centre, through the chart's
+	// own law: the log ladder above the surface, a single log below it. The
+	// lens, the fit and the hand-over all read this one helper, so a body is
+	// never drawn by one curve and picked by another.
+	sky.distanceY = function(distance, oy, scale) {
+		if (distance >= pivot.radius) {
+			return oy - scale * R.coords.ladderOf(distance - pivot.radius,
+				R.camera.logScale, R.camera.ladderQ0, R.camera.ladderFar);
+		}
+		return oy + scale * Math.log(pivot.radius / Math.max(1e-9, distance));
+	};
+
+	// Farthest surface of the whole charted system from the pivot's centre,
+	// ship included: the shared scale is set from this so every body and the
+	// ship itself fit on one scale.
+	function maxExtent(game) {
 		var extent = 0;
 		var body;
 		var dx;
@@ -150,17 +220,23 @@
 			dy = plane.y - pivot.y;
 			extent = Math.max(extent, Math.sqrt(dx * dx + dy * dy) + sky.bodyRadius(body));
 		}
+		sky.shipPlane(game, shipPlane);
+		dx = shipPlane.x - pivot.x;
+		dy = shipPlane.y - pivot.y;
+		extent = Math.max(extent, Math.sqrt(dx * dx + dy * dy));
 		return Math.max(extent, view.radius * 1.5);
 	}
 
 	var simTime = 0;
 
-	// The shared scale, damped. `range` is the natural log of how many e-folds
-	// the chart covers, so the scale is just the pixel span divided by it.
-	function fitScale(dt) {
+	// The shared scale, damped. `range` is the double-log span the chart
+	// covers, so the scale is just the pixel span divided by it.
+	function fitScale(dt, game) {
 		var top = R.camera.height * viewSettings.chartTopFraction;
-		var line = R.camera.groundY;
-		var range = Math.log(Math.max(1.0001, maxExtent() / Math.max(1, pivot.radius)));
+		var line = R.camera.baseGroundY;
+		var extent = maxExtent(game);
+		var range = R.coords.ladderOf(Math.max(0, extent - Math.max(1, pivot.radius)),
+			R.camera.logScale, R.camera.ladderQ0, R.camera.ladderFar);
 
 		if (!fit.ready) {
 			fit.range = fit.target = range;
@@ -175,7 +251,10 @@
 			fit.range = ease(fit.range, fit.target, dt, fit.target > fit.range ?
 				settings.fitGrowTau : settings.fitCloseTau);
 		}
-		return (line - top) / Math.max(fit.range, 0.2);
+		// The deck inherits the damped range, so its closed form and the lenses
+		// below are the same curve at every frame of the ease.
+		R.camera.setRangeUnits(fit.range);
+		return (line - top) / Math.max(fit.range, 0.2) * R.camera.zoom;
 	}
 
 	sky.ensure = function() {
@@ -188,6 +267,7 @@
 		planet = R.world.planet;
 		view.planetId = planet.id;
 		view.logScale = planet.logAltitudeScale;
+		view.knee = planet.logAltitudeScale;
 		view.gravity = planet.surfaceGravity;
 		view.radius = planet.radius;
 		view.atmosphereTop = R.physics.atmosphereTop();
@@ -217,8 +297,11 @@
 	// is the same pose the interpolation has been approaching.
 	sky.seatPivot = function(index, game) {
 		var wasFlat;
-		var angle;
 		var body;
+		var radius;
+		var dx;
+		var dy;
+		var distance;
 
 		sky.ensure();
 		if (pivot.reseating || index === pivot.index) {
@@ -230,41 +313,60 @@
 		// point which is about to become the ground line, so holding it still is
 		// exactly "the new surface arrives where the ground already is".
 		body = index < 0 ? worldBody : bodies[index];
-		plane.x = index < 0 ? 0 : 0;
 		if (index < 0) {
-			angle = 0;
 			plane.x = 0;
 			plane.y = 0;
 		} else {
 			sky.planePosition(body, simTime, plane);
-			angle = Math.atan2(plane.y, plane.x);
 		}
-		pivot.anchorX = plane.x + Math.sin(angle) * sky.bodyRadius(body);
-		pivot.anchorY = plane.y + Math.cos(angle) * sky.bodyRadius(body);
+		radius = sky.bodyRadius(body);
+		sky.shipPlane(game, shipPlane);
+		dx = shipPlane.x - plane.x;
+		dy = shipPlane.y - plane.y;
+		distance = Math.sqrt(dx * dx + dy * dy);
+		if (distance > 1e-9) {
+			pivot.anchorX = plane.x + dx / distance * radius;
+			pivot.anchorY = plane.y + dy / distance * radius;
+		} else {
+			pivot.anchorX = plane.x;
+			pivot.anchorY = plane.y + radius;
+		}
+		// The anchor is stored without the pointer pan: the pose is solved for
+		// the base, and the pan is added on top, so a drag mid-hand-over pans
+		// the view instead of moving the anchor.
 		if (wasFlat) {
 			// The deck's map is the closed form of this same chart. Its
 			// horizontal axis is arc length around the world, so the anchor's
 			// own longitude gives its screen x; its surface is the ground line.
 			pivot.anchorSx = (Math.atan2(pivot.anchorX, pivot.anchorY) * view.radius -
-				R.camera.leftWx) * R.camera.pixelsPerMeterX;
-			pivot.anchorSy = R.camera.groundY;
-			pivot.fromOx = R.camera.ox;
-			pivot.fromOy = R.camera.oy;
+				R.camera.baseLeftWx) * R.camera.pixelsPerMeterX;
+			pivot.anchorSy = R.camera.baseGroundY;
+			pivot.fromOx = R.camera.baseOx;
+			pivot.fromOy = R.camera.baseOy;
 		} else {
-			pivot.anchorSx = R.camera.ox + R.camera.scalePx *
+			pivot.anchorSx = R.camera.baseOx + R.camera.scalePx *
 				Math.atan2(pivot.anchorX - pivot.x, pivot.anchorY - pivot.y);
-			pivot.anchorSy = R.camera.oy - R.camera.scalePx * Math.log(Math.max(1e-9,
-				Math.sqrt((pivot.anchorX - pivot.x) * (pivot.anchorX - pivot.x) +
-					(pivot.anchorY - pivot.y) * (pivot.anchorY - pivot.y))));
+			pivot.anchorSy = sky.distanceY(Math.sqrt((pivot.anchorX - pivot.x) * (pivot.anchorX - pivot.x) +
+				(pivot.anchorY - pivot.y) * (pivot.anchorY - pivot.y)), R.camera.baseOy, R.camera.scalePx);
+			pivot.fromOx = R.camera.baseOx;
+			pivot.fromOy = R.camera.baseOy;
 		}
+		// A seat returns to the fitted overview: the pan the player dragged in is
+		// kept (it is their place in the chart) but the wheel zoom eases back to
+		// the fit, so landing on a distant body does not land on empty space.
+		R.camera.zoomTarget = 1;
 		pivot.previousIndex = pivot.index;
 		pivot.index = index;
+		pivot.fromX = pivot.x;
+		pivot.fromY = pivot.y;
+		pivot.fromRadius = pivot.radius;
+		pivot.fromScale = R.camera.scalePx;
 		pivot.morph = 0;
 		pivot.reseating = true;
 		// The first frame after this must reproduce the pose that was on
 		// screen, in the spelling the hand-over will use. Without this the
 		// switch to the general form would be a jump all by itself.
-		applyPose(R.camera.scalePx);
+		applyPose(R.camera.scalePx, game);
 		R.camera.flat = false;
 		return true;
 	};
@@ -300,41 +402,42 @@
 		}
 	}
 
-	// Place the pole and solve the screen offsets. Seated on a body, the
-	// offsets are chosen so that body's surface sits on the ground line and its
-	// centre is the pole. Mid-hand-over they are chosen so a fixed plane point
-	// (`pivot.anchor`) stays at the screen position it had when the hand-over
-	// started: the pole and the scale are what move, the anchor does not jump.
-	//
-	// Solving for the offsets instead of interpolating them is what makes the
-	// change continuous. The pole travels from one body's centre to the next,
-	// the scale eases, and the ground line arrives where the new surface is
-	// because that is where the anchor's own surface ends up.
-	// Place the pose. Seated, the pivot's centre is the pole and its surface
-	// sits on the ground line, which fixes both offsets. Mid-hand-over the
-	// offsets are solved from the anchor instead: the anchor's angle and
-	// distance are read against the *live* pole, so however the pole slides its
-	// screen position does not move. That is what makes the change continuous —
-	// the chart travels under the point the player is watching.
-	function applyPose(scale) {
+	// Place the pose. Seated, the pivot's centre is the pole, its surface sits
+	// on the ground line, and the ship sits at the anchor fraction: the offsets
+	// follow the ship, so a rocket above the atmosphere stays centred while
+	// the ground stays on the line. Mid-hand-over the offsets are solved from
+	// the anchor instead: the anchor's angle and distance are read against the
+	// *live* pole, so however the pole slides its screen position does not
+	// move. That is what makes the change continuous — the chart travels under
+	// the point the player is watching.
+	function applyPose(scale, game) {
 		var camera = R.camera;
 		var ax;
 		var ay;
+		var distance;
 
 		camera.pivotX = pivot.x;
 		camera.pivotY = pivot.y;
 		camera.pivotRadius = pivot.radius;
 		camera.worldRadius = view.radius;
 		camera.scalePx = scale;
-		camera.ox = camera.width * 0.5;
-		camera.oy = camera.groundY + scale * Math.log(pivot.radius);
 		if (!pivot.reseating) {
+			sky.shipPlane(game, shipPlane);
+			camera.baseOx = camera.width * viewSettings.cameraAnchorFraction -
+				scale * Math.atan2(shipPlane.x - pivot.x, shipPlane.y - pivot.y);
+			camera.baseOy = camera.baseGroundY;
+			camera.syncPan();
 			return;
 		}
 		ax = pivot.anchorX - pivot.x;
 		ay = pivot.anchorY - pivot.y;
-		camera.ox = pivot.anchorSx - scale * Math.atan2(ax, ay);
-		camera.oy = pivot.anchorSy + scale * Math.log(Math.max(1e-9, Math.sqrt(ax * ax + ay * ay)));
+		distance = Math.sqrt(ax * ax + ay * ay);
+		camera.baseOx = pivot.anchorSx - scale * Math.atan2(ax, ay);
+		camera.baseOy = pivot.anchorSy + (distance >= pivot.radius ?
+			scale * R.coords.ladderOf(distance - pivot.radius, camera.logScale, camera.ladderQ0,
+				camera.ladderFar) :
+			-scale * Math.log(pivot.radius / Math.max(1e-9, distance)));
+		camera.syncPan();
 	}
 
 	sky.update = function(game, dt) {
@@ -366,8 +469,27 @@
 			R.camera.flat = false;
 		}
 
-		scale = fitScale(step);
-		applyPose(scale);
+		// A landed chart compresses the top so the bodies sit low over the
+		// surface; the system view is a plain log, where every body is at its
+		// own ratio from the pole and the orbits spread instead of stacking.
+		view.ladderFar = ease(view.ladderFar, pivot.index < 0 ? viewSettings.ladderFar : 1,
+			step, settings.pivotSeconds * 0.5);
+		// The knee follows the pole: the planet's metre ladder on its own
+		// surface, the pivot body's own radius once the chart is seated on it.
+		// A log that knees at a body radius spreads the catalog by distance
+		// ratio, which is what makes the orbits readable from another body.
+		view.knee = ease(view.knee, pivot.index < 0 ? planet.logAltitudeScale : pivot.radius,
+			step, settings.pivotSeconds * 0.5);
+		view.logScale = view.knee;
+		R.camera.setLadder(view.knee, planet.ladderSwitch, view.ladderFar);
+		// The follow runs here, not beside it: the zoom it eases is the scale
+		// this same frame solves the pose with, so a wheel notch cannot move the
+		// deck and the lenses a frame apart.
+		if (game && game.rocket) {
+			R.camera.follow(game.rocket.wx, game.rocket.wy, step);
+		}
+		scale = fitScale(step, game);
+		applyPose(scale, game);
 
 		// Only after the pose is drawn does the hand-over end: clearing the
 		// flag first would make the final frame jump to the settled offsets.
@@ -377,15 +499,17 @@
 			R.camera.flat = pivot.index < 0;
 		}
 
-		view.logScale = planet.logAltitudeScale * pivot.radius / planet.radius;
-		view.ceiling = Math.max(planet.maxAltitude, planet.maxAltitude * pivot.radius / planet.radius);
+		view.logScale = planet.logAltitudeScale;
+		view.ceiling = planet.maxAltitude;
 		// Air belongs to the active world; a chart seated elsewhere has none.
 		view.atmosphereTop = ease(view.atmosphereTop,
 			pivot.index < 0 ? R.physics.atmosphereTop() : 0, step, settings.easeTau);
 		view.gravity = view.from.gravity + (planet.surfaceGravity - view.from.gravity) * blend;
 		view.radius = view.from.radius + (planet.radius - view.from.radius) * blend;
-		R.camera.setRange(view.logScale, view.ceiling);
 		R.camera.setCircumference(TWO_PI * pivot.radius);
+		// The follow needs to know where the air ends to decide whether the
+		// camera's target is the ground or the ship.
+		R.camera.airTop = view.atmosphereTop;
 		return view;
 	};
 
@@ -449,26 +573,156 @@
 		shape.visible = true;
 		shape.distance = distance;
 		shape.angularRadius = alpha;
-		shape.halfWidth = alpha * camera.scalePx;
-		shape.centerX = camera.ox + camera.scalePx * centre;
+		shape.halfWidth = alpha * angularScale();
+		shape.centerX = screenX(centre);
 		// The near limb is the part of the sphere closest to the pivot, and the
 		// pivot's centre is below its surface on screen, so the near limb is the
 		// *lower* edge of the lens: `nearY` is greater than `farY`.
-		shape.nearY = camera.oy - camera.scalePx * Math.log(distance - rho);
-		shape.farY = camera.oy - camera.scalePx * Math.log(distance + rho);
+		shape.nearY = sky.distanceY(distance - rho, camera.oy, camera.scalePx);
+		shape.farY = sky.distanceY(distance + rho, camera.oy, camera.scalePx);
 		for (j = 0; j <= SAMPLES; j += 1) {
 			psi = -alpha + 2 * alpha * j / SAMPLES;
 			cosPsi = Math.cos(psi);
 			half = Math.sqrt(Math.max(0, rho * rho - distance * distance * Math.sin(psi) * Math.sin(psi)));
-			shape.xs[j] = camera.ox + camera.scalePx * (centre + psi);
-			shape.nearYs[j] = camera.oy - camera.scalePx * Math.log(Math.max(1e-9, distance * cosPsi - half));
-			shape.farYs[j] = camera.oy - camera.scalePx * Math.log(Math.max(1e-9, distance * cosPsi + half));
+			shape.xs[j] = screenX(centre + psi);
+			shape.nearYs[j] = sky.distanceY(Math.max(1e-9, distance * cosPsi - half), camera.oy, camera.scalePx);
+			shape.farYs[j] = sky.distanceY(Math.max(1e-9, distance * cosPsi + half), camera.oy, camera.scalePx);
 		}
 		shape.centerY = (shape.nearY + shape.farY) * 0.5;
 		sky.planePosition(bodies[0], simTimeOf(game), starPlane);
 		shape.shade = R.util.clamp(0.55 + 0.45 * Math.cos(
 			Math.atan2(dx, dy) - Math.atan2(starPlane.x - pivot.x, starPlane.y - pivot.y)), 0, 1);
 		return shape;
+	};
+
+	// The smallest a body is ever drawn. A distant sphere is a hairline in log
+	// space, so it is charted as a small disc instead: visible, clickable, and
+	// the same size the picker uses.
+	sky.iconRadius = function(index) {
+		var body = sky.bodyOf(index);
+
+		if (body === worldBody) {
+			return 10;
+		}
+		if (body.kind === 'star') {
+			return 9;
+		}
+		return body.radiusRadii >= 10 ? 7 : 4.5;
+	};
+
+	// Pick a body under a screen point, through the same lens geometry the
+	// renderer draws (including the minimum-height stretch, so a distant body
+	// is clickable). Returns the body index (-1 for the world), or -2 for
+	// empty space. The seated body is the ground, never a pick.
+	sky.pick = function(mx, my, game) {
+		var camera = R.camera;
+		var period = TWO_PI * camera.scalePx;
+		var best = -2;
+		var bestDistance = Infinity;
+		var i;
+		var lens;
+		var halfHeight;
+		var dx;
+		var dy;
+		var distance;
+
+		for (i = -1; i < bodies.length; i += 1) {
+			if (i === pivot.index) {
+				continue;
+			}
+			lens = sky.outline(i, game);
+			if (!lens.visible || lens.alpha <= 0.01) {
+				continue;
+			}
+			halfHeight = Math.max(sky.iconRadius(i), (lens.nearY - lens.farY) * 0.5);
+			dx = lens.centerX - mx;
+			if (period > 0) {
+				dx -= period * Math.round(dx / period);
+			}
+			dy = lens.centerY - my;
+			distance = Math.sqrt(dx * dx + dy * dy);
+			if (distance <= Math.max(10, Math.max(lens.halfWidth, sky.iconRadius(i)) + halfHeight) &&
+				distance < bestDistance) {
+				// Ellipse test in the lens's own axes, so the rim is the rim.
+				if ((dx * dx) / Math.max(1, lens.halfWidth * lens.halfWidth) +
+					(dy * dy) / Math.max(1, halfHeight * halfHeight) <= 1.2) {
+					best = i;
+					bestDistance = distance;
+				}
+			}
+		}
+		return best;
+	};
+
+	// A catalog body's orbit around the active world, sampled through the same
+	// map that draws its lens: the circle is charted, not drawn as an ellipse.
+	// Points inside the pivot body are dropped, which is what keeps the log
+	// pole from throwing a line across the chart.
+	sky.orbit = function(index) {
+		var body;
+		var distance;
+		var camera = R.camera;
+		var poleDistance;
+		var i;
+		var angle;
+		var px;
+		var py;
+		var dx;
+		var dy;
+		var d;
+
+		orbit.valid = false;
+		orbit.count = 0;
+		orbit.period = TWO_PI * camera.scalePx;
+		if (index < 0) {
+			return orbit;
+		}
+		body = bodies[index];
+		distance = body.distanceRadii * view.radius;
+		if (!(distance > 0)) {
+			return orbit;
+		}
+		if (camera.flat) {
+			// On the deck a circular orbit is a level lane at one altitude: an
+			// arc length across the viewport and the ladder's height for its
+			// radius. Same circle, same law, other spelling.
+			orbit.valid = true;
+			orbit.radius = distance;
+			orbit.period = camera.width;
+			for (i = 0; i <= ORBIT_N; i += 1) {
+				angle = TWO_PI * i / ORBIT_N;
+				R.camera.project(angle * view.radius, distance - view.radius, chartPoint);
+				orbit.xs[i] = chartPoint.x;
+				orbit.ys[i] = chartPoint.y;
+			}
+			orbit.count = ORBIT_N + 1;
+			return orbit;
+		}
+		poleDistance = Math.sqrt(pivot.x * pivot.x + pivot.y * pivot.y);
+		// An orbit that runs through the pole is not a curve on this chart.
+		if (Math.abs(distance - poleDistance) < pivot.radius * 1.01) {
+			return orbit;
+		}
+		orbit.valid = true;
+		orbit.radius = distance;
+		for (i = 0; i <= ORBIT_N; i += 1) {
+			angle = TWO_PI * i / ORBIT_N;
+			px = distance * Math.sin(angle);
+			py = distance * Math.cos(angle);
+			dx = px - pivot.x;
+			dy = py - pivot.y;
+			d = Math.sqrt(dx * dx + dy * dy);
+			if (d <= pivot.radius) {
+				orbit.xs[i] = NaN;
+				orbit.ys[i] = NaN;
+				continue;
+			}
+			orbit.xs[i] = camera.ox + camera.scalePx * Math.atan2(dx, dy);
+
+			orbit.ys[i] = sky.distanceY(d, camera.oy, camera.scalePx);
+			orbit.count += 1;
+		}
+		return orbit;
 	};
 
 	if (typeof module !== 'undefined' && module.exports) {
