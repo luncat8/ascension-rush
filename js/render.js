@@ -33,6 +33,11 @@
 	// Cached so the atmosphere label does not build a string per frame.
 	render.airLabel = { key: -1, text: 'ATMOSPHERE TOP' };
 	render.airY = 0;
+	// Half-height, in pixels, of the thinnest lens drawn. A distant body's true
+	// silhouette is only a couple of pixels tall at this scale; below this the
+	// drawn shape is stretched about its own centre for readability. Its
+	// placement is never altered.
+	render.minBodyHeight = 3.5;
 	render.timeLabel = { index: -1, text: 'x1' };
 	// The pad pair the map highlights: the leg in flight, a mission waiting for
 	// its return, or the dispatch form's selection. Filled in place per frame.
@@ -281,7 +286,9 @@
 		var y = render.airY;
 		var label;
 
-		if (y >= camera.groundY) {
+		// An airless world has no ceiling line to draw or to name.
+		if (airTop <= 0 || y >= camera.groundY) {
+			render.airLabel.key = -1;
 			return;
 		}
 		context.fillStyle = 'rgba(36, 84, 112, 0.20)';
@@ -293,74 +300,141 @@
 			label = key >= 10 ? (key / 10).toFixed(1) + ' km' : Math.round(airTop) + ' m';
 			render.airLabel.text = 'ATMOSPHERE TOP  ·  ' + label;
 		}
+		if (y < 26) {
+			// The line is at the very top: a label there would collide with the
+			// altitude ladder's own heading.
+			return;
+		}
 		context.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
 		context.textAlign = 'left';
 		context.fillStyle = 'rgba(174, 216, 230, 0.82)';
 		context.fillText(render.airLabel.text, 20, y - 6);
 	}
 
-	function drawSkyBody(context, body, projection) {
-		var x = projection.x;
-		var y = projection.y;
-		var r = projection.radius;
+	// A body's lens. Both limbs are already in screen space: each sample angle
+	// gives the two intersections of its ray with the sphere, and the chart's
+	// own log-polar map puts them where they belong. The shape is then the
+	// closed polygon between the near limb and the far limb.
+	function lensPath(context, lens) {
+		var i;
+
+		context.beginPath();
+		for (i = 0; i < lens.xs.length; i += 1) {
+			if (i === 0) {
+				context.moveTo(lens.xs[0], lens.nearYs[0]);
+			} else {
+				context.lineTo(lens.xs[i], lens.nearYs[i]);
+			}
+		}
+		for (i = lens.xs.length - 1; i >= 0; i -= 1) {
+			context.lineTo(lens.xs[i], lens.farYs[i]);
+		}
+		context.closePath();
+	}
+
+	function drawSkyBody(context, body, lens) {
+		var star = body.kind === 'star';
+		var halfWidth;
+		var halfHeight;
+		var x;
+		var mid;
 		var angle;
 		var i;
 
+		if (!lens.visible || lens.alpha <= 0.01) {
+			return;
+		}
+		halfWidth = Math.max(1, lens.halfWidth);
+		halfHeight = Math.max(render.minBodyHeight, (lens.nearY - lens.farY) * 0.5);
+		x = lens.centerX;
+		mid = lens.centerY;
+		if (x < -halfWidth * 4 || x > render.width + halfWidth * 4) {
+			return;
+		}
+		if (mid - halfHeight > R.camera.groundY) {
+			return;
+		}
 		context.save();
-		if (body.kind === 'star') {
+		if (star) {
 			for (i = 4; i >= 1; i -= 1) {
-				context.globalAlpha = 0.05 + (5 - i) * 0.045;
+				context.globalAlpha = lens.alpha * (0.05 + (5 - i) * 0.045);
 				context.beginPath();
-				context.arc(x, y, r * (1 + i * 0.65), 0, Math.PI * 2);
+				context.arc(x, mid, Math.max(halfWidth, halfHeight) * (1 + i * 0.65), 0, Math.PI * 2);
 				context.fillStyle = body.color;
 				context.fill();
 			}
-			context.globalAlpha = 1;
 			context.strokeStyle = 'rgba(255, 231, 174, 0.55)';
 			context.lineWidth = 1;
 			for (i = 0; i < 8; i += 1) {
 				angle = i * Math.PI / 4;
 				context.beginPath();
-				context.moveTo(x + Math.cos(angle) * r * 1.25, y + Math.sin(angle) * r * 1.25);
-				context.lineTo(x + Math.cos(angle) * r * 1.7, y + Math.sin(angle) * r * 1.7);
+				context.moveTo(x + Math.cos(angle) * halfWidth * 1.25, mid + Math.sin(angle) * halfWidth * 1.25);
+				context.lineTo(x + Math.cos(angle) * halfWidth * 1.7, mid + Math.sin(angle) * halfWidth * 1.7);
 				context.stroke();
 			}
 		}
-		context.beginPath();
-		context.arc(x, y, r, 0, Math.PI * 2);
-		context.clip();
+		context.globalAlpha = lens.alpha;
+		lensPath(context, lens);
 		context.fillStyle = body.color;
-		context.fillRect(x - r, y - r, r * 2, r * 2);
-		context.fillStyle = body.shade;
-		context.globalAlpha = 0.72;
-		context.beginPath();
-		context.arc(x + (1 - projection.shade) * r * 1.7, y - r * 0.18, r * 1.12, 0, Math.PI * 2);
 		context.fill();
+		// The shaded side is turned away from the star, the same lighting rule
+		// the ship uses.
+		context.save();
+		context.clip();
+		context.globalAlpha = lens.alpha * 0.55;
+		context.fillStyle = body.shade;
+		context.fillRect(x + (1 - lens.shade) * halfWidth * 1.4, mid - halfHeight * 2,
+			halfWidth * 1.6, halfHeight * 4);
 		context.restore();
-		context.globalAlpha = 1;
-		context.beginPath();
-		context.arc(x, y, r, 0, Math.PI * 2);
+		lensPath(context, lens);
+		context.globalAlpha = lens.alpha;
 		context.lineWidth = 1;
 		context.strokeStyle = 'rgba(226, 240, 247, 0.35)';
 		context.stroke();
+		context.restore();
 		if (render.width >= 650) {
 			context.font = '600 9px ui-monospace, SFMono-Regular, Menlo, monospace';
 			context.textAlign = 'center';
 			context.fillStyle = 'rgba(211, 228, 235, 0.82)';
-			context.fillText(body.name.toUpperCase(), x, y - r - 9);
+			context.fillText(body.name.toUpperCase(), x, Math.max(9, mid - halfHeight - 6));
 		}
+	}
+
+	// The body the chart is seated on is the ground, so its whole sphere is
+	// drawn as the cutaway below the ground line: the same map that puts its
+	// surface on the line sends its interior down the screen.
+	function drawGroundBody(context, body) {
+		var camera = R.camera;
+		var top = camera.groundY;
+		var bottom = camera.height;
+		var radius = R.sky.pivot.radius;
+		var y;
+
+		if (bottom - top < 2) {
+			return;
+		}
+		// The interior is the log band from the surface down to the centre. A
+		// single fill is enough: the layers are a later slice.
+		y = camera.oy - camera.scalePx * Math.log(radius * 0.35);
+		context.fillStyle = body.shade;
+		context.fillRect(0, top, render.width, bottom - top);
+		context.fillStyle = 'rgba(180, 199, 173, 0.16)';
+		context.fillRect(0, Math.min(bottom, y), render.width, 1);
 	}
 
 	function drawSkyBodies(context, game) {
 		var bodies = R.constants.sky.bodies;
-		var projection = R.sky.projection;
+		var lens = R.sky.shape;
+		var ground = R.sky.pivot.index;
 		var i;
 
-		for (i = 0; i < bodies.length; i += 1) {
-			R.sky.projectBody(bodies[i], game, projection);
-			if (projection.visible) {
-				drawSkyBody(context, bodies[i], projection);
+		for (i = -1; i < bodies.length; i += 1) {
+			if (i === ground && !R.sky.pivot.reseating) {
+				drawGroundBody(context, i < 0 ? R.sky.world : bodies[i]);
+				continue;
 			}
+			R.sky.outline(i, game);
+			drawSkyBody(context, i < 0 ? R.sky.world : bodies[i], lens);
 		}
 	}
 
@@ -1338,6 +1412,39 @@
 		context.stroke();
 		context.restore();
 	}
+
+	// Just the chart: sky shade, stars, the air band, every body's lens in the
+	// system, the altitude ladder and the ground. `render.draw` adds the game
+	// on top; the projection test page calls this directly.
+	render.drawChart = function(context, game) {
+		context.clearRect(0, 0, render.width, render.height);
+		context.fillStyle = render.skyGradient;
+		context.fillRect(0, 0, render.width, render.height);
+		R.sky.ensure();
+		drawSkyShade(context);
+		drawStars(context);
+		drawAirBand(context);
+		drawSkyBodies(context, game);
+		drawAltitudeScale(context);
+		drawGround(context);
+	};
+
+	// A point marker for the projection page: the thing whose motion the chart
+	// is being tested against.
+	render.drawProbe = function(context, wx, wy) {
+		var point = render.scratch.marker;
+
+		R.camera.project(wx, wy, point);
+		context.beginPath();
+		context.arc(point.x, point.y, 5, 0, Math.PI * 2);
+		context.fillStyle = '#f4c76a';
+		context.fill();
+		context.beginPath();
+		context.arc(point.x, point.y, 11, 0, Math.PI * 2);
+		context.strokeStyle = 'rgba(244, 199, 106, 0.45)';
+		context.lineWidth = 1;
+		context.stroke();
+	};
 
 	render.draw = function(game) {
 		var context = render.context;

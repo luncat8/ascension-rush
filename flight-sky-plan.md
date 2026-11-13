@@ -7,7 +7,7 @@ above the atmosphere — moons, planets, a star, a proper escape-speed readout,
 a flown / predicted trajectory and a log scale that follows the approach to a
 body. Keep the existing pad-to-pad velocity controller and shared physics:
 0.3.7 adds no orbital state, no second gravity model and no new forces. A
-separate experiment phase (0.3.8) measures whether Lagrange points and
+separate experiment phase (0.3.9) measures whether Lagrange points and
 multi-body gravity can be added cleanly before any of it reaches the flight
 loop. Do not turn this arcade-scale game into an orbital simulator or replace
 the controller with a large optimizer.
@@ -85,8 +85,8 @@ References:
 - The map is a wrap-X / log-Y cylinder: `coords` owns the only forward and
   inverse altitude transform, and `camera` owns its scale. 0.3.7 makes that
   scale dynamic through those two modules rather than adding a second
-  projection for the rocket; the sky dome is a separate projection used only
-  for distant bodies.
+  projection for the rocket. The system chart is that same map with a movable
+  pivot; there is no separate sky projection.
 
 ## Aerodynamic model
 
@@ -323,7 +323,7 @@ it happens, which is where the few 0.3.2 regressions came from.
   counts flights fixed against flights broken against that baseline on the
   same seeds and build counts.
 
-### 0.3.7 — Inter-planet sky, escape speed & adaptive projection
+### 0.3.7 — Inter-planet sky, escape speed & the system chart
 
 One visual layer above the atmosphere. It adds no orbital state, no second
 gravity model and no change to the point-mass integrator: the same fixed-step
@@ -337,19 +337,44 @@ What changes is what the player can see and read.
   scale with the active world's radius. Bodies are visual only in this slice:
   gravity, drag, collisions and trajectory integration remain the active
   world's inverse-square field. A body's sphere of influence is not named yet.
-- **Proper projection.** `sky.projectBody` places a body from its polar orbit
-  geometry into an azimuthal equidistant sky dome, rather than by choosing a
-  sprite position. With `d = distanceRadii * radius`, angular separation
-  `theta` from the rocket's longitude, and an observer at `radius + altitude`,
-  the line of sight is `(d*sin(theta), d*cos(theta) - (radius + altitude))`;
-  elevation is `atan2(vertical, |horizontal|)`, azimuth `atan2(horizontal,
-  vertical)`, and the horizon angle is `acos((radius + altitude) / d)`. Screen
-  x is `width/2 + (width/2) * azimuth / horizonAngle`, screen y runs from the
-  sky-band bottom up to its top as elevation goes from 0 to `pi/2`. Apparent
-  radius in pixels is `asin(bodyRadius / observerDistance) / horizonAngle *
-  width/2`, clamped to a small readable range. Bodies below the horizon are
-  hidden, not clamped to the edge. Longitude drift and the rocket's longitude
-  both feed the projection, so the sky has real parallax.
+- **One chart for the whole system.** The game's own chart is the projection:
+  a log-polar map of the plane with a single shared scale `s`,
+  `x = ox + s·atan2(dx, dy)` and `y = oy − s·ln(distance)`, measured from a
+  **pivot** body's centre. One scale on both axes is the requirement, not a
+  detail: a sphere is round in the plane, so its image is a lens whose width and
+  height agree, and a moon thousands of radii away stays a visible shape. A
+  vertical-only log altitude with an independent horizontal px/metre squashes
+  every distant body into a line, so it cannot be used for this.
+- **The deck map is the closed form.** With the pivot on the active world,
+  `oy = groundY + s·ln(R)` and `atan2` cancels, leaving
+  `y = groundY − s·ln(1 + wy/R)` and `x = ox + s·wx/R` — the existing wrap-X /
+  log-altitude chart with the world's radius as its log knee. The gameplay
+  projection is therefore unchanged: pads, trails, the altitude ladder and the
+  mouse readout all read the same numbers, and forward and inverse round-trip
+  exactly. `camera.flat` selects the closed form; the general form is used away
+  from the world.
+- **A body is a lens, not a sprite.** With `D` the distance from the pivot,
+  `rho` the body's radius and `alpha = asin(rho/D)`, each ray at offset `psi`
+  inside the body's angular radius crosses the sphere twice:
+  `half = sqrt(rho² − D²·sin²psi)`, `near = D·cos(psi) − half`,
+  `far = D·cos(psi) + half`. Both limbs are projected through the same map, so
+  the shape is the true silhouette and a close body gets a genuine cutaway.
+  A body containing the pivot has no lens and is skipped.
+- **Shared-scale fit.** The farthest surface of the charted system is fitted to
+  `view.chartTopFraction` of the viewport, which fixes `s`. The fit is sampled
+  at `sky.fitSampleSeconds` and eases outward at `fitGrowTau` and inward at
+  `fitCloseTau`, so the farthest body stays fitted without the whole chart
+  breathing at the orbit period.
+- **Pivot hand-over.** The chart is seated on exactly one body. Seating it on
+  another is a continuous change, not a cut: the pole eases to the new body's
+  centre and `s` eases with it, while the offsets `ox`, `oy` are **solved every
+  frame** from an anchor so the anchor's screen position does not change. The
+  anchor is the destination body's surface point nearest the ship — the point
+  that is about to become the ground line. Because the anchor's angle and
+  distance are read against the live pole, the chart travels underneath it and
+  nothing on screen jumps. Once seated, the world the ship left is a lens like
+  any other. The hand-over is view-only: it never writes `wx`, `wy` or any
+  physics state.
 - **Proper escape speed.** Derive the gravitational parameter from the world
   the physics already uses: `mu = surfaceGravity * radius^2`, `r = radius +
   altitude`, `v_escape(r) = sqrt(2*mu/r)`, `v_circular(r) = sqrt(mu/r)`. The
@@ -364,14 +389,6 @@ What changes is what the player can see and read.
   translucent air band below it and the star field above it. Choose altitude
   marks from a decade ladder inside the current ceiling; never clamp several
   out-of-range labels onto the top edge.
-- **Log scale that follows the approach.** Keep `logScale` and `ceiling` on the
-  camera, and have both `worldToScreen` and `screenToWorld` read them so the
-  transform stays invertible at every frame. `sky.update(game, dt)` computes a
-  target from the rocket's radial distance and the nearest catalog body: the
-  ceiling expands to keep the approached body on screen, and the log knee moves
-  from `planet.logAltitudeScale` toward a fraction of that body's radius. Ease
-  both with `1 - exp(-dt/tau)`. At the deck and inside the atmosphere the
-  targets are the planet's own values, so the gameplay map does not move.
 - **Smooth transform on a gravity change.** A world switch replaces
   `surfaceGravity`, radius, scale height and log scale at the run boundary.
   Capture the outgoing `gravity`, `radius`, `atmosphereTop`, `logScale` and
@@ -392,7 +409,7 @@ What changes is what the player can see and read.
   unbound high-altitude state is marked near the rocket. These are readouts,
   not a new flight mode.
 
-### 0.3.8 — Experiment: Lagrange points & multi-body gravity (next phase)
+### 0.3.9 — Experiment: Lagrange points & multi-body gravity (next phase)
 
 A separate experiment phase, not part of 0.3.7's shipped slice. The question is
 whether proper multi-body gravity and the visual transformations it needs can
@@ -436,13 +453,13 @@ js/main.js                  # per-frame sky / trail update, smooth world switch
 index.html                  # classic script order for the new helpers
 css/style.css               # compact profile control if required
 experiments/aerodynamics-test.js # aerodynamic formula / edge-case checks
-experiments/sky-test.js      # escape speed, projection, transform and trace
+experiments/sky-test.js      # escape speed, chart, lens projection, pivot, trace
 experiments/envelope.js      # cross-planet guidance and load report
 experiments/flight-test.js   # physics, touchdown report and mission regressions
 experiments/trajectory-test.js # coast predictor: integrator equivalence, edges
 experiments/impact-accuracy.js # forecast error and cost over many states
 experiments/render-smoke-test.js # new telemetry, sky and marker paths
-experiments/gravity-field-experiment.js # 0.3.8 headless L-point / gravity study
+experiments/gravity-field-experiment.js # 0.3.9 headless L-point / gravity study
 experiments/autopilot-test.js # envelope limits, profiles, staging, frame rates
 experiments/harness.js       # shared flight harness and flight-quality metrics
 experiments/build-sweep.js   # random builds: dry baseline, limits off, profiles
@@ -494,7 +511,7 @@ aerodynamics helpers instead.
   inverse round trips, monotonic screen y, finite projections and bounded
   easing at 30, 60 and 144 fps. Compare the projected apparent radius against
   the analytic angular size for each body.
-- For 0.3.8, judge the gravity experiment on its residuals and on the same
+- For 0.3.9, judge the gravity experiment on its residuals and on the same
   reference routes with the extra bodies off; a model that needs a special
   case inside `physics.step` or changes a shipped route is a rejected model,
   not a tuning problem.
@@ -542,11 +559,15 @@ aerodynamics helpers instead.
 - `node experiments/sky-test.js` passes. Escape speed is `sqrt(2*g0*R^2/r)`
   on every world and decreases with altitude; an airless world reports a zero
   atmosphere ceiling; `coords` round trips hold at every eased `logScale` and
-  `ceiling`; body projection hides below-horizon bodies and reproduces the
-  analytic angular radius; the coast trace matches the rollout it came from.
-- The sky, flown trail, coast trace, adaptive altitude marks, atmosphere
-  ceiling, star, moons and planets draw on every world and at narrow
-  viewports without per-frame allocations. A world switch morphs the view over
+  `ceiling` in both the closed-form and general spellings of the chart; every
+  catalog body is a lens whose limbs meet at the lens edges and whose near limb
+  is `D − rho`; a pivot hand-over holds its anchor to 0.001 px across at least
+  ten frames in both directions; the coast trace matches the rollout it came
+  from.
+- The chart, flown trail, coast trace, altitude marks, atmosphere ceiling,
+  star, moons and planets draw on every world and at narrow viewports without
+  per-frame allocations; the deck layout is unchanged because its map is the
+  closed form of the chart. A world switch morphs the view over
   its configured seconds; no physics value, pad longitude, route, price or
   flight report changes. The 0.3.5 reference-route table still matches.
 
@@ -564,7 +585,7 @@ aerodynamics helpers instead.
   attitude modes or KSP-specific trajectory planners to this release line.
 - Real multi-body gravity, spheres of influence, Lagrange points, patched
   conics, rotating-frame projections and body-relative visual transforms are
-  the 0.3.8 experiment, not part of 0.3.7's visual sky. 0.3.7 draws bodies
+  the 0.3.9 experiment, not part of the 0.3.7/0.3.8 visual chart. 0.3.7 draws bodies
   from orbit geometry and reads escape speed from the active world's GM, but
   applies no force from them.
 - A builder warning for a stack whose later stages cannot hold the rocket up.

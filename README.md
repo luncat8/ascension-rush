@@ -2,7 +2,7 @@
 
 A small 2D rocket-delivery game: wrap-around planets, staged rockets, manual
 flight or autopilot, pad-to-pad delivery, fuel/hull/payload economics, a
-logarithmic altitude view with an adaptive inter-planet sky, in-flight damage
+logarithmic altitude view with a log-polar system chart, in-flight damage
 and failures, and a competing logistics company.
 
 ## Status
@@ -110,17 +110,33 @@ fleet and routes start over. The world menu shows each world as locked (with
 the milestone that opens it), in progress or dominant, and the campaign is kept
 in the browser's local storage until "Start a new campaign" erases it.
 
-The **0.3.7** inter-planet sky slice puts a visual system above the atmosphere:
-a star, two planets and two moons placed by an azimuthal projection from their
-orbit geometry, a labelled atmosphere ceiling, adaptive decade altitude marks,
-and a solid flown trail beside the dashed engine-off coast trace. Surface and
-current escape speeds come from `sqrt(2 * g0 * R^2 / r)`, the same GM the
-integrator uses, and an above-atmosphere rocket at that speed is marked
-`UNBOUND`. As the rocket climbs toward a body the camera's log knee and ceiling
-ease toward it; a world switch morphs gravity, radius, air ceiling and scale
-over about a second instead of snapping. No force, route, price or flight
-report changes. The 0.3.8 gravity / Lagrange-point work is an experiment phase
-in the plan, not wired into the flight loop.
+The **0.3.7** inter-planet sky slice puts a visual system above the atmosphere,
+and **0.3.8** replaces its separate sky band with the game's own chart. The
+chart is log-polar: one shared scale puts `atan2` across and `−ln(distance)` up
+the screen, so a body is the image of its whole sphere — a lens solved from its
+near and far limbs — and a moon three thousand radii away is still a visible
+shape rather than a one-pixel line. The deck's wrap-X / log-altitude view is
+the closed form of the same map with the active world's radius as the log knee,
+so the gameplay projection is unchanged: forward and inverse round-trip to
+1e-12 and the altitude ladder, pads, trails and mouse readout all read the same
+numbers. Nothing is a sprite in a second projection.
+
+The chart is seated on one body, its **pivot**, whose surface is the ground
+line. Seating it elsewhere is a hand-over, not a cut: the pole and the shared
+scale ease across while the screen offsets are solved every frame from an
+anchor — the destination body's surface point nearest the ship — so the anchor
+never moves (measured drift 0.0 px over 87 frames) and the new surface arrives
+as the flat ground. Once seated, the world the ship left is charted as a body
+like any other. `experiments/body-hop.html` exercises this with a point and no
+rocket at all.
+
+Surface and current escape speeds come from `sqrt(2 * g0 * R^2 / r)`, the same
+GM the integrator uses, and an above-atmosphere rocket at that speed is marked
+`UNBOUND`. A labelled atmosphere ceiling, adaptive decade altitude marks, the
+solid flown trail and the dashed engine-off coast trace stay as they were. No
+force, route, price or flight report changes: the chart is a view. The 0.3.9
+multi-body gravity / Lagrange-point work remains an experiment phase in the
+plan, not wired into the flight loop.
 
 Plans now use short descriptive filenames (`flight-sky-plan.md`,
 `market-parts-plan.md`, …); subject numbers like 0.3.7 stay inside the
@@ -128,7 +144,7 @@ documents and in worklog names.
 
 ## Plans (subject numbers inside, short descriptive filenames)
 Active:
-- [`flight-sky-plan.md`](./flight-sky-plan.md) — Aerodynamics, safer guidance, flight diagnostics (0.3.1–0.3.4) and the inter-planet sky / escape-speed / adaptive-projection phase (0.3.7, with 0.3.8 as a gravity experiment).
+- [`flight-sky-plan.md`](./flight-sky-plan.md) — Aerodynamics, safer guidance, flight diagnostics (0.3.1–0.3.4), the inter-planet sky (0.3.7) and the log-polar system chart with its pivot hand-over (0.3.8).
 - [`campaign-plan.md`](./campaign-plan.md) — Milestones & campaign arc: company milestones, rewards, world unlocks and a dominant-courier end condition.
 - [`deck-hud-plan.md`](./deck-hud-plan.md) — Self-explained deck & HUD.
 - [`damage-rivals-plan.md`](./damage-rivals-plan.md) — Damage & failures (0.5.1) and competitor pressure (0.5.2), both shipped.
@@ -161,7 +177,12 @@ tags, `file://`-friendly). Node smoke/regression tests:
 
 ```sh
 node experiments/coords-test.js
-node experiments/sky-test.js               # escape speed, sky projection, adaptive log scale
+node experiments/sky-test.js               # escape speed, log-polar chart, lens projection, pivot hand-over
+
+Open `experiments/body-hop.html` in a browser (file:// works) to watch the
+chart re-seat: a point with no rocket on it hops between bodies, and the
+pivot change can be scrubbed, paused and slowed down.
+
 node experiments/aerodynamics-test.js
 node experiments/flight-test.js
 node experiments/builder-test.js            # rocket-type workshop, snapshots

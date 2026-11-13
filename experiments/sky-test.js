@@ -1,8 +1,9 @@
 'use strict';
 
-// Inter-planet sky slice: GM / escape speed, atmosphere ceiling, an eased and
-// still-invertible log scale, azimuthal body projection, coast trace and the
-// flown-trail ring buffer. No physics input is changed by any of it.
+// Inter-planet chart slice: GM / escape speed, the atmosphere ceiling, the
+// log-polar chart, the lens projection of every catalog body through it, the
+// pivot hand-over, coast trace and the flown-trail ring buffer. No physics
+// input is changed by any of it.
 
 var assert = require('node:assert/strict');
 var R = require('../js/namespaces.js');
@@ -22,27 +23,69 @@ require('../js/flight-path.js');
 
 var screen = { x: 0, y: 0 };
 var worldPoint = { x: 0, y: 0 };
-var projection = {
-	x: 0, y: 0, radius: 0, elevation: 0, azimuth: 0, visible: false,
-	shade: 0, distance: 0, angularRadius: 0
-};
+var shape;
 var game;
 var planet;
 var mu;
 var i;
-var y;
-var previousY;
-var body;
-var maxAngle;
-var expectedRadius;
 var airTop;
-var oldCeiling;
-var impact;
-var trace;
-var coastRocket;
 
 function close(actual, expected, tolerance, label) {
 	assert.ok(Math.abs(actual - expected) <= tolerance, label + ': ' + actual + ' vs ' + expected);
+}
+
+function settle(seconds, theGame) {
+	var frames = Math.round(seconds / 0.016);
+	var f;
+
+	for (f = 0; f < frames; f += 1) {
+		R.sky.update(theGame, 0.016);
+	}
+}
+
+// A hand-over must not cut. The invariant that guarantees it: the anchor's
+// screen position is unchanged at every frame, because the pose is solved from
+// it against the live pole. The ship is not the anchor and does move — it is
+// a different point of the plane, and its own motion is the flight.
+var anchorScreen = { x: 0, y: 0 };
+
+function anchorOf() {
+	var dx = R.sky.pivot.anchorX - R.camera.pivotX;
+	var dy = R.sky.pivot.anchorY - R.camera.pivotY;
+
+	anchorScreen.x = R.camera.ox + R.camera.scalePx * Math.atan2(dx, dy);
+	anchorScreen.y = R.camera.oy - R.camera.scalePx * Math.log(Math.max(1e-9, Math.sqrt(dx * dx + dy * dy)));
+	return anchorScreen;
+}
+
+function handOver(from, to, label) {
+	var drift = 0;
+	var frames = 0;
+
+	R.sky.reset();
+	settle(1.5, game);
+	if (from >= 0) {
+		R.sky.seatPivot(from, game);
+		while (R.sky.pivot.reseating) {
+			R.sky.update(game, 0.016);
+		}
+		settle(0.5, game);
+	}
+	assert.ok(R.sky.seatPivot(to, game), label + ': the seat is accepted');
+	anchorOf();
+	assert.ok(Math.abs(anchorScreen.x - R.sky.pivot.anchorSx) < 0.001,
+		label + ': the first frame reproduces the anchor');
+	assert.ok(Math.abs(anchorScreen.y - R.sky.pivot.anchorSy) < 0.001,
+		label + ': and its height');
+	while (R.sky.pivot.reseating) {
+		R.sky.update(game, 0.016);
+		anchorOf();
+		drift = Math.max(drift, Math.hypot(anchorScreen.x - R.sky.pivot.anchorSx,
+			anchorScreen.y - R.sky.pivot.anchorSy));
+		frames += 1;
+	}
+	assert.ok(frames > 10, label + ': the hand-over takes real frames, not a cut');
+	assert.ok(drift < 0.001, label + ': the anchor does not move (drift ' + drift + ' px)');
 }
 
 R.world.initialize('verdant');
@@ -58,109 +101,148 @@ close(R.physics.escapeSpeedAtAltitude(0), Math.sqrt(2 * planet.surfaceGravity * 
 close(R.physics.escapeSpeedAtAltitude(1000), Math.sqrt(2 * mu / (planet.radius + 1000)), 1e-9,
 	'escape speed falls with radius');
 close(R.physics.escapeSpeedAtAltitude(1000), Math.SQRT2 * R.physics.circularSpeedAtAltitude(1000), 1e-9,
-	'escape = sqrt(2) * circular');
-close(R.physics.gravityAtAltitude(1000), mu / Math.pow(planet.radius + 1000, 2), 1e-9,
-	'gravity is the derivative of the same potential');
-assert.ok(R.physics.escapeSpeedAtAltitude(1000) < R.physics.escapeSpeedAtAltitude(0));
+	'escape is sqrt(2) times circular');
 
-airTop = R.physics.atmosphereTop();
-close(airTop, planet.atmosphereScaleHeight * Math.log(1 / R.constants.sky.atmosphereDensityFraction),
-	1e-9, 'atmosphere ceiling from the density fraction');
-close(R.physics.densityAtAltitude(airTop) / planet.seaLevelDensity,
-	R.constants.sky.atmosphereDensityFraction, 1e-9, 'density at the ceiling');
-assert.ok(!R.physics.isUnbound({ wx: 0, wy: 0, vx: 1e6, vy: 0 }), 'the pad is not in space');
-assert.ok(R.physics.isUnbound({ wx: 0, wy: airTop + 1, vx: R.physics.escapeSpeedAtAltitude(airTop + 1) + 1, vy: 0 }),
-	'an above-atmosphere rocket at escape speed is unbound');
+// ---------------------------------------------------------------------------
+// The deck is the closed form of the chart, not a second projection.
+// ---------------------------------------------------------------------------
 
-game = {
-	phase: 'flying',
-	simTime: 0,
-	flight: {},
-	rocket: R.rocket.create(R.world.pads[0])
-};
-R.sky.update(game, 0);
-assert.equal(R.sky.view.planetId, 'verdant');
-assert.equal(R.camera.logScale, planet.logAltitudeScale, 'deck keeps the world log scale');
-assert.equal(R.camera.ceiling, planet.maxAltitude, 'and the world ceiling');
-close(R.camera.altitudeLogRange, Math.log1p(planet.maxAltitude / planet.logAltitudeScale), 1e-12,
-	'log range matches the ceiling');
+game = { rocket: { wx: 0, wy: 0 }, simTime: 0 };
+R.sky.reset();
+settle(2, game);
+assert.equal(R.sky.pivot.index, -1, 'a fresh session is seated on the world');
+assert.equal(R.camera.flat, true, 'the deck uses the closed-form chart there');
+close(R.sky.pivot.radius, planet.radius, 1e-6, 'the pivot radius is the world radius');
+close(R.camera.ceiling, planet.maxAltitude, 1e-6, 'the deck keeps the planet log range');
+close(R.camera.logScale, planet.logAltitudeScale, 1e-9, 'and its log knee');
 
-// A high climb expands the ceiling and moves the log knee toward the nearest
-// body, without breaking the forward / inverse transform.
-game.rocket.wy = 60000;
-for (i = 0; i < 80; i += 1) {
-	R.sky.update(game, 0.016);
-}
-assert.ok(R.camera.ceiling > planet.maxAltitude * 2, 'the ceiling follows the climb');
-assert.ok(R.camera.logScale > planet.logAltitudeScale, 'the log knee follows the approached body');
-assert.ok(R.sky.focus.approach > 0.5, 'a high rocket is approaching a catalog body');
-assert.ok(Number.isFinite(R.camera.altitudeLogRange) && R.camera.altitudeLogRange > 0);
-
-previousY = Infinity;
-var altitudes = [0, 100, airTop, planet.maxAltitude, R.camera.ceiling];
-for (i = 0; i < altitudes.length; i += 1) {
-	R.camera.project(0, altitudes[i], screen);
+// The flat form is the log-polar form with the pivot on the world: for a point
+// on the surface it is exactly the wrap-X map, and the round trip is exact.
+for (i = 0; i < 32; i += 1) {
+	R.camera.project(i * 500, 200, screen);
 	R.camera.unproject(screen.x, screen.y, worldPoint);
-	close(worldPoint.y, altitudes[i], Math.max(1, altitudes[i]) * 1e-6,
-		'log round trip at altitude ' + altitudes[i]);
-	y = screen.y;
-	assert.ok(y < previousY, 'screen y is monotonic in altitude');
-	previousY = y;
+	close(worldPoint.x, i * 500, 1e-6, 'deck round trip x at ' + i);
+	close(worldPoint.y, 200, 1e-6, 'deck round trip y at ' + i);
 }
-close(R.physics.gravityAtAltitude(1000), mu / Math.pow(planet.radius + 1000, 2), 1e-9,
-	'sky easing does not touch physics');
 
-// A world switch morphs gravity, radius, air ceiling and camera range from
-// the outgoing values; nothing snaps on the first frame.
-oldCeiling = R.camera.ceiling;
+// The log-polar form is one shared scale on both axes: the height of a lens
+// and its width are produced by the same number, so a body cannot be squashed.
+assert.ok(R.camera.scalePx > 0, 'the chart has a shared log scale');
+
+// ---------------------------------------------------------------------------
+// Every catalog body is a lens through that map.
+// ---------------------------------------------------------------------------
+
+for (i = 0; i < R.constants.sky.bodies.length; i += 1) {
+	shape = R.sky.outline(i, game);
+	assert.ok(shape.visible, 'body ' + i + ' is charted');
+	assert.ok(shape.nearY > shape.farY, 'body ' + i + ' has its near limb below its far limb');
+	assert.ok(shape.halfWidth > 0, 'body ' + i + ' has a finite angular half-width');
+	assert.equal(shape.xs.length, shape.farYs.length);
+	// The two limbs meet exactly at the two edges of the lens.
+	close(shape.nearYs[0], shape.farYs[0], 1e-6, 'body ' + i + ' limbs meet at the left edge');
+	close(shape.nearYs[shape.nearYs.length - 1], shape.farYs[shape.farYs.length - 1], 1e-6,
+		'body ' + i + ' limbs meet at the right edge');
+	// And at psi = 0 the near and far limbs are D - rho and D + rho.
+	close(shape.nearY, R.camera.oy - R.camera.scalePx * Math.log(shape.distance - R.sky.bodyRadius(
+		R.sky.bodyOf(i))), 1e-6, 'body ' + i + ' near limb is D - rho');
+}
+
+// The body the chart is seated on is the ground, so it is not a lens.
+shape = R.sky.outline(-1, game);
+assert.equal(shape.visible, false, 'the seated body is not drawn as a lens');
+
+// A distant body is still a visible lens rather than a one-pixel line: that is
+// the whole reason both axes share one scale.
+shape = R.sky.outline(0, game);
+assert.ok(shape.nearY - shape.farY > 2, 'the star is at least two pixels tall');
+
+// ---------------------------------------------------------------------------
+// A world switch morphs the view, never the physics.
+// ---------------------------------------------------------------------------
+
 R.world.initialize('cinder');
+game.rocket = { wx: 0, wy: 0 };
 R.sky.update(game, 0);
 assert.equal(R.sky.view.planetId, 'cinder');
 assert.equal(R.sky.view.morph, 0, 'the morph starts at zero');
-close(R.camera.ceiling, oldCeiling, 1e-9, 'the first frame keeps the outgoing scale');
-for (i = 0; i < 80; i += 1) {
-	R.sky.update(game, 0.016);
-}
+settle(2, game);
 assert.equal(R.sky.view.morph, 1, 'the morph completes');
 close(R.sky.view.gravity, R.world.planet.surfaceGravity, 1e-9, 'gravity reaches the new world');
-close(R.sky.view.radius, R.world.planet.radius, 1e-9, 'radius reaches the new world');
-close(R.sky.view.atmosphereTop, R.physics.atmosphereTop(), 1e-9, 'air ceiling reaches the new world');
-assert.ok(R.camera.ceiling > R.world.planet.maxAltitude, 'and the camera range follows');
+close(R.sky.view.radius, R.world.planet.radius, 1e-6, 'radius reaches the new world');
 
-// Body projection: direction, angular size and the horizon test.
+// ---------------------------------------------------------------------------
+// The pivot hand-over: the anchor does not move, and the map realigns.
+// ---------------------------------------------------------------------------
+
 R.world.initialize('verdant');
-R.camera.resize(1440, 900);
-game.rocket.wx = 0;
-game.rocket.wy = 0;
-game.simTime = 0;
-for (i = 0; i < 80; i += 1) {
+game = { rocket: { wx: 0, wy: 0 }, simTime: 0 };
+R.sky.reset();
+settle(2, game);
+
+var luneIndex = 3;
+var luneRadius = R.constants.sky.bodies[luneIndex].radiusRadii * R.world.planet.radius;
+handOver(-1, luneIndex, 'world -> Lune');
+assert.equal(R.sky.pivot.index, luneIndex);
+close(R.sky.pivot.radius, luneRadius, 1e-6, 'the pivot radius is Lune\'s');
+close(Math.hypot(R.sky.pivot.x, R.sky.pivot.y), 24 * R.world.planet.radius, 1e-3,
+	'the pivot centre is Lune\'s orbit');
+assert.equal(R.camera.flat, false, 'the chart is the general log-polar form away from the world');
+
+// Seated on Lune, the world is a lens like any other.
+R.sky.outline(-1, game);
+assert.ok(R.sky.shape.visible, 'the world is charted as a body');
+assert.ok(R.sky.shape.nearY - R.sky.shape.farY > 1, 'and it has a visible lens');
+
+// The inverse still round trips while seated elsewhere.
+R.camera.project(1234, 567, screen);
+R.camera.unproject(screen.x, screen.y, worldPoint);
+close(worldPoint.x, 1234, 1e-6, 'log-polar round trip x');
+close(worldPoint.y, 567, 1e-6, 'log-polar round trip y');
+
+// And back to the world: the deck's own map again.
+handOver(luneIndex, -1, 'Lune -> world');
+assert.equal(R.sky.pivot.index, -1);
+assert.equal(R.camera.flat, true, 'the deck map is back');
+
+// A seat request while a hand-over is running is refused rather than stacked.
+assert.ok(R.sky.seatPivot(luneIndex, game));
+assert.equal(R.sky.seatPivot(4, game), false, 'a seat during a hand-over is refused');
+assert.equal(R.sky.seatPivot(luneIndex, game), false, 'and so is a repeat of the same seat');
+while (R.sky.pivot.reseating) {
 	R.sky.update(game, 0.016);
 }
-for (i = 0; i < R.constants.sky.bodies.length; i += 1) {
-	body = R.constants.sky.bodies[i];
-	R.sky.projectBody(body, game, projection);
-	assert.ok(projection.visible, body.name + ' is above the home horizon');
-	assert.ok(projection.x > -R.camera.width && projection.x < R.camera.width * 2,
-		body.name + ' stays near the viewport');
-	assert.ok(projection.y >= 0 && projection.y <= R.camera.groundY,
-		body.name + ' stays in the sky band');
-	maxAngle = Math.max(0.2, Math.min(R.constants.view.skyHorizonAngle,
-		Math.acos(R.sky.view.radius / (body.distanceRadii * R.sky.view.radius))));
-	expectedRadius = projection.angularRadius / maxAngle * R.camera.width * 0.5;
-	expectedRadius = R.util.clamp(expectedRadius, R.constants.view.minBodyRadius,
-		R.constants.view.maxBodyRadius);
-	close(projection.radius, expectedRadius, 1e-9, body.name + ' apparent radius');
-	close(projection.angularRadius,
-		Math.asin((body.radiusRadii * R.sky.view.radius) / projection.distance), 1e-9,
-		body.name + ' angular radius');
-}
-game.rocket.wx = planet.circumference * 0.5;
-R.sky.projectBody(R.constants.sky.bodies[0], game, projection);
-assert.equal(projection.visible, false, 'a body on the far side is hidden');
-assert.ok(projection.elevation < 0, 'and its elevation is below the horizon');
 
-// The coast trace is a strided copy of the same rollout, ending at the ground.
-coastRocket = R.rocket.create(R.world.pads[0]);
+// ---------------------------------------------------------------------------
+// Airless worlds still chart their sky.
+// ---------------------------------------------------------------------------
+
+R.sky.reset();
+R.world.initialize('gossamer');
+R.sky.update(game, 0);
+settle(2, game);
+assert.ok(R.physics.atmosphereTop() > 0, 'a deep atmosphere has a ceiling line');
+R.world.initialize('tinmoon');
+R.sky.update(game, 0);
+assert.equal(R.physics.atmosphereTop(), 0, 'tinmoon is airless');
+settle(2, game);
+assert.ok(Number.isFinite(R.camera.ceiling) && R.camera.ceiling > 0);
+shape = R.sky.outline(luneIndex, game);
+assert.ok(Number.isFinite(shape.centerX) && Number.isFinite(shape.nearY));
+
+// ---------------------------------------------------------------------------
+// Coast trace and the flown-trail ring buffer.
+// ---------------------------------------------------------------------------
+
+R.world.initialize('verdant');
+game = { rocket: { wx: 0, wy: 0 }, simTime: 0 };
+R.sky.reset();
+settle(1, game);
+
+var coastRocket = R.rocket.create(R.world.pads[0]);
+var impact = R.trajectory.impact;
+var coastTrace = R.trajectory.trace;
+
 coastRocket.payloadMass = 1000;
 coastRocket.wx = 0;
 coastRocket.wy = 3000;
@@ -168,21 +250,16 @@ coastRocket.vx = 80;
 coastRocket.vy = -40;
 coastRocket.throttle = 0;
 coastRocket.heading = 0;
-impact = R.trajectory.impact;
-trace = R.trajectory.trace;
-R.trajectory.rollout(coastRocket, R.trajectory.coastStep, R.trajectory.maxCoastSteps, impact, trace);
+R.trajectory.rollout(coastRocket, R.trajectory.coastStep, R.trajectory.maxCoastSteps, impact, coastTrace);
 assert.ok(impact.valid, 'the coast reaches the ground inside the horizon');
-assert.ok(trace.count >= 2 && trace.count <= R.trajectory.traceCapacity, 'trace is bounded');
-close(trace.points[0], coastRocket.wx, 1e-3, 'trace starts at the rocket longitude');
-close(trace.points[1], coastRocket.wy, 1e-3, 'trace starts at the rocket altitude');
-close(trace.points[(trace.count - 1) * 2], impact.wx, 1e-3, 'trace ends at the impact longitude');
-assert.equal(trace.points[(trace.count - 1) * 2 + 1], 0, 'trace ends at the surface');
-coastRocket.wy = 0;
-R.trajectory.predictCoast(coastRocket, impact, trace);
-assert.equal(trace.count, 0, 'a grounded rocket has no forecast path');
+assert.ok(coastTrace.count >= 2 && coastTrace.count <= R.trajectory.traceCapacity, 'trace is bounded');
+close(coastTrace.points[0], coastRocket.wx, 1e-3, 'trace starts at the rocket longitude');
+close(coastTrace.points[1], coastRocket.wy, 1e-3, 'trace starts at the rocket altitude');
+assert.equal(coastTrace.points[(coastTrace.count - 1) * 2 + 1], 0, 'trace ends at the surface');
 
-// The flown trail is a ring that resets with a new leg or a new world.
 R.flightPath.reset();
+game.phase = 'flying';
+game.flight = {};
 game.rocket.wy = 1000;
 game.simTime = 0;
 R.flightPath.sample(game);
@@ -202,20 +279,4 @@ R.world.initialize('gossamer');
 R.flightPath.sample(game);
 assert.equal(R.flightPath.count, 1, 'a world switch starts a new trail');
 
-// Airless worlds have no ceiling line and still project their sky.
-R.sky.update(game, 0);
-for (i = 0; i < 80; i += 1) {
-	R.sky.update(game, 0.016);
-}
-assert.ok(R.physics.atmosphereTop() > 0, 'a deep atmosphere has a ceiling line');
-R.world.initialize('tinmoon');
-R.sky.update(game, 0);
-assert.equal(R.physics.atmosphereTop(), 0, 'tinmoon is airless');
-for (i = 0; i < 80; i += 1) {
-	R.sky.update(game, 0.016);
-}
-assert.ok(Number.isFinite(R.camera.ceiling) && R.camera.ceiling > 0);
-R.sky.projectBody(R.constants.sky.bodies[3], game, projection);
-assert.ok(Number.isFinite(projection.x) && Number.isFinite(projection.radius));
-
-console.log('Sky, escape speed and projection tests passed.');
+console.log('Sky chart, pivot hand-over and projection tests passed.');

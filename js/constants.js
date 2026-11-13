@@ -11,23 +11,28 @@
 		// A world switch morphs the visual gravity / radius / log scale over
 		// this many real seconds; the physics switches at the run boundary.
 		transformSeconds: 1.1,
-		// The celestial dome occupies the top share of the usable height, and
-		// its azimuth is clamped to this angle from local vertical (rad).
-		skyBandFraction: 0.55,
-		skyHorizonAngle: 1.45,
-		minBodyRadius: 2,
-		maxBodyRadius: 46
+		// Top of the charted range: the farthest body's far limb is fitted to
+		// this fraction of the viewport height.
+		chartTopFraction: 0.05
 	};
 
 	// Inter-planet sky. Distances and radii are in active-planet radii, so one
-	// catalog reads correctly on every world. Bodies are visual in 0.3.7: they
-	// add no force to the point-mass integrator.
+	// catalog reads correctly on every world. Bodies are visual: they add no
+	// force to the point-mass integrator.
 	constants.sky = {
 		atmosphereDensityFraction: 1e-4,
-		approachLogSpan: 2.2,
-		ceilingMargin: 1.25,
-		bodyScaleFraction: 0.22,
 		easeTau: 0.35,
+		// Half the number of silhouette samples per body: 15 points trace each
+		// of the near and far limbs of the lens.
+		outlineSamples: 14,
+		pivotSeconds: 1.4,
+		// The shared log scale is refitted from the system's extent at this
+		// interval, and eases at different rates outward and inward so the
+		// farthest body stays fitted without the whole chart breathing at the
+		// orbit period.
+		fitSampleSeconds: 0.4,
+		fitGrowTau: 0.2,
+		fitCloseTau: 0.5,
 		trailInterval: 0.2,
 		trailCapacity: 320,
 		traceStrideSteps: 42,
