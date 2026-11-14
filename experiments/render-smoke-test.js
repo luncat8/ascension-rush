@@ -233,6 +233,28 @@ assert.ok(drawnText.some(function(text) {
 	return text.indexOf('DISTANCE FROM LUNE') >= 0;
 }), 'and the ruler says whose distance it is');
 
+// The flat views draw every body as a ring through their own map, the one
+// underfoot included, and the pads and the ruler with it.
+['real', 'real-log'].forEach(function(mode) {
+	[0, 3000, 23 * R.world.planet.radius].forEach(function(altitude) {
+		chartState(mode + ' at ' + Math.round(altitude) + ' m', function() {
+			R.sky.setMode(mode);
+			smokeGame.rocket.wy = altitude;
+		}, 60);
+		assert.equal(R.render.curves.flat, true, mode + ' has no ground curve');
+		R.render.draw(smokeGame);
+	});
+	assert.ok(drawnText.some(function(text) {
+		return text.indexOf(mode === 'real' ? 'REAL SCALE' : 'LOG SCALE') >= 0;
+	}), mode + ' names its ruler');
+});
+R.sky.setMode('body');
+chartState('the body view above the air', function() {
+	smokeGame.rocket.wy = 200000;
+}, 400);
+assert.equal(R.render.curves.radial, true, 'the body view keeps the pole inside the world');
+R.sky.setMode('ship');
+
 chartState('mid-drag onto a body', function() {
 	var lens;
 

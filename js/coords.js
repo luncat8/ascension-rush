@@ -104,10 +104,54 @@
 		return out;
 	};
 
+	// The flat views draw the plane itself: a rotation that puts the local up
+	// at the top of the screen and one scale, with no unwrapping and no period.
+	// The log variant keeps every bearing from the pole and compresses only
+	// the distance, `ln(1 + d / knee)`, so it is the same picture pulled in
+	// toward the pole rather than a different map.
+	coords.flatToScreen = function(px, py, camera, out) {
+		var dx = px - camera.poleX;
+		var dy = py - camera.poleY;
+		var right = dx * camera.upCos - dy * camera.upSin;
+		var up = dx * camera.upSin + dy * camera.upCos;
+		var distance;
+		var gain = camera.scale;
+
+		if (camera.flatLog) {
+			distance = Math.sqrt(dx * dx + dy * dy);
+			gain = distance > camera.logScale * 1e-9 ?
+				camera.scale * Math.log1p(distance / camera.logScale) / distance :
+				camera.scale / camera.logScale;
+		}
+		out.x = camera.ox + gain * right;
+		out.y = camera.oy - gain * up;
+		return out;
+	};
+
+	coords.screenToFlat = function(sx, sy, camera, out) {
+		var right = (sx - camera.ox) / camera.scale;
+		var up = (camera.oy - sy) / camera.scale;
+		var depth;
+
+		if (camera.flatLog) {
+			depth = Math.sqrt(right * right + up * up);
+			depth = depth > 1e-9 ? camera.logScale * Math.expm1(Math.min(depth, 700)) / depth :
+				camera.logScale;
+			right *= depth;
+			up *= depth;
+		}
+		out.x = camera.poleX + right * camera.upCos + up * camera.upSin;
+		out.y = camera.poleY - right * camera.upSin + up * camera.upCos;
+		return out;
+	};
+
 	coords.planeToScreen = function(px, py, camera, out) {
 		var dx = px - camera.poleX;
 		var dy = py - camera.poleY;
 
+		if (camera.flat) {
+			return coords.flatToScreen(px, py, camera, out);
+		}
 		out.x = camera.ox + camera.angularScale * Math.atan2(dx, dy);
 		out.y = camera.oy - camera.scale * coords.depthOf(Math.sqrt(dx * dx + dy * dy), camera);
 		return out;
@@ -115,8 +159,12 @@
 
 	coords.screenToPlane = function(sx, sy, camera, out) {
 		var angle = (sx - camera.ox) / Math.max(1e-9, camera.angularScale);
-		var distance = coords.distanceAt((camera.oy - sy) / Math.max(1e-9, camera.scale), camera);
+		var distance;
 
+		if (camera.flat) {
+			return coords.screenToFlat(sx, sy, camera, out);
+		}
+		distance = coords.distanceAt((camera.oy - sy) / Math.max(1e-9, camera.scale), camera);
 		out.x = camera.poleX + distance * Math.sin(angle);
 		out.y = camera.poleY + distance * Math.cos(angle);
 		return out;

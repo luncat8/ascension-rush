@@ -16,7 +16,8 @@
 		crosshair: { x: 0, y: 0 },
 		coast: { x: 0, y: 0 },
 		marker: { x: 0, y: 0 },
-		path: { x: 0, y: 0 }
+		path: { x: 0, y: 0 },
+		tilt: { x: 0, y: 0 }
 	};
 	// Cached so the atmosphere label does not build a string per frame.
 	render.airLabel = { key: -1, text: 'ATMOSPHERE TOP' };
@@ -244,6 +245,25 @@
 	// the ground or a body the ship has flown out of — the projection puts them
 	// on the world's lens from there — and in every lap of the wrap that reaches
 	// the viewport. A chart standing on another body draws none.
+	// A flat view keeps the world round, so a marker that stands on its surface
+	// is drawn in that surface's own frame: the origin on the ground at `wx`,
+	// the local up at the top. Returns false, with nothing to restore, when the
+	// place is off screen.
+	function enterSurfaceFrame(context, wx, point) {
+		var tip = render.scratch.tilt;
+
+		R.camera.project(wx, 0, point);
+		if (point.x < -60 || point.x > render.width + 60 ||
+			point.y < -60 || point.y > render.height + 60) {
+			return false;
+		}
+		R.camera.project(wx, 1, tip);
+		context.save();
+		context.translate(point.x, point.y);
+		context.rotate(Math.atan2(tip.x - point.x, point.y - tip.y));
+		return true;
+	}
+
 	function drawPads(context, game) {
 		var pads = R.world.pads;
 		var camera = R.camera;
@@ -265,6 +285,16 @@
 			camera.project(pad.wx, 0, point);
 			isCurrent = pad.id === focus.fromPadId;
 			isTarget = pad.id === focus.toPadId;
+			if (camera.flat) {
+				// A world a few pixels across has no room for its pads.
+				camera.projectPlane(0, 0, render.scratch.tilt);
+				x = Math.hypot(point.x - render.scratch.tilt.x, point.y - render.scratch.tilt.y);
+				if (x > 14 && enterSurfaceFrame(context, pad.wx, point)) {
+					drawPadMarker(context, pad, 0, 0, isCurrent, isTarget, x > 70);
+					context.restore();
+				}
+				continue;
+			}
 			for (copy = -laps; copy <= laps; copy += 1) {
 				x = point.x + copy * camera.period;
 				if (x < -40 || x > render.width + 40) {
@@ -297,7 +327,7 @@
 	// sampled silhouette and no seam, because a column is a ray and the wrap only
 	// repeats it.
 	var COLUMNS = R.constants.view.groundColumns;
-	var LEG_SAMPLES = 24;
+	var LEG_SAMPLES = 96;
 
 	// Heading of the vertical ruler, rebuilt only when the ground changes.
 	render.scaleLabel = { key: -3, text: 'ALTITUDE  /  LOG SCALE' };
@@ -312,6 +342,9 @@
 	render.curves = {
 		ground: -1,
 		radius: 0,
+		// A flat view has no ground curve: every body, the one underfoot
+		// included, is the ring `sky.outline` gives it.
+		flat: false,
 		// Whether the pole is inside the ground sphere, so its surface is a curve
 		// the chart can solve, and how many cutaway bands it is inside, so there is
 		// an interior to draw. A drag walks the pole out of one body and into
@@ -361,6 +394,12 @@
 		curves.bands = 0;
 		for (i = 0; i <= COLUMNS; i += 1) {
 			curves.xs[i] = i * step;
+		}
+		curves.flat = camera.flat;
+		if (curves.flat) {
+			curves.radial = false;
+			curves.air = R.sky.view.atmosphereTop;
+			return;
 		}
 		curves.radial = R.sky.poleInside(curves.radius);
 		// Clear of the ground sphere — the chart has flown out of the body. No ray
@@ -428,7 +467,7 @@
 		var curves = render.curves;
 
 		render.airY = curves.topY;
-		if (curves.ground !== -1 || curves.air <= 0) {
+		if (curves.flat || curves.ground !== -1 || curves.air <= 0) {
 			return;
 		}
 		context.beginPath();
@@ -440,10 +479,27 @@
 		context.fill();
 	}
 
-	function drawAirBand(context) {
+	function drawAirRing(context, game) {
+		if (render.curves.ground !== -1 || render.curves.air <= 0) {
+			return;
+		}
+		lensPath(context, R.sky.airRing(game), 0);
+		context.fillStyle = 'rgba(36, 84, 112, 0.20)';
+		context.fill();
+		context.lineWidth = 1;
+		context.strokeStyle = 'rgba(150, 205, 224, 0.34)';
+		context.stroke();
+	}
+
+	function drawAirBand(context, game) {
 		var curves = render.curves;
 		var label;
 		var key;
+
+		if (curves.flat) {
+			drawAirRing(context, game);
+			return;
+		}
 
 		// The band is skipped when it is not the world's, when the world has no
 		// air, and when the ground has sunk far enough that the whole band — and
@@ -490,6 +546,14 @@
 		var i;
 
 		context.beginPath();
+		if (lens.ring) {
+			context.moveTo(lens.ringXs[0] + offsetX, lens.ringYs[0]);
+			for (i = 1; i < lens.ringXs.length; i += 1) {
+				context.lineTo(lens.ringXs[i] + offsetX, lens.ringYs[i]);
+			}
+			context.closePath();
+			return;
+		}
 		for (i = 0; i < lens.xs.length; i += 1) {
 			if (i === 0) {
 				context.moveTo(lens.xs[0] + offsetX, lens.nearYs[0]);
@@ -512,6 +576,7 @@
 		var halfWidth;
 		var halfHeight;
 		var thin;
+		var reach;
 		var x;
 		var mid;
 		var angle;
@@ -589,8 +654,16 @@
 			context.clip();
 			context.globalAlpha = lens.alpha * 0.55;
 			context.fillStyle = body.shade;
-			context.fillRect(x + (1 - lens.shade) * halfWidth * 1.4, mid - halfHeight * 2,
-				halfWidth * 1.6, halfHeight * 4);
+			if (!lens.ring) {
+				context.fillRect(x + (1 - lens.shade) * halfWidth * 1.4, mid - halfHeight * 2,
+					halfWidth * 1.6, halfHeight * 4);
+			} else if (!star) {
+				// The real night side: the half of the disc turned from the star.
+				reach = (halfWidth + halfHeight) * 2;
+				context.translate(lens.bodyX + offsetX, lens.bodyY);
+				context.rotate(lens.nightAngle);
+				context.fillRect(0, -reach, reach, reach * 2);
+			}
 			context.restore();
 			lensPath(context, lens, offsetX);
 			context.globalAlpha = lens.alpha;
@@ -599,7 +672,9 @@
 			context.stroke();
 		}
 		context.restore();
-		if (render.width < 650) {
+		// The body underfoot in a flat view is the ground, which names itself in
+		// the world panel; its ring's top is where the hull and the pads are.
+		if (render.width < 650 || (lens.ring && index < 0 && !thin)) {
 			return;
 		}
 		// Above the disc normally; under it when the body is charted close to the
@@ -644,7 +719,7 @@
 		// No ground under the pole: the body the ship left is drawn as its lens,
 		// and the flat line the ladder starts at is the pole's own place in empty
 		// space, not a surface.
-		if (curves.ground === -2) {
+		if (curves.flat || curves.ground === -2) {
 			return;
 		}
 		body = R.sky.bodyOf(curves.ground);
@@ -709,9 +784,13 @@
 						started = false;
 						continue;
 					}
-					x = R.coords.wrapScreenX(x + copy * lens.period, previousX, lens.period);
-					previousX = x;
-					if (x < -width * 0.25 || x > width * 1.25) {
+					// Unwrapped along the curve first, then moved to its lap: the
+					// other order folds every lap back onto the first.
+					previousX = R.coords.wrapScreenX(x, previousX, lens.period);
+					x = previousX + copy * lens.period;
+					// Only the cylinder needs the cull: its laps would otherwise
+					// each draw the whole curve. A flat view draws it once.
+					if (lens.period > 0 && (x < -width * 0.25 || x > width * 1.25)) {
 						started = false;
 						continue;
 					}
@@ -759,8 +838,9 @@
 	}
 
 	function pathBreak(previousX, x, y) {
+		// A long step is a seam only on the cylinder; a flat view has none.
 		return !Number.isFinite(x) || !Number.isFinite(y) ||
-			Math.abs(x - previousX) > render.width * 0.5;
+			(R.camera.period > 0 && Math.abs(x - previousX) > render.width * 0.5);
 	}
 
 	function drawCoastTrace(context) {
@@ -855,6 +935,49 @@
 		{ distance: 100000000, label: '100,000 km' }
 	];
 
+	// A flat view's ruler. Real scale has one length everywhere, so it is a
+	// bar: the first decade at least 60 px long. The log view has a length per
+	// distance from its pole, so it is the decades as rings around the pole.
+	function drawFlatScale(context) {
+		var marks = distanceMarks;
+		var camera = R.camera;
+		var radius;
+		var i = 0;
+
+		context.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
+		context.textAlign = 'left';
+		context.fillStyle = 'rgba(184, 207, 218, 0.72)';
+		if (!camera.flatLog) {
+			context.fillText('REAL SCALE', 24, 173);
+			while (i < marks.length - 1 && marks[i].distance * camera.scale < 60) {
+				i += 1;
+			}
+			context.fillStyle = 'rgba(202, 220, 226, 0.72)';
+			context.fillRect(24, 186, marks[i].distance * camera.scale, 1);
+			context.fillRect(24, 182, 1, 9);
+			context.fillRect(24 + marks[i].distance * camera.scale, 182, 1, 9);
+			context.fillText(marks[i].label, 24, 204);
+			return;
+		}
+		context.fillText('DISTANCE FROM NEAREST SURFACE  /  LOG SCALE', 24, 173);
+		context.lineWidth = 1;
+		context.strokeStyle = 'rgba(190, 215, 224, 0.13)';
+		context.fillStyle = 'rgba(202, 220, 226, 0.6)';
+		context.textAlign = 'center';
+		for (i = 0; i < marks.length; i += 1) {
+			if (marks[i].distance > camera.extent) {
+				continue;
+			}
+			radius = camera.scale * Math.log1p(marks[i].distance / camera.logScale);
+			context.beginPath();
+			context.arc(camera.ox, camera.oy, radius, 0, Math.PI * 2);
+			context.stroke();
+			if (camera.oy - radius > 14) {
+				context.fillText(marks[i].label, camera.ox + radius * 0.5, camera.oy - radius * 0.866 - 4);
+			}
+		}
+	}
+
 	function drawAltitudeScale(context) {
 		var marks = distanceMarks;
 		var camera = R.camera;
@@ -863,6 +986,10 @@
 		var y;
 		var i;
 
+		if (curves.flat) {
+			drawFlatScale(context);
+			return;
+		}
 		if (!curves.radial) {
 			return;
 		}
@@ -1661,13 +1788,20 @@
 		if (game.phase !== 'flying' || !impact.valid || render.curves.ground !== -1) {
 			return;
 		}
+		color = impact.safeTouchdown ? (impact.onTargetPad ? coastColors[2] : coastColors[1]) : coastColors[0];
+		if (camera.flat) {
+			if (enterSurfaceFrame(context, impact.wx, point)) {
+				drawCoastMarkerAt(context, 0, 0, color);
+				context.restore();
+			}
+			return;
+		}
 		camera.project(impact.wx, 0, point);
 		// The chart wraps, so the impact is read in the lap the camera target is
 		// in and drawn in every lap that reaches the viewport: a coast that goes
 		// round the world keeps its marker, and at a seam it stands on both edges
 		// the way the pads do.
 		base = R.coords.wrapScreenX(point.x, anchorX, camera.period);
-		color = impact.safeTouchdown ? (impact.onTargetPad ? coastColors[2] : coastColors[1]) : coastColors[0];
 		for (copy = -laps; copy <= laps; copy += 1) {
 			x = base + copy * camera.period;
 			if (x < -20 || x > render.width + 20) {
@@ -1767,7 +1901,7 @@
 		render.solveGround();
 		drawSkyShade(context);
 		drawStars(context);
-		drawAirBand(context);
+		drawAirBand(context, game);
 		drawOrbits(context, game);
 		drawSkyBodies(context, game);
 		drawAltitudeScale(context);
@@ -1804,7 +1938,7 @@
 		render.solveGround();
 		drawSkyShade(context);
 		drawStars(context);
-		drawAirBand(context);
+		drawAirBand(context, game);
 		drawOrbits(context, game);
 		drawSkyBodies(context, game);
 		drawAltitudeScale(context);

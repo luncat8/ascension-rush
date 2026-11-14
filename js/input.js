@@ -142,9 +142,12 @@
 				return;
 			}
 			if (!input.dragging) {
+				// A flat view has no pole to walk: the press stays a click.
+				if (!R.sky.handBegin(downX, downY, R.game)) {
+					return;
+				}
 				input.dragging = true;
 				state = 'drag';
-				R.sky.handBegin(downX, downY, R.game);
 				setCursor('grabbing');
 			}
 			input.dragK = R.sky.hand.k;

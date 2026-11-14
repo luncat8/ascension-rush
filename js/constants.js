@@ -41,7 +41,42 @@
 		// low over the surface instead of spreading them to the top edge.
 		ladderFar: 0.45,
 		// Orbit polylines: samples per orbit circle.
-		orbitSamples: 128
+		orbitSamples: 128,
+		// The view scale control. `flat` modes draw the plane as it is, the
+		// rocket's local up at the top of the screen and no unwrapping; `log`
+		// compresses distance from the pole and nothing else. The chart modes
+		// differ only in what the log is read from: the hull's own ground
+		// point (`ship`) or the centre of the body whose influence the hull is
+		// in (`body`), which keeps that body's whole surface the flat ground.
+		modes: [
+			{ id: 'real', label: 'Real scale', flat: true, log: false, bodyCentred: false },
+			{ id: 'real-log', label: 'Real · log (exp.)', flat: true, log: true, bodyCentred: false },
+			{ id: 'ship', label: 'Chart · ship', flat: false, log: false, bodyCentred: false },
+			{ id: 'body', label: 'Chart · body', flat: false, log: false, bodyCentred: true }
+		],
+		defaultMode: 'ship',
+		flat: {
+			// Where the rocket (real scale) or the log pole under it sits.
+			centreX: 0.5,
+			shipY: 0.55,
+			poleY: 0.72,
+			// Real scale auto-fit: the ground under the hull stays this
+			// fraction of the viewport below it, and the fit never closes in
+			// further than `minAltitude` metres of climb would ask for.
+			groundDrop: 0.3,
+			minAltitude: 250,
+			fitTau: 0.35,
+			// The wheel reaches from one hull to the whole system.
+			zoomMin: 1e-6,
+			zoomMax: 40,
+			// Seconds the pole and the screen's up take to travel when the
+			// nearest body changes.
+			swapSeconds: 1.2,
+			// Outline samples either side of a body's point nearest the pole,
+			// spaced geometrically away from it so a horizon filling the
+			// screen is as smooth as a distant disc.
+			ringSamples: 72
+		}
 	};
 
 	// Inter-planet sky. Distances and radii are in active-planet radii, so one
@@ -60,6 +95,11 @@
 		// at the edge of one body's reach from flipping the chart every frame.
 		approachRadii: 6,
 		departRadii: 10,
+		// The `body` view hands the chart to the star once the hull is this
+		// many world radii out and inside no other body's reach, and back to
+		// the world inside the nearer one.
+		worldApproachRadii: 80,
+		worldDepartRadii: 120,
 		// Releasing a drag that did not reach a ground line eases the chart back
 		// to the follow pose over this many seconds, holding the ship still
 		// instead of snapping to it.
