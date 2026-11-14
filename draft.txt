@@ -45,3 +45,17 @@ player want to see clear, and better without read help text:
 
 ## inter-planet
 draw trajectory above atmosphere. add other moons and planets and star and proper escape speed and log scale that change approaching to body. use proper projection and smooth transform when change body gravity . i dont know can we easy implement L points and proper gravity and visual transformations so experiment this will be next plan phase
+
+
+'Test mode — 20x' to header, always available.
+
+## time control
+
+[slower] 1x [faster] each click 2x
+
+## view scale control:
+
+- real scale without special projections
+- (experimental) same as above, but log scale center log is nearest surface point
+- transformed scale relative to selected object(rocket for now) + unwrap surface of gravity influence body to line
+- transformed scale relative to gravity influence body (rocket fly on the orbit of this body or his gravity influence is more then other bodies) + unwrap surface of gravity influence body to line. this work almost as current mode but current seems has bug body-to-star transformation and mostly show space related to body surface and problems with switch to other body.
