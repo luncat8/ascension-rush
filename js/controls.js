@@ -7,6 +7,14 @@
 	var throttleUp = false;
 	var throttleDown = false;
 	var headingScreen = { x: 0, y: 0 };
+	var aimPoint = { x: 0, y: 0 };
+	var noseAim = {
+		valid: false,
+		pointerX: 0,
+		pointerY: 0,
+		targetX: 0,
+		targetY: 0
+	};
 
 	function isFormTarget(event) {
 		var target = event.target;
@@ -139,6 +147,7 @@
 		var slower = doc && doc.getElementById('time-slower');
 		var faster = doc && doc.getElementById('time-faster');
 		var select = viewSelect();
+		var interior = doc && doc.getElementById('interior-toggle');
 
 		root.addEventListener('keydown', onKeyDown);
 		root.addEventListener('keyup', onKeyUp);
@@ -156,12 +165,27 @@
 		if (select) {
 			fillViewSelect(select);
 		}
+		if (interior) {
+			interior.addEventListener('change', function() {
+				R.sky.showInterior = !!interior.checked;
+			});
+			R.sky.showInterior = !!interior.checked;
+		}
 		updateTimeDisplay();
+	};
+
+	controls.setInterior = function(enabled) {
+		R.sky.showInterior = !!enabled;
+		var el = root.document && root.document.getElementById('interior-toggle');
+		if (el) {
+			el.checked = !!enabled;
+		}
 	};
 
 	controls.reset = function() {
 		throttleUp = false;
 		throttleDown = false;
+		noseAim.valid = false;
 	};
 
 	controls.setTimeScaleIndex = function(index) {
@@ -202,7 +226,11 @@
 			return;
 		}
 
+		if (R.sky.mode.id !== 'nose') {
+			noseAim.valid = false;
+		}
 		if (R.autopilot.enabled) {
+			noseAim.valid = false;
 			R.autopilot.update(currentGame);
 			controls.applyHeading(state, R.autopilot.command.heading, dt);
 			controls.applyThrottle(state, R.autopilot.command.throttle, dt);
@@ -220,16 +248,50 @@
 		}
 
 		R.camera.project(state.wx, state.wy, headingScreen);
-		dx = input.pointerX - headingScreen.x;
-		dy = headingScreen.y - input.pointerY;
-		if (dx * dx + dy * dy < 64) {
-			return;
-		}
-		desiredHeading = Math.atan2(dx, dy);
 		if (R.camera.directionLock) {
-			// Mouse aim is relative to whichever axis the camera holds screen-up:
-			// prograde in one mode, the rocket's nose in the other.
-			desiredHeading -= R.camera.screenRotation;
+			R.camera.unrotateScreen(input.pointerX, input.pointerY, aimPoint);
+			if (R.sky.mode.id === 'nose') {
+				dx = aimPoint.x - headingScreen.x;
+				dy = headingScreen.y - aimPoint.y;
+				if (dx * dx + dy * dy < 64) {
+					noseAim.valid = false;
+					return;
+				}
+				if (!noseAim.valid || input.pointerX !== noseAim.pointerX ||
+					input.pointerY !== noseAim.pointerY) {
+					R.camera.unprojectPlane(aimPoint.x, aimPoint.y, aimPoint);
+					noseAim.targetX = aimPoint.x;
+					noseAim.targetY = aimPoint.y;
+					noseAim.pointerX = input.pointerX;
+					noseAim.pointerY = input.pointerY;
+					noseAim.valid = true;
+				}
+				R.sky.shipPlane(currentGame, aimPoint);
+				dx = noseAim.targetX - aimPoint.x;
+				dy = noseAim.targetY - aimPoint.y;
+				if (dx * dx + dy * dy < 1) {
+					return;
+				}
+				desiredHeading = Math.atan2(dx, dy) - state.wx / R.camera.worldRadius;
+			} else {
+				// In the wrapped prograde view horizontal offset is relative
+				// bearing; vertical offset is log distance, not bearing.
+				dx = R.coords.wrapScreenX(aimPoint.x, headingScreen.x, R.camera.period) - headingScreen.x;
+				if (dx * dx < 64) {
+					return;
+				}
+				desiredHeading = R.camera.lockAngle + dx / Math.max(1e-9, R.camera.angularScale);
+			}
+		} else {
+			noseAim.valid = false;
+			aimPoint.x = input.pointerX;
+			aimPoint.y = input.pointerY;
+			dx = aimPoint.x - headingScreen.x;
+			dy = headingScreen.y - aimPoint.y;
+			if (dx * dx + dy * dy < 64) {
+				return;
+			}
+			desiredHeading = Math.atan2(dx, dy);
 		}
 		controls.applyHeading(state, desiredHeading, dt);
 	};

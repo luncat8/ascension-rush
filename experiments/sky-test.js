@@ -24,6 +24,7 @@ require('../js/flight-path.js');
 
 var screen = { x: 0, y: 0 };
 var plane = { x: 0, y: 0 };
+var starPlane = { x: 0, y: 0 };
 var shape;
 var orbit;
 var game;
@@ -161,8 +162,24 @@ for (i = 0; i < R.constants.sky.bodies.length; i += 1) {
 	assert.ok(shape.nearY > shape.farY, 'body ' + i + ' has its near limb below its far limb');
 	assert.ok(shape.halfWidth > 0, 'body ' + i + ' has a finite angular half-width');
 	assert.equal(shape.xs.length, shape.farYs.length);
-	close(shape.distance, body.distanceRadii * planet.radius, rho * 1e-9,
-		'body ' + i + ' is at its catalog distance');
+	R.sky.planePosition(body, game.simTime, plane);
+	var poleDist = Math.hypot(plane.x - R.camera.poleX, plane.y - R.camera.poleY);
+	close(shape.distance, poleDist, 1e-6,
+		'body ' + i + ' is at its chart distance');
+	// Parent-relative catalog check.
+	if (body.parent === 'world') {
+		close(poleDist, body.distanceRadii * planet.radius, rho * 1e-9,
+			'moon ' + i + ' is at its catalog distance from world');
+	} else if (body.parent === 'helios') {
+		R.sky.planePosition(R.constants.sky.bodies[0], game.simTime, starPlane);
+		var parentDist = Math.hypot(plane.x - starPlane.x, plane.y - starPlane.y);
+		close(parentDist, body.distanceRadii * planet.radius, rho * 1e-9,
+			'planet ' + i + ' is at its catalog distance from star');
+	} else if (body.parent === null) {
+		var worldOrbit = R.constants.sky.worldOrbit;
+		close(poleDist, worldOrbit.distanceRadii * planet.radius, rho * 1e-9,
+			'star is at world-orbit distance');
+	}
 	// The two limbs meet exactly at the two edges of the lens.
 	close(shape.nearYs[0], shape.farYs[0], 1e-6, 'body ' + i + ' limbs meet at the left edge');
 	close(shape.nearYs[shape.nearYs.length - 1], shape.farYs[shape.farYs.length - 1], 1e-6,
@@ -217,7 +234,12 @@ assert.ok(R.sky.enclosingDistance(planet.radius, 0) > 0 || R.sky.enclosingDistan
 // ---------------------------------------------------------------------------
 
 for (i = 0; i < R.constants.sky.bodies.length; i += 1) {
+	var orbitBody = R.constants.sky.bodies[i];
 	orbit = R.sky.orbit(i);
+	if (orbitBody.parent === null) {
+		assert.equal(orbit.valid, false, 'body ' + i + ' parent null has no orbit');
+		continue;
+	}
 	assert.ok(orbit.valid, 'body ' + i + ' has an orbit');
 	close(orbit.period, R.camera.period, 1e-9, 'body ' + i + ' orbit repeats with the chart');
 	assert.ok(orbit.count > orbit.xs.length * 0.9, 'body ' + i + ' orbit is sampled all the way round');

@@ -733,6 +733,33 @@
 		context.globalAlpha = 1;
 	}
 
+	function drawRocketInterior(context) {
+		if (!R.sky.showInterior) {
+			return;
+		}
+		if (!R.camera.directionLock) {
+			return;
+		}
+		var baseY = R.camera.height * R.constants.view.directionLock.objectY;
+		context.fillStyle = 'rgba(14, 28, 44, 0.96)';
+		context.fillRect(0, baseY, render.width, render.height - baseY);
+		context.strokeStyle = 'rgba(100, 213, 194, 0.35)';
+		context.lineWidth = 1;
+		context.beginPath();
+		context.moveTo(0, baseY);
+		context.lineTo(render.width, baseY);
+		context.stroke();
+		context.fillStyle = 'rgba(110, 200, 185, 0.85)';
+		context.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
+		context.textAlign = 'center';
+		context.fillText('ROCKET INTERIOR', render.width * 0.5, baseY + 18);
+		context.fillStyle = 'rgba(150, 180, 190, 0.45)';
+		var x;
+		for (x = 0; x < render.width; x += 18) {
+			context.fillRect(x, baseY + 26, 2, 10);
+		}
+	}
+
 	// The ground: the surface curve filled to the bottom edge, its cutaway, and
 	// the surface line itself. The curve is the sphere of the body under the
 	// pole solved per screen column, so it is flat while the pole is that body's
@@ -743,8 +770,11 @@
 
 		// No ground under the pole: the body the ship left is drawn as its lens,
 		// and the flat line the ladder starts at is the pole's own place in empty
-		// space, not a surface.
+		// space, not a surface. Show interior band instead when toggled.
 		if (curves.flat || curves.ground === -2) {
+			if (curves.ground === -2) {
+				drawRocketInterior(context);
+			}
 			return;
 		}
 		body = R.sky.bodyOf(curves.ground);
@@ -1655,6 +1685,7 @@
 		var vyDir;
 		var target = R.world.findPadById(game.targetPadId);
 		var pointer = render.scratch.pointer;
+		var displayHeading = rocket.heading - (R.camera.directionLock ? R.camera.lockAngle : 0);
 		var deltaX = target ? R.util.wrapDelta(target.wx - rocket.wx, R.world.planet.circumference) : 0;
 
 		// Aim tick ahead of the nose, and dashed line to cursor in manual flight.
@@ -1663,12 +1694,12 @@
 		context.lineWidth = 1.5;
 		context.setLineDash(dashAim);
 		context.beginPath();
-		context.moveTo(rx + Math.sin(rocket.heading) * 34, ry - Math.cos(rocket.heading) * 34);
+		context.moveTo(rx + Math.sin(displayHeading) * 34, ry - Math.cos(displayHeading) * 34);
 		if (!R.autopilot.enabled && R.input.pointerActive) {
 			R.camera.unrotateScreen(R.input.pointerX, R.input.pointerY, pointer);
 			context.lineTo(pointer.x, pointer.y);
 		} else {
-			context.lineTo(rx + Math.sin(rocket.heading) * 62, ry - Math.cos(rocket.heading) * 62);
+			context.lineTo(rx + Math.sin(displayHeading) * 62, ry - Math.cos(displayHeading) * 62);
 		}
 		context.stroke();
 		context.setLineDash(dashSolid);
@@ -1676,8 +1707,8 @@
 		// Prograde velocity vector so drift and sink direction are drawn directly.
 		if (speed > 2) {
 			vLen = R.util.clamp(speed * 0.25, 20, 66);
-			vxDir = rocket.vx / speed;
-			vyDir = -rocket.vy / speed;
+			vxDir = Math.sin(Math.atan2(rocket.vx, rocket.vy) - (R.camera.directionLock ? R.camera.lockAngle : 0));
+			vyDir = -Math.cos(Math.atan2(rocket.vx, rocket.vy) - (R.camera.directionLock ? R.camera.lockAngle : 0));
 			context.strokeStyle = 'rgba(100, 213, 194, 0.85)';
 			context.lineWidth = 1.8;
 			context.beginPath();
@@ -1939,12 +1970,12 @@
 		drawAirBand(context, game);
 		drawOrbits(context, game);
 		drawSkyBodies(context, game);
-		drawAltitudeScale(context);
-		drawGround(context);
-		if (transformed) {
-			context.restore();
-		}
-	};
+	drawAltitudeScale(context);
+	drawGround(context);
+	if (transformed) {
+		context.restore();
+	}
+};
 
 	// A point marker for the projection page: the thing whose motion the chart
 	// is being tested against.
@@ -1982,9 +2013,9 @@
 		drawAirBand(context, game);
 		drawOrbits(context, game);
 		drawSkyBodies(context, game);
-		drawAltitudeScale(context);
-		drawGround(context);
-		drawLegArc(context, game);
+	drawAltitudeScale(context);
+	drawGround(context);
+	drawLegArc(context, game);
 		drawPads(context, game);
 		drawTrajectories(context);
 		drawCoastMarker(context, game);
@@ -1993,7 +2024,7 @@
 		if (game.phase === 'flying') {
 			drawFlightGuides(context, game);
 		}
-		R.rocket.draw(context, render.scratch.rocket.x, render.scratch.rocket.y, rocket.heading, flameThrottle);
+		R.rocket.draw(context, render.scratch.rocket.x, render.scratch.rocket.y, rocket.heading - (R.camera.directionLock ? R.camera.lockAngle : 0), flameThrottle);
 		drawExplosion(context, game);
 		if (transformed) {
 			context.restore();

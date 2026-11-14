@@ -9,8 +9,7 @@
 	// The chart's projection state, and the only place a pan, a zoom, a follow
 	// or a hand-over can move the view. sky.js solves one pose per frame and
 	// hands it over; coords.js reads it; the renderer and picker share its
-	// chart coordinates. A direction lock adds one rigid screen rotation, with an
-	// inverse for pointer readout and picking.
+	// chart coordinates.
 	//
 	// A pose is the pole the log is measured from, the body that pole stands on,
 	// the ladder, the camera target's distance (what the origin line holds), the
@@ -75,11 +74,10 @@
 	camera.flatLog = false;
 	camera.upSin = 0;
 	camera.upCos = 1;
-	// Direction-locked views use one rigid screen-space camera roll around a
-	// fixed object anchor. Projection and inverse projection continue to share the
-	// same chart; these helpers bridge pointer coordinates to that chart.
+	// Screen transform helpers are shared by drawing and picking.
 	camera.directionLock = false;
 	camera.screenRotation = 0;
+	camera.lockAngle = 0;
 	camera.screenOriginX = 0;
 	camera.screenOriginY = 0;
 	camera.rotateScreen = function(sx, sy, out) {

@@ -159,13 +159,13 @@ with hysteresis, not calculated gravity: catalog bodies have no mass and only
 the active world gravitates in the simulation. The star hand-off is likewise a
 visual chart transition, not a physical sphere-of-influence model.
 
-*Prograde lock · rocket* uses that body-centred chart, anchors the rocket near
-the lower centre, and rolls the view so its velocity points screen-up. At rest,
-where prograde is undefined, it follows the nose. *Nose lock · rocket* uses the
-same anchor and body selection but follows rocket attitude instead. In both,
-the surface remains unwrapped in chart space and rolls on screen with the
-locked direction; mouse aim is relative to that direction. The frame transform
-is generic; the rocket is the only selectable object today.
+*Prograde lock · rocket* keeps velocity screen-up, falling back to the nose
+at rest; *Nose lock · rocket* keeps the nose screen-up. The unwrapped chart
+stays upright rather than rotating with the rocket. Its base at 78% screen
+height eases from the local surface to the rocket as it leaves the body. In
+space the log-polar pole follows just behind the rocket along the locked axis,
+so even objects behind it wrap around into the view. Mouse aim uses the same
+locked direction. The rocket interior is not currently displayed.
 `experiments/view-mode-test.js` checks all six modes, the nearest-surface
 handover and both lock axes; `experiments/render-smoke-test.js` exercises their
 renderer paths.

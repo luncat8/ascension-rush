@@ -145,11 +145,22 @@ close(screen.y, camera.originY, 1e-9, 'and on the origin line');
 // ---------------------------------------------------------------------------
 
 var farthest = 0;
-for (i = 0; i < R.constants.sky.bodies.length; i += 1) {
-	farthest = Math.max(farthest, (R.constants.sky.bodies[i].distanceRadii +
-		R.constants.sky.bodies[i].radiusRadii) * planet.radius);
+var tmpPlane = { x: 0, y: 0 };
+for (i = -1; i < R.constants.sky.bodies.length; i += 1) {
+	var body = i < 0 ? R.sky.world : R.constants.sky.bodies[i];
+	var radiusBody = i < 0 ? planet.radius : body.radiusRadii * planet.radius;
+	R.sky.planePosition(body, 0, tmpPlane);
+	var dist = Math.hypot(tmpPlane.x - R.camera.poleX, tmpPlane.y - R.camera.poleY);
+	if (dist < radiusBody - 1e-9) {
+		continue;
+	}
+	farthest = Math.max(farthest, dist + radiusBody);
 }
-camera.project(0, farthest - planet.radius, screen);
+if (farthest < planet.radius * 1.5) {
+	farthest = planet.radius * 1.5;
+}
+var farthestAlt = farthest - planet.radius;
+camera.project(0, farthestAlt, screen);
 close(screen.y, camera.topY(), 0.5, 'the farthest far limb is fitted to the top edge');
 close(camera.extent, farthest, farthest * 1e-6, 'the charted extent is that limb');
 

@@ -224,6 +224,7 @@
 		return null;
 	}
 
+	sky.showInterior = false;
 	sky.mode = modeOf(viewSettings.defaultMode);
 	sky.flat = flat;
 	sky.view = view;
@@ -267,21 +268,74 @@
 		return body === worldBody ? view.radius : body.radiusRadii * view.radius;
 	};
 
-	// A catalog body's place in the plane, in metres, from the world's centre.
-	// Orbit and body radii are quoted in active-planet radii, so one table reads
-	// on every world. The plane shares the world's frame (angle from the +Y
-	// axis), so a body at longitude 0 sits due north of the ship at wx 0.
-	// Orbiters are circular test bodies in the active world's gravity; the
-	// fixed star is a background light, not an orbiting body.
-	sky.planePosition = function(body, time, out) {
-		var distance = body.distanceRadii * view.radius;
-		var radius = body.distanceRadii * R.world.planet.radius;
-		var rate = body.kind === 'star' || radius <= 0 ? 0 :
+	// Heliocentric absolute of the active world: the vector from the star to
+	// the world centre. All catalog orbits are heliocentric; the world-centred
+	// plane the chart draws is absolute - worldAbsolute.
+	var worldHelio = { x: 0, y: 0 };
+	var tempHelio = { x: 0, y: 0 };
+
+	function worldHelioPosition(time, out) {
+		var worldOrbit = settings.worldOrbit || { distanceRadii: 2600, longitude: 0.06 };
+		var distance = worldOrbit.distanceRadii * view.radius;
+		var radius = worldOrbit.distanceRadii * R.world.planet.radius;
+		var rate = radius <= 0 ? 0 :
 			Math.sqrt(R.physics.gravitationalParameter() / (radius * radius * radius));
-		var angle = body.longitude * TWO_PI + time * rate;
+		var angle = worldOrbit.longitude * TWO_PI + time * rate;
 
 		out.x = distance * Math.sin(angle);
 		out.y = distance * Math.cos(angle);
+		return out;
+	}
+
+	function absolutePosition(body, time, out) {
+		var parent = body.parent;
+		var distance;
+		var radius;
+		var rate;
+		var angle;
+
+		if (!parent) {
+			// Star (or any root): at the heliocentric origin.
+			out.x = 0;
+			out.y = 0;
+			return out;
+		}
+		if (parent === 'world') {
+			worldHelioPosition(time, worldHelio);
+			distance = body.distanceRadii * view.radius;
+			radius = body.distanceRadii * R.world.planet.radius;
+			rate = radius <= 0 ? 0 :
+				Math.sqrt(R.physics.gravitationalParameter() / (radius * radius * radius));
+			angle = body.longitude * TWO_PI + time * rate;
+			out.x = worldHelio.x + distance * Math.sin(angle);
+			out.y = worldHelio.y + distance * Math.cos(angle);
+			return out;
+		}
+		// Parent is the star: planets orbit it.
+		distance = body.distanceRadii * view.radius;
+		radius = body.distanceRadii * R.world.planet.radius;
+		rate = body.kind === 'star' || radius <= 0 ? 0 :
+			Math.sqrt(R.physics.gravitationalParameter() / (radius * radius * radius));
+		angle = body.longitude * TWO_PI + time * rate;
+		out.x = distance * Math.sin(angle);
+		out.y = distance * Math.cos(angle);
+		return out;
+	}
+
+	// A catalog body's place in the plane, in metres, from the world's centre.
+	// Bodies are on heliocentric orbits; the chart is world-centred, so the
+	// plane is absolute - worldAbsolute. Distances remain in active-planet radii.
+	sky.planePosition = function(body, time, out) {
+		// World-body request is origin; keep the direct path for tests.
+		if (body === worldBody) {
+			out.x = 0;
+			out.y = 0;
+			return out;
+		}
+		worldHelioPosition(time, worldHelio);
+		absolutePosition(body, time, tempHelio);
+		out.x = tempHelio.x - worldHelio.x;
+		out.y = tempHelio.y - worldHelio.y;
 		return out;
 	};
 
@@ -293,6 +347,9 @@
 		}
 		return sky.planePosition(bodies[index], simTime, out);
 	};
+
+	sky.worldHelioPosition = worldHelioPosition;
+	sky.absolutePosition = absolutePosition;
 
 	// The ship's place in the same plane: its radius from the world's centre at
 	// its own longitude. The target, the pole, the anchor and the fit all read
@@ -694,39 +751,26 @@
 
 	// Fly the chart onto the body the ship is standing over, when there is one.
 	function approachSeat(game) {
-		var index = sky.approachIndex(game);
+		var index;
 
+		// A direction lock changes its base from the active world's surface to
+		// the rocket itself; catalog bodies never become its ground pivot.
+		if (sky.mode.directionLock) {
+			if (pivot.index !== -1) {
+				sky.seatPivot(-1, game, false);
+			}
+			return;
+		}
+		index = sky.approachIndex(game);
 		if (index === -2) {
 			return;
 		}
 		sky.seatPivot(index, game, sky.mode.bodyCentred || index >= 0);
 	}
 
-	// The camera's target and the log pole, both on the ray from the pivot's
-	// centre to the ship:
-	//
-	//   on the ground   pole = the centre,               target = the surface
-	//   above the air   pole = the hull's ground point,  target = the hull
-	//
-	// The pole is what the ladder starts at and what every bearing is read from,
-	// so above the air the chart is read from the ship's own place: the hull
-	// holds the origin line, the ground sinks below it by exactly the climb, the
-	// body's surface curves away from the hull instead of lying flat under it,
-	// and a body is charted at its own bearing and distance from the hull rather
-	// than riding a level ring around the world.
-	//
-	// The pole stops on the surface instead of going out to the hull because the
-	// chart's height is distance from the pole: from a pole on the hull every
-	// bearing at the same range is at the same height, and the world it left
-	// would be drawn above it.
-	//
-	// The ship's own depth is `ladder(altitude)` at every point of the travel —
-	// the pole and the ladder's start move together — so what the climb moves is
-	// the origin line, from the ground up to the hull, and nothing jumps.
-	//
-	// A seat is an explicit "look at this body": the chart stands on it, its
-	// surface is the flat ground and the ship is a marker above it, so the pole
-	// stays at that body's centre.
+	// Blend from a body-centred surface chart to a chart whose pole is just
+	// behind the rocket along the locked direction. The offset keeps the pole
+	// finite while putting every external bearing above the rocket's base line.
 	function solveTarget(game) {
 		var shipDistance;
 		var poleDistance;
@@ -745,41 +789,78 @@
 		altitude = shipDistance - pivot.radius;
 		above = R.util.clamp((altitude - view.switchAltitude) /
 			Math.max(1, view.switchAltitude), 0, 1);
-		// The local-body chart holds the surface as ground. Direction-lock views
-		// keep that body pole but target the rocket itself and open the chart.
+		// The local-body chart holds the surface as ground. A direction lock opens
+		// with the altitude instead, whatever the chart is seated on: its base line
+		// is the surface under the hull while the rocket is over it and the hull's
+		// own place once it is above the air, so free space is never charted as a
+		// distant body's ground.
 		if (sky.mode.bodyCentred && !directionLock) {
 			above = 0;
 		}
-		goal = directionLock ? 1 : (pivot.index < 0 ? above : 1);
+		goal = pivot.index < 0 || directionLock ? above : 1;
 		view.fly = ease(view.fly, goal, sky.step, goal > view.fly ?
 			viewSettings.followOpenTau : viewSettings.followCloseTau);
 		// The pole's own travel, which completes a body diameter out rather than
 		// at the ceiling: the far side of the sphere is charted at ladder(2R), so
-		// until the hull is above that the ground would be drawn over it.
-		goal = pivot.index < 0 && !sky.mode.bodyCentred ?
-			R.util.clamp((altitude - view.switchAltitude) /
-				Math.max(1, 2 * pivot.radius - view.switchAltitude), 0, 1) : 0;
+		// until the hull is above that the ground would be drawn over it. A locked
+		// view walks it out on the same altitude that moves its base line, so the
+		// pole, the ladder's start and the target arrive together.
+		if (directionLock) {
+			goal = above;
+		} else if (pivot.index < 0 && !sky.mode.bodyCentred) {
+			goal = R.util.clamp((altitude - view.switchAltitude) /
+				Math.max(1, 2 * pivot.radius - view.switchAltitude), 0, 1);
+		} else {
+			goal = 0;
+		}
 		view.orbit = ease(view.orbit, goal, sky.step, goal > view.orbit ?
 			viewSettings.followOpenTau : viewSettings.followCloseTau);
-		poleDistance = pivot.radius * view.orbit;
-		targetRadius = directionLock ? shipDistance : (pivot.index < 0 ?
-			pivot.radius * Math.pow(shipDistance / Math.max(1e-9, pivot.radius), view.fly) :
-			pivot.radius);
-		pose.ladderRef = pivot.radius - poleDistance;
-		if (shipDistance > 1e-9) {
-			pose.poleX = pivot.x + dx / shipDistance * poleDistance;
-			pose.poleY = pivot.y + dy / shipDistance * poleDistance;
-			pose.targetX = pivot.x + dx / shipDistance * targetRadius;
-			pose.targetY = pivot.y + dy / shipDistance * targetRadius;
+			if (directionLock && game && game.rocket) {
+			var rocket = game.rocket;
+			var angle = rocket.heading;
+			var speed = Math.hypot(rocket.vx || 0, rocket.vy || 0);
+			var longitude = rocket.wx / view.radius;
+			var base = Math.max(1, view.radius * 0.001);
+			if (directionLock === 'prograde' && speed > R.aerodynamics.speedEpsilon) {
+				angle = Math.atan2(rocket.vx, rocket.vy);
+			}
+			angle += longitude;
+			var dirX = Math.sin(angle);
+			var dirY = Math.cos(angle);
+			var shipDirX = shipDistance > 1e-9 ? dx / shipDistance : 0;
+			var shipDirY = shipDistance > 1e-9 ? dy / shipDistance : 1;
+			var surfaceX = pivot.x + shipDirX * pivot.radius;
+			var surfaceY = pivot.y + shipDirY * pivot.radius;
+			var highPoleX = shipPlane.x - dirX * base;
+			var highPoleY = shipPlane.y - dirY * base;
+			pose.poleX = pivot.x + (highPoleX - pivot.x) * view.orbit;
+			pose.poleY = pivot.y + (highPoleY - pivot.y) * view.orbit;
+			pose.targetX = surfaceX + (shipPlane.x - surfaceX) * view.fly;
+			pose.targetY = surfaceY + (shipPlane.y - surfaceY) * view.fly;
+			pose.ladderRef = pivot.radius * (1 - view.orbit) + base * view.orbit;
 		} else {
-			pose.poleX = pivot.x;
-			pose.poleY = pivot.y;
-			pose.targetX = pivot.x;
-			pose.targetY = pivot.y + targetRadius;
+			poleDistance = pivot.radius * view.orbit;
+			// The target is the surface under the hull on the ground and the hull
+			// itself above the air; a seat on another body keeps that body's surface.
+			targetRadius = pivot.index < 0 ?
+				pivot.radius * Math.pow(shipDistance / Math.max(1e-9, pivot.radius), view.fly) :
+				pivot.radius;
+			pose.ladderRef = pivot.radius - poleDistance;
+			if (shipDistance > 1e-9) {
+				pose.poleX = pivot.x + dx / shipDistance * poleDistance;
+				pose.poleY = pivot.y + dy / shipDistance * poleDistance;
+				pose.targetX = pivot.x + dx / shipDistance * targetRadius;
+				pose.targetY = pivot.y + dy / shipDistance * targetRadius;
+			} else {
+				pose.poleX = pivot.x;
+				pose.poleY = pivot.y;
+				pose.targetX = pivot.x;
+				pose.targetY = pivot.y + targetRadius;
+			}
 		}
-		// The target's own depth holds the surface on the default line or the
-		// rocket near the bottom in a direction-locked view.
-		pose.targetDistance = Math.max(1e-9, targetRadius - poleDistance);
+		// The target's own depth holds the surface on the default line or whatever
+		// the lock is following on its own line near the bottom.
+		pose.targetDistance = Math.max(1e-9, Math.hypot(pose.targetX - pose.poleX, pose.targetY - pose.poleY));
 		pose.originLine = directionLock ? R.camera.height * viewSettings.directionLock.objectY :
 			(pivot.index < 0 ? R.camera.baseGroundY +
 				(R.camera.height * viewSettings.followHeight - R.camera.baseGroundY) * view.fly :
@@ -805,9 +886,8 @@
 		return shipDistance;
 	}
 
-	// Keep the rocket at one lower-centre anchor, then roll the rendered chart
-	// until either its velocity or its nose points screen-up. The map remains
-	// the same log-polar projection; only its screen frame follows the axis.
+	// Anchor the followed point without rotating the unwrapped chart. The
+	// heading is applied to the rocket and controls, not to the landscape.
 	function lockDirection(game, axis) {
 		var camera = R.camera;
 		var rocket = game && game.rocket;
@@ -824,9 +904,13 @@
 			camera.clearDirectionLock();
 			return;
 		}
-		sky.shipPlane(game, shipPlane);
-		dx = shipPlane.x - camera.poleX;
-		dy = shipPlane.y - camera.poleY;
+		if (view.fly > 0.999) {
+			sky.shipPlane(game, shipPlane);
+			camera.targetX = shipPlane.x;
+			camera.targetY = shipPlane.y;
+		}
+		dx = camera.targetX - camera.poleX;
+		dy = camera.targetY - camera.poleY;
 		distance = Math.max(1e-9, Math.sqrt(dx * dx + dy * dy));
 		positionAngle = Math.atan2(dx, dy);
 		directionAngle = rocket.heading;
@@ -837,14 +921,18 @@
 			}
 		}
 		camera.directionLock = true;
-		camera.screenRotation = -directionAngle;
+		camera.screenRotation = 0;
+		camera.lockAngle = directionAngle;
 		camera.screenOriginX = anchorX;
 		camera.screenOriginY = anchorY;
+		// A lock must show at most one full turn: repeated laps would put a
+		// second copy of a rear or side body on the forward sightline.
+		camera.angularScale = Math.max(camera.angularScale, camera.width / (2 * Math.PI));
+		camera.stretch = camera.angularScale / camera.scale;
+		camera.period = 2 * Math.PI * camera.angularScale;
 		camera.baseOx = camera.ox = anchorX - camera.angularScale * positionAngle;
 		camera.baseOy = camera.oy = anchorY + camera.scale * camera.depth(distance);
 		camera.targetDistance = distance;
-		camera.targetX = shipPlane.x;
-		camera.targetY = shipPlane.y;
 		camera.originLine = anchorY;
 		camera.syncLines();
 		camera.extent = R.coords.distanceAt(camera.depth(distance) + camera.range, camera);
@@ -1424,6 +1512,8 @@
 		var distance;
 		var singular;
 		var body;
+		var parentX = 0;
+		var parentY = 0;
 		var i;
 		var angle;
 		var px;
@@ -1439,29 +1529,40 @@
 			return orbit;
 		}
 		body = bodies[index];
+		if (body.parent === null || body.parent === undefined) {
+			return orbit;
+		}
 		distance = body.distanceRadii * view.radius;
 		if (!(distance > 0)) {
 			return orbit;
+		}
+		if (body.parent === 'world') {
+			parentX = 0;
+			parentY = 0;
+		} else {
+			worldHelioPosition(simTime, worldHelio);
+			parentX = -worldHelio.x;
+			parentY = -worldHelio.y;
 		}
 		// The body the chart stands on does not draw its own orbit: its centre is
 		// the pole, and the image of a circle through the pole whips a whole
 		// period along the ground line.
 		singular = camera.flat ? 0 : Math.max(1, camera.pivotRadius) * settings.orbitPoleGuard;
-		if (Math.abs(distance - Math.sqrt(camera.poleX * camera.poleX +
-			camera.poleY * camera.poleY)) < singular) {
+		if (Math.abs(distance - Math.sqrt((camera.poleX - parentX) * (camera.poleX - parentX) +
+			(camera.poleY - parentY) * (camera.poleY - parentY))) < singular) {
 			return orbit;
 		}
 		orbit.valid = true;
 		orbit.radius = distance;
 		if (camera.flat) {
-			sampleCircle(0, 0, distance, ORBIT_N >> 1, orbit.xs, orbit.ys);
+			sampleCircle(parentX, parentY, distance, ORBIT_N >> 1, orbit.xs, orbit.ys);
 			orbit.count = ORBIT_N + 1;
 			return orbit;
 		}
 		for (i = 0; i <= ORBIT_N; i += 1) {
 			angle = TWO_PI * i / ORBIT_N;
-			px = distance * Math.sin(angle);
-			py = distance * Math.cos(angle);
+			px = parentX + distance * Math.sin(angle);
+			py = parentY + distance * Math.cos(angle);
 			dx = px - camera.poleX;
 			dy = py - camera.poleY;
 			d = Math.sqrt(dx * dx + dy * dy);

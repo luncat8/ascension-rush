@@ -45,8 +45,10 @@
 		// The flat views preserve the plane or compress only its distance.
 		// Chart views share the log-polar map and differ in what they follow:
 		// `ship` follows the rocket's ground point, `body` follows its current
-		// local visual body, and the direction-lock views keep the rocket low
-		// while aligning either its velocity (`prograde`) or nose (`nose`) up.
+		// local visual body, and direction-lock views use a lower-centre base
+		// line drawn from whatever it follows — the surface
+		// under the hull in the air, the hull itself in space — aligning either
+		// its velocity (`prograde`) or nose (`nose`) up.
 		modes: [
 			{ id: 'real', label: 'Real scale', description: 'Linear plane; the rocket stays centred and the world stays round.',
 				flat: true, log: false, bodyCentred: false },
@@ -60,15 +62,17 @@
 				description: 'Automatically centres the local visual body; hand-off is distance-based, not gravity.',
 				flat: false, log: false, bodyCentred: true },
 			{ id: 'prograde', label: 'Prograde lock · rocket',
-				description: 'Keeps the rocket low and aligns its velocity with screen-up; at rest it follows the nose.',
-				flat: false, log: false, bodyCentred: true, directionLock: 'prograde' },
+				description: 'Unwraps the surface in the air and the rocket in space, with velocity screen-up; at rest it follows the nose.',
+				flat: false, log: false, bodyCentred: false, directionLock: 'prograde' },
 			{ id: 'nose', label: 'Nose lock · rocket',
-				description: 'Keeps the rocket low and rolls the chart to keep its nose pointed screen-up.',
-				flat: false, log: false, bodyCentred: true, directionLock: 'nose' }
+				description: 'Same surface-to-rocket base as prograde lock, with the rocket nose pointed screen-up.',
+				flat: false, log: false, bodyCentred: false, directionLock: 'nose' }
 		],
 		defaultMode: 'ship',
 		directionLock: {
-			// The rocket remains in the lower centre while the map rolls around it.
+			// The followed object stays on the lower-centre base line: the surface
+			// under the hull in the air, the hull itself
+			// once it is in space.
 			centreX: 0.5,
 			objectY: 0.78
 		},
@@ -146,16 +150,20 @@
 		trailCapacity: 320,
 		traceStrideSteps: 42,
 		traceCapacity: 256,
+		// World orbit around the star: the active world's centre in heliocentric
+		// coordinates; in the world-centred plane the star appears at the
+		// negated vector. Moons orbit the world, planets orbit the star.
+		worldOrbit: { distanceRadii: 2600, longitude: 0.06 },
 		bodies: [
-			{ id: 'helios', name: 'Helios', kind: 'star', color: '#ffe6ae', shade: '#8a6a3a',
-				distanceRadii: 2600, radiusRadii: 170, longitude: 0.06 },
-			{ id: 'vesper', name: 'Vesper', kind: 'planet', color: '#8fa9d8', shade: '#2b3f68',
+			{ id: 'helios', name: 'Helios', kind: 'star', parent: null, color: '#ffe6ae', shade: '#8a6a3a',
+				distanceRadii: 0, radiusRadii: 170, longitude: 0 },
+			{ id: 'vesper', name: 'Vesper', kind: 'planet', parent: 'helios', color: '#8fa9d8', shade: '#2b3f68',
 				distanceRadii: 430, radiusRadii: 30, longitude: -0.19 },
-			{ id: 'ember', name: 'Ember', kind: 'planet', color: '#d98b6a', shade: '#5b2c25',
+			{ id: 'ember', name: 'Ember', kind: 'planet', parent: 'helios', color: '#d98b6a', shade: '#5b2c25',
 				distanceRadii: 1180, radiusRadii: 62, longitude: 0.23 },
-			{ id: 'lune', name: 'Lune', kind: 'moon', color: '#d6ded9', shade: '#3d4a4d',
+			{ id: 'lune', name: 'Lune', kind: 'moon', parent: 'world', color: '#d6ded9', shade: '#3d4a4d',
 				distanceRadii: 24, radiusRadii: 2.1, longitude: 0.13 },
-			{ id: 'pale', name: 'Pale', kind: 'moon', color: '#a9b6c8', shade: '#364150',
+			{ id: 'pale', name: 'Pale', kind: 'moon', parent: 'world', color: '#a9b6c8', shade: '#364150',
 				distanceRadii: 58, radiusRadii: 3.2, longitude: -0.09 }
 		]
 	};

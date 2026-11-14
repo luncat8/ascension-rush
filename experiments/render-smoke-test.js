@@ -261,7 +261,7 @@ chartState('prograde lock', function() {
 	smokeGame.rocket.wy = 2000;
 }, 200);
 assert.equal(R.camera.directionLock, true, 'the chart renderer applies prograde lock');
-assert.ok(Math.abs(R.camera.screenRotation + Math.atan2(3, 4)) < 1e-12,
+assert.ok(Math.abs(R.camera.lockAngle - Math.atan2(3, 4)) < 1e-12,
 	'the prograde roll follows the velocity vector');
 R.render.draw(smokeGame);
 chartState('nose lock', function() {
@@ -269,7 +269,7 @@ chartState('nose lock', function() {
 	smokeGame.rocket.heading = 0.8;
 	smokeGame.rocket.wy = 2000;
 }, 200);
-assert.ok(Math.abs(R.camera.screenRotation + 0.8) < 1e-12,
+assert.ok(Math.abs(R.camera.lockAngle - 0.8) < 1e-12,
 	'the separate nose view follows rocket attitude');
 R.render.draw(smokeGame);
 R.sky.setMode('ship');
