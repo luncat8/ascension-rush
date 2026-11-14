@@ -63,3 +63,12 @@ draw trajectory above atmosphere. add other moons and planets and star and prope
 transformation should follow direction, direction always locked to up from bottom center.
 it should keep transform base bottom of the screen. if selected object is planet - it is planet surface, unwrapped to line, if rocket - it is just space near rocket unwrapped to line.
 So: in these modes whole universe is if front of view. behind is only planet underground or rocket interior.
+
+Nose lock Prograde lock
+it should keep transform base bottom of the screen. if selected object is planet - it is planet surface, unwrapped to line, if rocket - it is just space near rocket unwrapped to line. !! in this modes by design when rocket is above atmosphere the selected body is rocket. 
+So: in these modes whole universe is if front of view. behind is only planet underground (in case we landed/started and planet is behind and bottom of the screen) or rocket interior in all other ceases.
+it is like fisheye to compress all to heading and heading is upward on the screen.
+if something unclear - ask. i am  not 100% sure how it should work.
+anyway: 
+- nose or prograde is locked on screen up.
+- all bodies always in front - this mean of screen. except the gravity body in case of it is behind ship (landing, launching) - in this case it is transformed to line so all other space behind this (planet) become also on scene (on side of screen but also up). if no such gravity body - is should transform all space in same way. so this is not a special case but universal transformation rule that do such projection behind ship (behind nose or retrograde according to these view modes )
