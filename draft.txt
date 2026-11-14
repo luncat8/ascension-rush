@@ -59,3 +59,7 @@ draw trajectory above atmosphere. add other moons and planets and star and prope
 - (experimental) same as above, but log scale center log is nearest surface point
 - transformed scale relative to selected object(rocket for now) + unwrap surface of gravity influence body to line
 - transformed scale relative to gravity influence body (rocket fly on the orbit of this body or his gravity influence is more then other bodies) + unwrap surface of gravity influence body to line. need body-to-star transformation and mostly show space related to body surface and problems with switch to other body.
+- Nose lock Prograde lock
+transformation should follow direction, direction always locked to up from bottom center.
+it should keep transform base bottom of the screen. if selected object is planet - it is planet surface, unwrapped to line, if rocket - it is just space near rocket unwrapped to line.
+So: in these modes whole universe is if front of view. behind is only planet underground or rocket interior.
