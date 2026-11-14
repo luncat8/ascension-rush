@@ -7,6 +7,7 @@
 	var throttleUp = false;
 	var throttleDown = false;
 	var headingScreen = { x: 0, y: 0 };
+	var aimPoint = { x: 0, y: 0 };
 
 	function isFormTarget(event) {
 		var target = event.target;
@@ -220,17 +221,22 @@
 		}
 
 		R.camera.project(state.wx, state.wy, headingScreen);
-		dx = input.pointerX - headingScreen.x;
-		dy = headingScreen.y - input.pointerY;
+		if (R.camera.directionLock) {
+			// A locked chart is rolled on screen, and its base line holds the object
+			// it follows rather than the hull. The pointer is read in the chart's own
+			// frame, so the aim is the same gesture whichever axis the camera holds
+			// upright — prograde in one mode, the rocket's nose in the other.
+			R.camera.unrotateScreen(input.pointerX, input.pointerY, aimPoint);
+		} else {
+			aimPoint.x = input.pointerX;
+			aimPoint.y = input.pointerY;
+		}
+		dx = aimPoint.x - headingScreen.x;
+		dy = headingScreen.y - aimPoint.y;
 		if (dx * dx + dy * dy < 64) {
 			return;
 		}
 		desiredHeading = Math.atan2(dx, dy);
-		if (R.camera.directionLock) {
-			// Mouse aim is relative to whichever axis the camera holds screen-up:
-			// prograde in one mode, the rocket's nose in the other.
-			desiredHeading -= R.camera.screenRotation;
-		}
 		controls.applyHeading(state, desiredHeading, dt);
 	};
 

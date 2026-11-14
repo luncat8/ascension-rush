@@ -195,11 +195,21 @@ assert.equal(camera.directionLock, true, 'prograde lock enables the camera roll'
 assert.equal(R.sky.mode.id, 'prograde', 'the prograde mode is selectable');
 assert.ok(Math.abs(camera.period - 2 * Math.PI * camera.angularScale) < 1e-9,
 	'the prograde view keeps the chart wrap');
+// In the world's air the lock's base line is the planet surface under the hull:
+// one unwrapped line on the anchor, underground behind it, everything else in
+// front.
+assert.equal(R.sky.pivot.index, -1, 'the locked chart stands on the world it flies over');
+assert.ok(Math.abs(camera.ladderRef - radius) < 1,
+	'the planet radius starts the ladder, so its surface is depth zero');
+assert.ok(Math.abs(camera.groundY - camera.height * R.constants.view.directionLock.objectY) < 0.05,
+	'and that surface is the base line at the lower-centre anchor');
+camera.projectPlane(0, radius, screen);
+camera.projectPlane(radius * Math.sin(0.4), radius * Math.cos(0.4), other);
+assert.ok(Math.abs(screen.y - camera.groundY) < 0.05 && Math.abs(other.y - camera.groundY) < 0.05,
+	'the surface is unwrapped to one line for every bearing');
 camera.project(game.rocket.wx, game.rocket.wy, screen);
-camera.rotateScreen(screen.x, screen.y, other);
-assert.ok(Math.abs(other.x - camera.width * R.constants.view.directionLock.centreX) < 1e-6 &&
-	Math.abs(other.y - camera.height * R.constants.view.directionLock.objectY) < 1e-6,
-	'the rocket stays at the lower-centre anchor');
+assert.ok(Math.abs(screen.x - camera.screenOriginX) < 1e-6 && screen.y < camera.groundY,
+	'the rocket is charted in front of the base line, on the ray above its ground');
 assert.ok(Math.abs(camera.screenRotation + prograde) < 1e-12,
 	'the chart rolls against velocity, not attitude');
 R.sky.outline(3, game);
@@ -217,8 +227,13 @@ assert.ok(Math.hypot(other.x - camera.screenOriginX - 43,
 game.phase = 'flying';
 R.input.pointerActive = true;
 pointerAngle = 0.2;
-R.input.pointerX = camera.screenOriginX + 60 * Math.sin(pointerAngle);
-R.input.pointerY = camera.screenOriginY - 60 * Math.cos(pointerAngle);
+// The pointer is placed beside the drawn rocket, not beside the base anchor:
+// the anchor holds the object the lock follows, which is the surface while the
+// chart is on the ground.
+camera.project(game.rocket.wx, game.rocket.wy, screen);
+camera.rotateScreen(screen.x, screen.y, other);
+R.input.pointerX = other.x + 60 * Math.sin(pointerAngle);
+R.input.pointerY = other.y - 60 * Math.cos(pointerAngle);
 beforeHeading = game.rocket.heading;
 R.controls.update(game, 0.1);
 assert.ok(Math.abs(R.util.wrapDelta(game.rocket.heading - beforeHeading, 2 * Math.PI) +
@@ -253,19 +268,45 @@ game.phase = 'deck';
 R.input.pointerActive = false;
 camera.projectPlane(0, radius, screen);
 camera.projectPlane(radius, 0, other);
-assert.ok(Math.abs(screen.y - other.y) < 1e-6 && Math.abs(screen.y - camera.groundY) < 1e-6,
-	'the active body surface is still an unwrapped line beneath the rocket');
+assert.ok(Math.abs(screen.y - other.y) < 0.05 && Math.abs(screen.y - camera.groundY) < 0.05,
+	'the active body surface is one unwrapped line at the base');
 assert.equal(R.sky.handBegin(300, 300, game), false, 'the tracking view does not pan away from its object');
 
-game.rocket.wy = 200 * radius;
-frames(1);
-assert.equal(R.sky.pivot.index, 0, 'prograde lock follows the same visual hand-off to the star');
-assert.equal(camera.transition.active, true, 'the body-to-star change is eased');
+// Above the air the base line is the rocket's own place in space: the hull takes
+// the anchor, the planet surface sinks behind the line, and the universe in
+// front is charted from the hull's ground point rather than the planet centre.
+game.rocket.wy = 8 * radius;
+frames(600);
+assert.ok(camera.fly > 0.999 && R.sky.view.orbit > 0.999,
+	'the lock opens the chart once the hull is above the air');
+assert.ok(camera.ladderRef < 1, 'the ladder starts at the hull ground point, not the planet radius');
+assert.ok(Math.abs(Math.hypot(camera.poleX, camera.poleY) - radius) < 1,
+	'so the pole stands on the surface under the hull');
 camera.project(game.rocket.wx, game.rocket.wy, screen);
 camera.rotateScreen(screen.x, screen.y, other);
 assert.ok(Math.abs(other.x - camera.screenOriginX) < 1e-6 &&
 	Math.abs(other.y - camera.screenOriginY) < 1e-6,
-	'the rocket stays pinned through the first hand-over frame');
+	'the rocket itself is the base line now');
+assert.ok(camera.groundY > camera.height && camera.originY < camera.groundY,
+	'with the planet surface behind the line, below the chart');
+assert.equal(R.sky.poleOutside(camera.pivotRadius), false,
+	'the pole is still the surface under the hull rather than beyond it');
+
+// The star hand-off: the chart leaves the world for the star out at the
+// departure reach, easing the pole and the ladder across.
+game.rocket.wy = 70 * radius;
+frames(400);
+assert.equal(R.sky.pivot.index, -1, 'the locked chart holds the world inside its reach');
+while (R.sky.pivot.index === -1) {
+	game.rocket.wy += radius * 0.2;
+	R.sky.update(game, 0.016);
+}
+assert.equal(R.sky.pivot.index, 0, 'prograde lock follows the same visual hand-off to the star');
+assert.equal(camera.transition.active, true, 'the body-to-star change is eased');
+camera.project(game.rocket.wx, game.rocket.wy, screen);
+camera.rotateScreen(screen.x, screen.y, other);
+assert.ok(Math.hypot(other.x - camera.screenOriginX, other.y - camera.screenOriginY) < 2,
+	'the hull keeps the base line through the first hand-over frame');
 frames(200);
 assert.equal(camera.transition.active, false, 'the star hand-over settles in prograde lock');
 game.rocket.wy = 40 * radius;
@@ -274,6 +315,10 @@ assert.equal(R.sky.pivot.index, -1, 'the chart returns to the world inside its a
 assert.equal(camera.transition.active, true, 'the star-to-world change is eased too');
 frames(200);
 assert.equal(camera.transition.active, false, 'the return hand-over settles');
+camera.project(game.rocket.wx, game.rocket.wy, screen);
+camera.rotateScreen(screen.x, screen.y, other);
+assert.ok(Math.hypot(other.x - camera.screenOriginX, other.y - camera.screenOriginY) < 1e-6,
+	'and the hull is back on the base line once it settles');
 
 R.sky.setMode('ship');
 game.rocket.heading = 0;

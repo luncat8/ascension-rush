@@ -45,8 +45,10 @@
 		// The flat views preserve the plane or compress only its distance.
 		// Chart views share the log-polar map and differ in what they follow:
 		// `ship` follows the rocket's ground point, `body` follows its current
-		// local visual body, and the direction-lock views keep the rocket low
-		// while aligning either its velocity (`prograde`) or nose (`nose`) up.
+		// local visual body, and the direction-lock views roll the chart about a
+		// lower-centre base line drawn from whatever it follows — the surface
+		// under the hull in the air, the hull itself in space — aligning either
+		// its velocity (`prograde`) or nose (`nose`) up.
 		modes: [
 			{ id: 'real', label: 'Real scale', description: 'Linear plane; the rocket stays centred and the world stays round.',
 				flat: true, log: false, bodyCentred: false },
@@ -60,15 +62,17 @@
 				description: 'Automatically centres the local visual body; hand-off is distance-based, not gravity.',
 				flat: false, log: false, bodyCentred: true },
 			{ id: 'prograde', label: 'Prograde lock · rocket',
-				description: 'Keeps the rocket low and aligns its velocity with screen-up; at rest it follows the nose.',
+				description: 'Unwraps the base line from the object it follows — the surface in the air, the hull in space — and rolls it with velocity; at rest it follows the nose.',
 				flat: false, log: false, bodyCentred: true, directionLock: 'prograde' },
 			{ id: 'nose', label: 'Nose lock · rocket',
-				description: 'Keeps the rocket low and rolls the chart to keep its nose pointed screen-up.',
+				description: 'Same base line as the prograde lock, rolled to keep the rocket nose pointed screen-up.',
 				flat: false, log: false, bodyCentred: true, directionLock: 'nose' }
 		],
 		defaultMode: 'ship',
 		directionLock: {
-			// The rocket remains in the lower centre while the map rolls around it.
+			// The followed object stays on the lower-centre base line while the map
+			// rolls about it: the surface under the hull in the air, the hull itself
+			// once it is in space.
 			centreX: 0.5,
 			objectY: 0.78
 		},

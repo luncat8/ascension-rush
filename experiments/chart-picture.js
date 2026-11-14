@@ -360,7 +360,22 @@ var states = [
 		R.sky.reset();
 		step(200);
 		R.camera.zoomBy(3);
-	}, 60, 'Zoomed in on the deck: the ground line holds, the air column magnifies, the catalog leaves the top.')
+	}, 60, 'Zoomed in on the deck: the ground line holds, the air column magnifies, the catalog leaves the top.'),
+	state('lock-ground', function() {
+		R.sky.reset();
+		R.sky.setMode('prograde');
+		game.rocket.wy = 3000;
+		game.rocket.heading = 0.5;
+		game.rocket.vx = 60;
+		game.rocket.vy = 90;
+	}, 400, 'Prograde lock in the air: the planet surface is the base line — unwrapped, flat, underground behind it — and the hull is charted above it.'),
+	state('lock-space', function() {
+		R.sky.reset();
+		R.sky.setMode('prograde');
+		game.rocket.wy = 8 * R.world.planet.radius;
+		game.rocket.vx = 60;
+		game.rocket.vy = 90;
+	}, 600, 'Prograde lock above the air: the base line is space at the hull, the planet surface sinks behind it, the universe is in front.')
 ];
 
 var wanted = process.argv.slice(2);

@@ -687,8 +687,8 @@ only switch and `sky.mode` the only state.
 | `real-log` (experimental) | bearings kept, distance `ln(1 + d / knee)` | nearest surface point to the rocket | the nearest body's ring through that point |
 | `ship` (default) | log-polar chart | rocket's ground point in flight | unwrapped on the deck, a horizon in flight |
 | `body` | log-polar chart | centre of the automatically selected local visual body | that body's surface as the flat ground line |
-| `prograde` | body-centred log-polar chart, screen-rolled | rocket near lower centre, velocity upright | same unwrapped surface line, rotated with velocity |
-| `nose` | body-centred log-polar chart, screen-rolled | rocket near lower centre, nose upright | same unwrapped surface line, rotated with rocket attitude |
+| `prograde` | log-polar chart, screen-rolled | the base line: the surface under the hull in the air, the hull itself in space. Velocity upright | unwrapped to a straight line at the lower centre, interior behind it |
+| `nose` | log-polar chart, screen-rolled | the same base line, nose upright | the same, rotated with rocket attitude |
 
 **Flat views (`real`, `real-log`).** `coords.flatToScreen / screenToFlat` are
 the whole map: a rotation that puts the active world's local up at the hull on
@@ -724,20 +724,37 @@ map. `ship` follows the rocket's ground point so the body curves away as the
 rocket climbs. `body` automatically chooses the nearby visual body, keeps the
 pole at its centre and targets its surface, leaving the rocket as a marker above
 a flat ground line. A clicked seat from `ship` is not sticky in any body-centred
-mode. `prograde` and `nose` use that same automatic body selection and pole,
-but target the rocket near the lower centre. `prograde` rolls the chart so the
-velocity vector points screen-up (falling back to the nose at rest); `nose`
-rolls it by rocket attitude instead. The nose therefore need not point up in
-prograde view, nor the velocity in nose view. The scenery, aim guides and
-surface line roll around the locked direction. Pointer readout and body picking
-inverse-rotate into the shared chart before unprojection. Mouse aim is relative
-to the direction held screen-up. Drag-pan is disabled in both tracking views.
+mode.
+
+`prograde` and `nose` roll the chart, and they have no fixed ground. Their base
+line at the lower centre (`directionLock.objectY`) holds whatever the frame
+follows, and `lockDirection` pins that camera target rather than the hull: over
+a body it is the surface point under the hull, so the body's surface is one
+unwrapped straight line on the base, its cutaway behind it, and the hull is
+charted above it; above the air the target becomes the hull itself, the pole
+stands on the hull's ground point with a ladder start of zero, and the surface
+sinks below the line. Both come from the same pose — `view.fly` and `view.orbit`
+ease with the altitude above the pivot body — so the change of base is a
+travel, not a cut, and the same map serves both. In either regime the whole
+universe is in front of the base line and behind it there is only the planet's
+interior or the rocket's own, which is nothing the chart draws. `prograde`
+rolls the chart so the velocity vector points screen-up (falling back to the
+nose at rest); `nose` rolls it by rocket attitude instead. The nose therefore
+need not point up in prograde view, nor the velocity in nose view. The scenery,
+aim guides and surface line roll around the locked direction. Pointer readout,
+body picking and mouse aim inverse-rotate into the shared chart before they are
+read, so the aim is the same gesture whichever axis is upright and wherever the
+followed object sits on the screen. Drag-pan is disabled in both tracking
+views.
 
 The local body is currently chosen by visual distance bands with hysteresis,
 not gravity: the catalog bodies have no masses and only the active world
 exerts force. In `body`, `prograde` and `nose`, a nearby catalog body can take
 the pole; outside the world's wider visual reach the star takes it, with an
-eased pivot hand-over. This is a chart convention, not a physical sphere of
+eased pivot hand-over. A lock's base object is that seat only while the hull is
+over it; once the hull is above the seat's air the base is the rocket, however
+far the seated body is — free space is never charted as a distant body's
+ground. This is a chart convention, not a physical sphere of
 influence. A future multi-body model can replace `sky.approachIndex`'s reach
 tests with a force or patched-conic criterion without changing the view modes'
 meanings.
@@ -750,4 +767,7 @@ flat states.
 Open: drag-pan and focus-on-body in the flat views; a blended cut between flat
 and chart; `real-log` compresses far bodies into slivers, which is honest but
 may want a minimum-size disc; `body`, `prograde` and `nose` repeat the chart
-surface across multiple cylindrical laps.
+surface across multiple cylindrical laps. The lock's base object is picked by
+altitude rather than by a control, so a pilot cannot pin the planet surface
+under the hull in space or the hull while still in the air; a frame-object
+selector would make that explicit.

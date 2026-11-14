@@ -720,6 +720,12 @@
 	// bearing at the same range is at the same height, and the world it left
 	// would be drawn above it.
 	//
+	// A direction-lock view has no fixed ground. Its base line is whatever the
+	// chart is following — the surface under the hull while the rocket is over
+	// it, the hull's own place in space once it is above the air — so the same
+	// two poses serve it: the whole of the universe is in front of that line,
+	// and behind it there is only the planet's interior or the rocket's own.
+	//
 	// The ship's own depth is `ladder(altitude)` at every point of the travel —
 	// the pole and the ladder's start move together — so what the climb moves is
 	// the origin line, from the ground up to the hull, and nothing jumps.
@@ -745,26 +751,38 @@
 		altitude = shipDistance - pivot.radius;
 		above = R.util.clamp((altitude - view.switchAltitude) /
 			Math.max(1, view.switchAltitude), 0, 1);
-		// The local-body chart holds the surface as ground. Direction-lock views
-		// keep that body pole but target the rocket itself and open the chart.
+		// The local-body chart holds the surface as ground. A direction lock opens
+		// with the altitude instead, whatever the chart is seated on: its base line
+		// is the surface under the hull while the rocket is over it and the hull's
+		// own place once it is above the air, so free space is never charted as a
+		// distant body's ground.
 		if (sky.mode.bodyCentred && !directionLock) {
 			above = 0;
 		}
-		goal = directionLock ? 1 : (pivot.index < 0 ? above : 1);
+		goal = pivot.index < 0 || directionLock ? above : 1;
 		view.fly = ease(view.fly, goal, sky.step, goal > view.fly ?
 			viewSettings.followOpenTau : viewSettings.followCloseTau);
 		// The pole's own travel, which completes a body diameter out rather than
 		// at the ceiling: the far side of the sphere is charted at ladder(2R), so
-		// until the hull is above that the ground would be drawn over it.
-		goal = pivot.index < 0 && !sky.mode.bodyCentred ?
-			R.util.clamp((altitude - view.switchAltitude) /
-				Math.max(1, 2 * pivot.radius - view.switchAltitude), 0, 1) : 0;
+		// until the hull is above that the ground would be drawn over it. A locked
+		// view walks it out on the same altitude that moves its base line, so the
+		// pole, the ladder's start and the target arrive together.
+		if (directionLock) {
+			goal = above;
+		} else if (pivot.index < 0 && !sky.mode.bodyCentred) {
+			goal = R.util.clamp((altitude - view.switchAltitude) /
+				Math.max(1, 2 * pivot.radius - view.switchAltitude), 0, 1);
+		} else {
+			goal = 0;
+		}
 		view.orbit = ease(view.orbit, goal, sky.step, goal > view.orbit ?
 			viewSettings.followOpenTau : viewSettings.followCloseTau);
 		poleDistance = pivot.radius * view.orbit;
-		targetRadius = directionLock ? shipDistance : (pivot.index < 0 ?
+		// The target is the surface under the hull on the ground and the hull
+		// itself above the air; a seat on another body keeps that body's surface.
+		targetRadius = directionLock || pivot.index < 0 ?
 			pivot.radius * Math.pow(shipDistance / Math.max(1e-9, pivot.radius), view.fly) :
-			pivot.radius);
+			pivot.radius;
 		pose.ladderRef = pivot.radius - poleDistance;
 		if (shipDistance > 1e-9) {
 			pose.poleX = pivot.x + dx / shipDistance * poleDistance;
@@ -777,8 +795,8 @@
 			pose.targetX = pivot.x;
 			pose.targetY = pivot.y + targetRadius;
 		}
-		// The target's own depth holds the surface on the default line or the
-		// rocket near the bottom in a direction-locked view.
+		// The target's own depth holds the surface on the default line or whatever
+		// the lock is following on its own line near the bottom.
 		pose.targetDistance = Math.max(1e-9, targetRadius - poleDistance);
 		pose.originLine = directionLock ? R.camera.height * viewSettings.directionLock.objectY :
 			(pivot.index < 0 ? R.camera.baseGroundY +
@@ -805,8 +823,11 @@
 		return shipDistance;
 	}
 
-	// Keep the rocket at one lower-centre anchor, then roll the rendered chart
-	// until either its velocity or its nose points screen-up. The map remains
+	// Hold the chart's base line on one lower-centre anchor, then roll the
+	// rendered chart about it until either the rocket's velocity or its nose
+	// points screen-up. The anchor holds the camera target — the surface under
+	// the hull while the chart stands on a body, the hull itself in space — so
+	// the line is the followed object's, not always the planet's. The map stays
 	// the same log-polar projection; only its screen frame follows the axis.
 	function lockDirection(game, axis) {
 		var camera = R.camera;
@@ -824,9 +845,8 @@
 			camera.clearDirectionLock();
 			return;
 		}
-		sky.shipPlane(game, shipPlane);
-		dx = shipPlane.x - camera.poleX;
-		dy = shipPlane.y - camera.poleY;
+		dx = camera.targetX - camera.poleX;
+		dy = camera.targetY - camera.poleY;
 		distance = Math.max(1e-9, Math.sqrt(dx * dx + dy * dy));
 		positionAngle = Math.atan2(dx, dy);
 		directionAngle = rocket.heading;
@@ -843,8 +863,6 @@
 		camera.baseOx = camera.ox = anchorX - camera.angularScale * positionAngle;
 		camera.baseOy = camera.oy = anchorY + camera.scale * camera.depth(distance);
 		camera.targetDistance = distance;
-		camera.targetX = shipPlane.x;
-		camera.targetY = shipPlane.y;
 		camera.originLine = anchorY;
 		camera.syncLines();
 		camera.extent = R.coords.distanceAt(camera.depth(distance) + camera.range, camera);
