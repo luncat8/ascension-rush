@@ -394,7 +394,12 @@ close(luneHandOver.endY, R.camera.baseGroundY, 1e-6, 'and on the ground line');
 handOver(3, -1, 'Lune -> world');
 assert.equal(R.sky.pivot.index, -1);
 close(R.sky.pivot.radius, R.world.planet.radius, 1e-6, 'the world is the ground again');
+// The follow eases the pole back down onto the world's centre after a seat that
+// held it out at the ship, so the flat deck is the settled state, not the first
+// frame after the hand-over.
+settle(8);
 close(R.camera.ladderRef, R.world.planet.radius, 1e-6, 'and its surface is the ladder start');
+assert.ok(R.sky.poleInside(R.world.planet.radius), 'with the pole back at that centre');
 
 // A seat request while a hand-over is running is refused rather than stacked.
 assert.ok(R.sky.seatPivot(3, game));
@@ -450,7 +455,13 @@ assert.ok(Number.isFinite(shape.centerX) && Number.isFinite(shape.nearY), 'and a
 game.rocket.wy = R.world.planet.radius;
 settle(8);
 close(R.sky.view.fly, 1, 1e-6, 'above the switch altitude the ship becomes the centre of the scale');
-close(R.camera.targetDistance, R.world.planet.radius * 2, 1e-3, 'at its own distance from the pole');
+// The pole has left the centre on the way to the hull's ground point, and the
+// target is the hull, so the two together reach the hull's own distance.
+var poleOut = Math.hypot(R.camera.poleX - R.camera.pivotX, R.camera.poleY - R.camera.pivotY);
+
+assert.ok(poleOut > R.world.planet.radius * 0.2, 'the pole has travelled out of the centre');
+close(poleOut + R.camera.targetDistance, R.world.planet.radius * 2, 1e-3,
+	'and the pole and the target together reach the hull');
 
 // ---------------------------------------------------------------------------
 // Coast trace and the flown-trail ring buffer.

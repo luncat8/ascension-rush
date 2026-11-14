@@ -9,12 +9,20 @@
 	var TWO_PI = Math.PI * 2;
 	var SAMPLES = settings.outlineSamples;
 
-	// The chart stands on exactly one body — its **pivot** — whose surface is
-	// the ground line, and the log pole is that body's centre. Everything else
+	// The chart stands on exactly one body — its **pivot** — and everything else
 	// in the catalog is a body of the same plane, drawn as the lens its sphere
-	// casts on the chart. A drag can put the pole on a surface point instead of
-	// a centre, which is the same map read from a different place: the body
-	// under the pole is still the ground, and its horizon curves.
+	// casts on the chart.
+	//
+	// The log **pole** is a point on the ray from the pivot's centre to the ship.
+	// On the ground it is the centre, so the pivot's surface is the flat ground
+	// line the ladder starts at; once the ship is above the air it travels out
+	// along that ray and stops on the pivot's surface under the ship, so the
+	// chart is read from the ship's own place: the hull holds the origin line,
+	// the world curves away below it as a horizon, and every body is charted
+	// from the pole by its own bearing and distance. The travel is one
+	// continuous map — the same sphere, bending from a flat line into that
+	// horizon — and the pivot keeps its surface, its curve and its colour all
+	// the way, so two bodies only trade places halfway.
 	var view = {
 		planetId: '',
 		logScale: 0,
@@ -37,6 +45,11 @@
 		// to the ship and the tangential axis from one-circumference-per-viewport
 		// to the shared scale, so both changes are one continuous morph.
 		fly: 0,
+		// How far the log pole has travelled out from the pivot's centre toward
+		// the surface under the ship: 0 at the centre, where the surface is the
+		// flat ground line, 1 standing on that surface, where the chart is read
+		// from the ship's own place and the surface curves away from it.
+		orbit: 0,
 		morph: 1,
 		from: { gravity: 0, radius: 0 }
 	};
@@ -48,7 +61,11 @@
 		morph: 1,
 		radius: 1,
 		x: 0,
-		y: 0
+		y: 0,
+		// Whether the chart stands here because the ship flew here rather than
+		// because the player pointed at it. Only an approach seat is handed back
+		// when the ship leaves; a seat the player asked for stays put.
+		approach: false
 	};
 
 	// The active world as a body of the plane: the origin of the catalog, and a
@@ -178,8 +195,15 @@
 		return t * t * (3 - 2 * t);
 	}
 
+	// Exponential easing, snapped shut at the end. The ladder is a log, so the
+	// last part-per-million of an eased distance is still tenths of a nat on
+	// screen: without the snap the pole asymptotes toward the hull and the hull
+	// asymptotes toward its own line forever. The snap is far below a pixel of
+	// chart at the far end of the catalog.
 	function ease(current, goal, dt, tau) {
-		return current + (goal - current) * (1 - Math.exp(-dt / Math.max(1e-6, tau)));
+		var next = current + (goal - current) * (1 - Math.exp(-dt / Math.max(1e-6, tau)));
+
+		return Math.abs(goal - next) <= 1e-7 * Math.max(1, Math.abs(goal)) ? goal : next;
 	}
 
 	function wrapPi(angle) {
@@ -221,16 +245,19 @@
 	};
 
 	// The ship's place in the same plane: its radius from the world's centre at
-	// its own longitude. The target, the anchor and the fit all read it.
+	// its own longitude. The target, the pole, the anchor and the fit all read
+	// it, and it uses the radius the projection itself uses, so the pole that
+	// stands on the surface under the hull and the hull the chart draws are the
+	// same point.
 	sky.shipPlane = function(game, out) {
 		var rocket = game && game.rocket;
 
 		if (!rocket) {
 			out.x = 0;
-			out.y = view.radius;
+			out.y = R.camera.worldRadius;
 			return out;
 		}
-		return R.coords.planeOfWorld(rocket.wx || 0, rocket.wy || 0, view.radius, out);
+		return R.coords.planeOfWorld(rocket.wx || 0, rocket.wy || 0, R.camera.worldRadius, out);
 	};
 
 	// Screen y of a plane distance from the pole, through the chart's own law.
@@ -251,6 +278,19 @@
 		var dy = R.camera.pivotY - R.camera.poleY;
 
 		return dx * dx + dy * dy < radius * radius * (1 - 1e-9);
+	};
+
+	// Whether the pole is beyond the ground sphere, which a climb never is —
+	// that stops the pole on the surface. Only a gesture walks it out past the
+	// sphere, and no ray from out there exits it forward: there is no surface
+	// under the chart at all, and the body is the lens `sky.outline` draws for
+	// it. Standing exactly on a surface counts as on it, not beyond, which is
+	// the horizon the climb ends on.
+	sky.poleOutside = function(radius) {
+		var dx = R.camera.pivotX - R.camera.poleX;
+		var dy = R.camera.pivotY - R.camera.poleY;
+
+		return dx * dx + dy * dy > radius * radius * GROUND_SLACK;
 	};
 
 	// The body the ground belongs to: the one whose centre the camera's pivot is
@@ -373,11 +413,13 @@
 		view.switchAltitude = Math.max(view.atmosphereTop, planet.radius * 0.5);
 		view.morph = 1;
 		view.fly = 0;
+		view.orbit = 0;
 		view.from.gravity = view.gravity;
 		view.from.radius = view.radius;
 		pivot.index = -1;
 		pivot.previousIndex = -1;
 		pivot.reseating = false;
+		pivot.approach = false;
 		pivot.morph = 1;
 		pivot.radius = view.radius;
 		pivot.x = 0;
@@ -396,6 +438,7 @@
 		pivot.index = -1;
 		pivot.previousIndex = -1;
 		pivot.reseating = false;
+		pivot.approach = false;
 		pivot.radius = 0;
 		fit.ready = false;
 		hand.active = false;
@@ -409,6 +452,7 @@
 		pivot.index = -1;
 		pivot.previousIndex = -1;
 		pivot.reseating = false;
+		pivot.approach = false;
 	};
 
 	// Seat the chart on a catalog body, or back on the world with -1.
@@ -419,7 +463,7 @@
 	// scale travel to their new values while the camera solves its offsets from
 	// that anchor every frame, so the chart travels underneath the point the
 	// player is watching and the new surface arrives as the flat ground.
-	sky.seatPivot = function(index, game) {
+	sky.seatPivot = function(index, game, approach) {
 		var radius;
 		var dx;
 		var dy;
@@ -446,6 +490,7 @@
 		pivot.index = index;
 		pivot.morph = 0;
 		pivot.reseating = true;
+		pivot.approach = approach === true;
 		// A seat returns to the fitted overview: the pan the player dragged in is
 		// kept, but the wheel zoom eases back to the fit so landing on a distant
 		// body does not land on empty space.
@@ -483,38 +528,131 @@
 		pivot.radius = bodies[pivot.index].radiusRadii * view.radius;
 	}
 
-	// The camera's target. Below the switch altitude it is the ground: the
-	// pivot's own surface, held on the ground line. Above it the target is the
-	// ship, and the ship's own distance from the pole becomes the centre of the
-	// scale — the hull stays on its line while the ground sinks below it by
-	// exactly the climb. Seated on a catalog body the target is that body's
-	// ground, because seating it is an explicit "look at this body".
-	function solveTarget(game) {
-		var shipDistance;
+	// Which body the ship is standing over. A body the ship has flown inside
+	// reaches for the chart — the same seat a click on it gives, so its surface
+	// arrives as the flat ground under the hull instead of the hull stopping in
+	// front of a lens — and it keeps it until the ship is clear of the wider
+	// departure reach. The two reaches are the hysteresis: a hull parked at the
+	// edge of one body's reach cannot make the chart flip every frame. Nothing
+	// in the catalog reaching leaves a seat the player asked for alone, and
+	// hands an approach seat back to the world.
+	//
+	// Returns the index to seat, or -2 to leave the pivot where it is.
+	sky.approachIndex = function(game) {
+		var best = -2;
+		var bestGap = 0;
+		var body;
+		var radius;
+		var gap;
 		var dx;
 		var dy;
+		var i;
+
+		if (hand.active || R.camera.transition.active) {
+			return -2;
+		}
+		sky.shipPlane(game, shipPlane);
+		for (i = 0; i < bodies.length; i += 1) {
+			body = bodies[i];
+			radius = Math.max(1e-9, body.radiusRadii * view.radius);
+			sky.planePosition(body, simTime, plane);
+			dx = shipPlane.x - plane.x;
+			dy = shipPlane.y - plane.y;
+			gap = Math.sqrt(dx * dx + dy * dy) / radius -
+				(i === pivot.index ? settings.departRadii : settings.approachRadii);
+			if (gap >= 0 || (best > -2 && gap >= bestGap)) {
+				continue;
+			}
+			best = i;
+			bestGap = gap;
+		}
+		if (best > -2) {
+			return best === pivot.index ? -2 : best;
+		}
+		return pivot.approach && pivot.index >= 0 ? -1 : -2;
+	};
+
+	// Fly the chart onto the body the ship is standing over, when there is one.
+	function approachSeat(game) {
+		var index = sky.approachIndex(game);
+
+		if (index === -2) {
+			return;
+		}
+		sky.seatPivot(index, game, index >= 0);
+	}
+
+	// The camera's target and the log pole, both on the ray from the pivot's
+	// centre to the ship:
+	//
+	//   on the ground   pole = the centre,               target = the surface
+	//   above the air   pole = the hull's ground point,  target = the hull
+	//
+	// The pole is what the ladder starts at and what every bearing is read from,
+	// so above the air the chart is read from the ship's own place: the hull
+	// holds the origin line, the ground sinks below it by exactly the climb, the
+	// body's surface curves away from the hull instead of lying flat under it,
+	// and a body is charted at its own bearing and distance from the hull rather
+	// than riding a level ring around the world.
+	//
+	// The pole stops on the surface instead of going out to the hull because the
+	// chart's height is distance from the pole: from a pole on the hull every
+	// bearing at the same range is at the same height, and the world it left
+	// would be drawn above it.
+	//
+	// The ship's own depth is `ladder(altitude)` at every point of the travel —
+	// the pole and the ladder's start move together — so what the climb moves is
+	// the origin line, from the ground up to the hull, and nothing jumps.
+	//
+	// A seat is an explicit "look at this body": the chart stands on it, its
+	// surface is the flat ground and the ship is a marker above it, so the pole
+	// stays at that body's centre.
+	function solveTarget(game) {
+		var shipDistance;
+		var poleDistance;
+		var targetRadius;
+		var altitude;
 		var above;
 		var goal;
+		var dx;
+		var dy;
 
 		sky.shipPlane(game, shipPlane);
 		dx = shipPlane.x - pivot.x;
 		dy = shipPlane.y - pivot.y;
 		shipDistance = Math.max(pivot.radius, Math.sqrt(dx * dx + dy * dy));
-		above = R.util.clamp((Math.max(0, (game && game.rocket ? game.rocket.wy : 0)) -
-			view.switchAltitude) / Math.max(1, view.switchAltitude), 0, 1);
+		altitude = shipDistance - pivot.radius;
+		above = R.util.clamp((altitude - view.switchAltitude) /
+			Math.max(1, view.switchAltitude), 0, 1);
 		goal = pivot.index < 0 ? above : 1;
 		view.fly = ease(view.fly, goal, sky.step, goal > view.fly ?
 			viewSettings.followOpenTau : viewSettings.followCloseTau);
-		pose.targetDistance = pivot.index < 0 ?
+		// The pole's own travel, which completes a body diameter out rather than
+		// at the ceiling: the far side of the sphere is charted at ladder(2R), so
+		// until the hull is above that the ground would be drawn over it.
+		goal = pivot.index < 0 ? R.util.clamp((altitude - view.switchAltitude) /
+			Math.max(1, 2 * pivot.radius - view.switchAltitude), 0, 1) : 0;
+		view.orbit = ease(view.orbit, goal, sky.step, goal > view.orbit ?
+			viewSettings.followOpenTau : viewSettings.followCloseTau);
+		poleDistance = pivot.radius * view.orbit;
+		targetRadius = pivot.index < 0 ?
 			pivot.radius * Math.pow(shipDistance / Math.max(1e-9, pivot.radius), view.fly) :
 			pivot.radius;
+		pose.ladderRef = pivot.radius - poleDistance;
 		if (shipDistance > 1e-9) {
-			pose.targetX = pivot.x + dx / shipDistance * pose.targetDistance;
-			pose.targetY = pivot.y + dy / shipDistance * pose.targetDistance;
+			pose.poleX = pivot.x + dx / shipDistance * poleDistance;
+			pose.poleY = pivot.y + dy / shipDistance * poleDistance;
+			pose.targetX = pivot.x + dx / shipDistance * targetRadius;
+			pose.targetY = pivot.y + dy / shipDistance * targetRadius;
 		} else {
+			pose.poleX = pivot.x;
+			pose.poleY = pivot.y;
 			pose.targetX = pivot.x;
-			pose.targetY = pivot.y + pose.targetDistance;
+			pose.targetY = pivot.y + targetRadius;
 		}
+		// The target's own distance from the pole: the pivot's radius while the
+		// ground is the target, the hull's altitude once the pole stands under it.
+		pose.targetDistance = Math.max(1e-9, targetRadius - poleDistance);
 		pose.originLine = pivot.index < 0 ?
 			R.camera.baseGroundY + (R.camera.height * viewSettings.followHeight -
 				R.camera.baseGroundY) * view.fly :
@@ -527,11 +665,8 @@
 		var shipDistance = solveTarget(game);
 		var range;
 
-		pose.poleX = pivot.x;
-		pose.poleY = pivot.y;
 		pose.pivotX = pivot.x;
 		pose.pivotY = pivot.y;
-		pose.ladderRef = pivot.radius;
 		pose.pivotRadius = pivot.radius;
 		pose.knee = view.knee;
 		pose.far = view.ladderFar;
@@ -740,11 +875,13 @@
 			view.logScale = planet.logAltitudeScale;
 			view.morph = 0;
 			view.fly = 0;
+			view.orbit = 0;
 			fit.ready = false;
 			R.camera.endTransition();
 		}
 		view.morph = Math.min(1, view.morph + step / viewSettings.transformSeconds);
 		blend = smoothstep(view.morph);
+		approachSeat(game);
 		placePivot();
 
 		// A landed chart compresses the top so distant bodies sit low over the
@@ -761,7 +898,10 @@
 		// Air belongs to the active world; a chart seated elsewhere has none.
 		view.atmosphereTop = ease(view.atmosphereTop,
 			pivot.index < 0 ? R.physics.atmosphereTop() : 0, step, settings.easeTau);
-		view.switchAltitude = Math.max(R.physics.atmosphereTop(), planet.radius * 0.5);
+		// The altitude the pole leaves the pivot's centre at: the world's ceiling
+		// while the chart stands on the world, a fraction of a catalog body's own
+		// radius once it stands on that.
+		view.switchAltitude = Math.max(view.atmosphereTop, pivot.radius * 0.5);
 		view.gravity = view.from.gravity + (planet.surfaceGravity - view.from.gravity) * blend;
 		view.radius = view.from.radius + (planet.radius - view.from.radius) * blend;
 
@@ -984,7 +1124,10 @@
 			return -1;
 		}
 		dot = dx * Math.sin(angle) + dy * Math.cos(angle);
-		return dot + Math.sqrt(Math.max(0, dot * dot + radius * radius - d2));
+		// A ray that leaves the pole grazing the sphere exits at the pole itself.
+		// The root rounds a hair below zero there, and a negative distance is the
+		// sentinel's territory, not a place on the chart.
+		return Math.max(0, dot + Math.sqrt(Math.max(0, dot * dot + radius * radius - d2)));
 	};
 
 	sky.enclosingY = function(radius, angle) {

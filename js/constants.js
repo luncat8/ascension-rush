@@ -54,6 +54,12 @@
 		// of the near and far limbs of the lens.
 		outlineSamples: 14,
 		pivotSeconds: 1.4,
+		// A ship inside this many radii of a catalog body flies the chart onto
+		// it, and the chart stays there until the ship is outside the wider
+		// departure reach: the two together are the hysteresis that keeps a hull
+		// at the edge of one body's reach from flipping the chart every frame.
+		approachRadii: 6,
+		departRadii: 10,
 		// Releasing a drag that did not reach a ground line eases the chart back
 		// to the follow pose over this many seconds, holding the ship still
 		// instead of snapping to it.

@@ -415,6 +415,24 @@ What changes is what the player can see and read.
   nothing on screen jumps. Once seated, the world the ship left is a lens like
   any other. The hand-over is view-only: it never writes `wx`, `wy` or any
   physics state.
+- **Approach and departure are automatic.** `sky.approachSeat` claims the body
+  whose centre the hull is inside — `sky.approachIndex`, by distance only,
+  never by where it is on screen — and seats on it through the same hand-over,
+  so flying into a body unwraps it with no click. `pivot.approach` marks that
+  seat; leaving the body releases it, so a body flown through is unwrapped on
+  the way in and handed back to the world on the way out.
+- **The pole leaves with the ship.** Above the atmosphere, with no body seated,
+  the pole travels out of the world along the ship's bearing to the world's
+  surface under the ship, and that point becomes the chart's origin: the hull
+  holds the origin line, the world curves away below it, and every body is
+  charted from the pole by distance, so an orbit lane is where its own distance
+  puts it and the hull is never drawn into a lane its speed does not belong to.
+  The ladder start is the pole and the target distance is the hull's altitude
+  above it, which puts the ground line exactly that altitude below the origin
+  line. The travel is a full body diameter, `view.orbit`, and it stops there:
+  past it the far limb at `ladder(2·r)` would be charted above the hull, so the
+  world would be drawn over the ship. One eased number covers both ways, so a
+  descent reads the same law back.
 - **Proper escape speed.** Derive the gravitational parameter from the world
   the physics already uses: `mu = surfaceGravity * radius^2`, `r = radius +
   altitude`, `v_escape(r) = sqrt(2*mu/r)`, `v_circular(r) = sqrt(mu/r)`. The
@@ -429,17 +447,19 @@ What changes is what the player can see and read.
   body to the other instead of cutting between them. Its surface is the sphere of
   radius `camera.pivotRadius` read from that pivot, charted per column by the same
   forward-ray exit the lenses use (`sky.enclosingY`): exactly the flat ground line
-  in every steady state, bending into a horizon while a gesture walks the pivot
-  out toward a surface. Below it, `constants.render.cutawayBands` are concentric
-  spheres at fractions of that radius, painted shallowest first in the body's own
-  shade at a rising alpha. Because the ladder is a log of distance, a fraction
-  *is* a depth, so the bands spread downward on screen and read as crust, mantle
-  and core with no geology modelled anywhere. A band sphere the pivot is outside
-  has no chartable surface — a ray from outside never exits it — so the count
-  solves from the shallowest inward and stops at the first miss
-  (`render.curves.bands`), and when the pivot is outside the ground sphere itself
-  there is no curve at all: the ground is the flat line the solved curve tends to
-  as the pivot reaches the surface, so the two regimes meet without a step.
+  in every steady state, bending into a horizon while the pivot leaves that
+  centre — a gesture, or the climb described above — and staying that horizon
+  once the pole is standing on the surface. It is one curve through all of it,
+  so there is no regime to cut between. Below it,
+  `constants.render.cutawayBands` are concentric spheres at fractions of that
+  radius, painted shallowest first in the body's own shade at a rising alpha.
+  Because the ladder is a log of distance, a fraction *is* a depth, so the bands
+  spread downward on screen and read as crust, mantle and core with no geology
+  modelled anywhere. A band sphere the pole is outside has no chartable surface
+  — a ray from outside never exits it — so the count solves from the shallowest
+  inward and stops at the first miss (`render.curves.bands`), and the interior,
+  the bands and the air are drawn only while the pole is inside: from outside
+  there is a surface to stand on and nothing behind it.
 - **Atmosphere ceiling.** Define space as the altitude where density falls to
   `constants.sky.atmosphereDensityFraction` of sea-level density: `H *
   ln(1/fraction)`, zero on an airless world. Draw that ceiling as a line, a

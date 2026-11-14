@@ -240,8 +240,10 @@
 		context.fillText(pad.name, sx, surfaceY - 31);
 	}
 
-	// Pads belong to the world's surface, so they are drawn only while the world
-	// is the ground, and in every lap of the wrap that reaches the viewport.
+	// Pads belong to the world's surface, so they are drawn while the world is
+	// the ground or a body the ship has flown out of — the projection puts them
+	// on the world's lens from there — and in every lap of the wrap that reaches
+	// the viewport. A chart standing on another body draws none.
 	function drawPads(context, game) {
 		var pads = R.world.pads;
 		var camera = R.camera;
@@ -255,7 +257,7 @@
 		var copy;
 		var i;
 
-		if (render.curves.ground !== -1) {
+		if (render.curves.ground > -1) {
 			return;
 		}
 		for (i = 0; i < pads.length; i += 1) {
@@ -302,6 +304,11 @@
 
 	var BANDS = R.constants.render.cutawayBands;
 
+	// The ground the chart stands on: the world (-1) or a catalog body, or -2
+	// when a gesture has walked the pole past that body's sphere, where no ray
+	// exits it forward and the chart has no ground at all — the body it left is
+	// the lens `sky.outline` draws for it. A climb above the air is not -2: the
+	// pole stops on the surface, and the surface stays the ground, curving away.
 	render.curves = {
 		ground: -1,
 		radius: 0,
@@ -335,11 +342,12 @@
 	// Once per frame, before anything reads the ground.
 	//
 	// The ground sphere is the camera's own pivot: its centre and its blended
-	// radius. In every steady state the pole is exactly that centre, so the
-	// surface is at depth zero — the ground line, flat — and the interior is the
-	// cutaway below it. While a gesture walks the pole out toward a surface the
-	// same sphere bends into a horizon and its interior drops away, which is what
-	// makes a drag read as leaving the ground rather than as a scale change.
+	// radius. With the pole at that centre the surface is at depth zero — the
+	// ground line, flat — and the interior is the cutaway below it. As the pole
+	// travels out toward the hull's own ground point, or a gesture walks it out
+	// to a surface, the same sphere bends into a horizon and its interior drops
+	// away, which is what makes leaving the ground read as leaving the ground
+	// rather than as a scale change.
 	render.solveGround = function() {
 		var curves = render.curves;
 		var camera = R.camera;
@@ -355,16 +363,25 @@
 			curves.xs[i] = i * step;
 		}
 		curves.radial = R.sky.poleInside(curves.radius);
-		if (!curves.radial) {
-			// Outside the ground sphere there is no surface to solve, and the flat
-			// ground line is what the solved curve tends to as the pole reaches the
-			// surface — so the two regimes meet without a step.
-			for (i = 0; i <= COLUMNS; i += 1) {
-				curves.groundYs[i] = camera.groundY;
-			}
+		// Clear of the ground sphere — the chart has flown out of the body. No ray
+		// from out there exits the sphere forward, so there is no surface under
+		// the chart at all: the body is the lens `sky.outline` draws for it.
+		if (R.sky.poleOutside(curves.radius)) {
+			curves.ground = -2;
 			return;
 		}
+		// From inside, and from a pole standing on the surface itself, the same
+		// forward root solves the surface, so it is one continuous curve all the
+		// way out: flat while the pole is the centre, bending into a horizon as
+		// the pole travels toward the hull's own ground point, and that horizon
+		// once it stands there.
 		solveCurve(camera, curves.radius, curves.groundYs, 0);
+		if (!curves.radial) {
+			// A pole on the surface charts no interior — the far side of the
+			// sphere is its surface, so there is nothing between — and no air
+			// column under its own feet.
+			return;
+		}
 		// The band spheres are concentric and shrink, so the pole is inside the
 		// first n of them and no further: solving one it is outside would ask the
 		// chart for a surface that its ray never meets.
@@ -564,7 +581,7 @@
 			context.stroke();
 		} else {
 			lensPath(context, lens, offsetX);
-			context.fillStyle = body.color;
+			context.fillStyle = index < 0 ? render.groundPattern : body.color;
 			context.fill();
 			// The shaded side is turned away from the star, the same lighting rule
 			// the ship uses.
@@ -622,8 +639,15 @@
 	// centre and bends into a horizon as a drag walks the pole toward a surface.
 	function drawGround(context) {
 		var curves = render.curves;
-		var body = R.sky.bodyOf(curves.ground);
+		var body;
 
+		// No ground under the pole: the body the ship left is drawn as its lens,
+		// and the flat line the ladder starts at is the pole's own place in empty
+		// space, not a surface.
+		if (curves.ground === -2) {
+			return;
+		}
+		body = R.sky.bodyOf(curves.ground);
 		context.beginPath();
 		traceCurve(context, curves.groundYs, 0, true);
 		context.lineTo(render.width, render.height + 1);

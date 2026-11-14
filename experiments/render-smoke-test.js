@@ -207,11 +207,18 @@ assert.ok(drawnText.some(function(text) {
 chartState('above the air', function() {
 	smokeGame.rocket.wy = 200000;
 }, 400);
-assert.ok(R.camera.originY < R.camera.groundY, 'the ground has sunk below the origin line');
-assert.ok(R.render.curves.topY > R.render.height, 'and the ceiling line has sunk with it');
+// The pole travelled out to the hull's own ground point: the world is still the
+// ground, but its surface is a horizon solved from there and its interior is
+// behind the pole, so there is no cutaway, no air band and no ceiling label.
+assert.equal(R.render.curves.ground, -1, 'the world is still the ground under the pole');
+assert.equal(R.render.curves.radial, false, 'which the pole now stands on rather than inside');
+assert.equal(R.render.curves.bands, 0, 'so it charts no interior from there');
+assert.ok(R.camera.groundY > R.render.height, 'and the ground line has sunk out of the viewport');
+assert.ok(R.render.curves.groundYs[0] > R.camera.originY,
+	'the surface stays below the hull that holds the origin line');
 assert.equal(drawnText.some(function(text) {
 	return text.indexOf('ATMOSPHERE TOP') >= 0;
-}), false, 'so the ceiling is not labelled from up there');
+}), false, 'and the ceiling is not labelled from up there');
 
 chartState('out at a moon distance', function() {
 	smokeGame.rocket.wy = 23 * R.world.planet.radius;

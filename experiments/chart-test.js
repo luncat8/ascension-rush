@@ -305,4 +305,132 @@ assert.ok(Math.abs(screen.y - R.camera.groundY) < 1e-6, 'and the ground is still
 R.sky.outline(3, game);
 assert.ok(Number.isFinite(R.sky.shape.centerX), 'and a body still has a place on it');
 
+// ---------------------------------------------------------------------------
+// The chart is the hull's own once the hull is above the air: the pole travels
+// out of the world to the ground under it, the hull holds the origin line, the
+// catalog is read from that pole by the same map that draws the hull, and
+// flying onto a body unwraps that body into flat ground. This is the flight the
+// projection lab drives with the mouse, in test form.
+// ---------------------------------------------------------------------------
+
+function close(actual, expected, tolerance, label) {
+	assert.ok(Math.abs(actual - expected) <= tolerance,
+		label + ': ' + actual + ' vs ' + expected);
+}
+
+// Screen y of the ground curve at a screen x, through the same forward root the
+// renderer solves its columns with: flat ground is a curve with no spread.
+function groundYAt(x) {
+	return R.sky.enclosingY(R.camera.pivotRadius,
+		(x - R.camera.ox) / R.camera.angularScale);
+}
+
+function groundSpread() {
+	var spread = 0;
+	var column;
+	var y;
+
+	for (column = 0; column <= 8; column += 1) {
+		y = groundYAt(R.camera.width * column / 8);
+		if (Number.isFinite(y)) {
+			spread = Math.max(spread, Math.abs(y - R.camera.groundY));
+		}
+	}
+	return spread;
+}
+
+var direct = { x: 0, y: 0 };
+var luneRadius = R.constants.sky.bodies[3].radiusRadii * R.world.planet.radius;
+var climbRate = 400;
+var jump;
+var previousX;
+var previousY;
+var lens;
+var frames;
+
+R.camera.resize(1200, 800);
+R.input.resize(R.camera);
+R.sky.reset();
+game.rocket.wx = 0;
+game.rocket.wy = 0;
+settle(4);
+R.camera.project(0, 0, screen);
+close(Math.hypot(R.camera.poleX, R.camera.poleY), 0, 1e-9, 'landed, the pole is the world centre');
+close(R.camera.ladderRef, R.world.planet.radius, 1e-9, 'and the ladder starts at its surface');
+assert.ok(R.sky.poleInside(R.camera.pivotRadius), 'so its interior is charted');
+close(groundSpread(), 0, 1e-9, 'and its surface is the flat ground line');
+
+// Climbing out at a flown rate is one continuous move of the pole, the target
+// and the ground line together: no frame of it jumps the hull off the map.
+jump = 0;
+previousX = screen.x;
+previousY = screen.y;
+for (frames = 0; frames < 4700; frames += 1) {
+	game.rocket.wy = Math.min(30000, game.rocket.wy + climbRate * 0.016);
+	step();
+	R.camera.project(game.rocket.wx, game.rocket.wy, screen);
+	jump = Math.max(jump, Math.hypot(screen.x - previousX, screen.y - previousY));
+	previousX = screen.x;
+	previousY = screen.y;
+}
+assert.ok(jump < 12, 'the climb never jumps the hull (' + jump.toFixed(2) + ' px in a frame)');
+settle(14);
+close(Math.hypot(R.camera.poleX, R.camera.poleY), R.world.planet.radius, 1e-6,
+	'above the air the pole stands on the surface under the hull');
+close(R.camera.ladderRef, 0, 1e-9, 'and the ladder starts at that point');
+R.camera.project(game.rocket.wx, game.rocket.wy, screen);
+close(screen.x, anchorX, 1e-6, 'the hull holds its anchor column');
+close(screen.y, R.camera.originY, 1e-6, 'and the origin line');
+close(R.camera.groundY,
+	R.camera.originY + R.camera.scale * R.coords.depthOf(game.rocket.wy, R.camera), 1e-6,
+	'while the ground sinks below it by exactly the climb');
+assert.equal(R.sky.outline(-1, game).visible, false,
+	'so the world is the ground under the pole, not a lens above the hull');
+
+// One projection for the hull and the catalog: a body's lens centre is its own
+// plane point put through the same map that places the hull's marker.
+for (f = 0; f < R.constants.sky.bodies.length; f += 1) {
+	R.sky.planePosition(R.constants.sky.bodies[f], game.simTime, plane);
+	R.camera.projectPlane(plane.x, plane.y, screen);
+	lens = R.sky.outline(f, game);
+	close(R.coords.wrapScreenX(lens.centerX, screen.x, R.camera.period), screen.x, 1e-9,
+		'body ' + f + ' is drawn where the map puts it');
+	close(lens.centerY, (lens.nearY + lens.farY) / 2, 1e-9, 'body ' + f + ' between its own limbs');
+}
+R.sky.shipPlane(game, plane);
+R.camera.projectPlane(plane.x, plane.y, screen);
+// The hull's own spelling of the same point, from its world coordinates.
+R.camera.project(game.rocket.wx, game.rocket.wy, direct);
+close(screen.x, direct.x, 1e-9, 'and the hull is charted by that same map');
+close(screen.y, direct.y, 1e-9, 'in both axes');
+
+// Flying inside a body unwraps it: the chart hands itself over, the body's
+// surface becomes the flat ground line, and it stops being a lens.
+R.sky.bodyCentre(3, plane);
+game.rocket.wx = Math.atan2(plane.x, plane.y) * R.camera.worldRadius;
+game.rocket.wy = Math.hypot(plane.x, plane.y) - R.world.planet.radius + luneRadius * 2;
+// The hand-over, and then the pole's own ease back down onto the new centre.
+settle(12);
+assert.equal(R.sky.pivot.index, 3, 'flying inside a body seats the chart on it');
+assert.equal(R.sky.pivot.approach, true, 'as an approach, which a departure can undo');
+close(Math.hypot(R.camera.poleX - R.sky.pivot.x, R.camera.poleY - R.sky.pivot.y), 0, 1e-6,
+	'the pole is that body centre again');
+close(R.camera.ladderRef, luneRadius, 1e-6, 'and its surface is the ladder start');
+close(groundSpread(), 0, 1e-6, 'so that surface is unwrapped into flat ground');
+assert.ok(R.sky.poleInside(luneRadius), 'with its interior charted below');
+assert.equal(R.sky.outline(3, game).visible, false, 'and it is the ground, not a lens');
+R.camera.project(game.rocket.wx, game.rocket.wy, screen);
+assert.ok(screen.y < R.camera.groundY, 'with the hull above its new ground line');
+
+// Flying clear of it hands the chart back to the world, and the pole goes back
+// out to the hull's own ground point there.
+game.rocket.wx = R.util.wrapDelta(game.rocket.wx + R.world.planet.circumference * 0.25,
+	R.world.planet.circumference);
+settle(10);
+assert.equal(R.sky.pivot.index, -1, 'flying clear of a body hands the chart back to the world');
+assert.equal(R.sky.pivot.approach, false, 'and the seat goes with it');
+settle(6);
+close(Math.hypot(R.camera.poleX, R.camera.poleY), R.world.planet.radius, 1e-6,
+	'so the pole stands on the world under the hull again');
+
 console.log('Chart gesture, seat and zoom tests passed.');

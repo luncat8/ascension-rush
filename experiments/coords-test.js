@@ -170,38 +170,46 @@ close(R.coords.periodOf(camera.angularScale), camera.period, 1e-12, 'the period 
 assert.equal(R.coords.lapSpan(camera.period, camera.width), 2, 'which needs two laps either side to cover it');
 
 // ---------------------------------------------------------------------------
-// Above the air the ship becomes the centre of the scale: it holds the origin
-// line and the ground sinks below it by exactly the climb.
+// Above the air the chart is read from the ship's own place: the pole travels
+// out of the world and stands on its surface under the hull, the hull holds the
+// origin line, and that surface sinks below it by exactly the climb.
 // ---------------------------------------------------------------------------
 
 game.rocket.wy = 200000;
 settle(8);
 
 close(camera.fly, 1, 1e-9, 'above the switch altitude the chart is in the system view');
-close(camera.targetDistance, planet.radius + 200000, 1e-4,
-	'the camera target is the ship at its own distance from the pole');
-close(camera.originY, camera.height * view.followHeight, 1e-6, 'and it holds the follow line');
+// The pole has travelled out of the centre to the hull's own ground point, the
+// ladder starts there, and the target is the hull above it.
+close(Math.hypot(camera.poleX, camera.poleY), planet.radius, 1e-6,
+	'the pole stands on the surface under the ship');
+close(camera.ladderRef, 0, 1e-9, 'so the ladder starts at that point');
+close(camera.targetDistance, 200000, 1e-4, 'and the target is the hull, at its own altitude');
+close(camera.originY, camera.height * view.followHeight, 1e-6, 'which holds the follow line');
 camera.project(game.rocket.wx, game.rocket.wy, screen);
 close(screen.x, anchorX, 1e-9, 'the ship stays on its anchor column');
 close(screen.y, camera.originY, 1e-6, 'and on the origin line');
-assert.ok(camera.groundY > camera.height, 'the ground has sunk below the viewport');
-close(R.coords.distanceAt(R.coords.depthOf(camera.targetDistance, camera), camera),
-	camera.targetDistance, camera.targetDistance * 1e-9, 'the target distance inverts through the depth');
-close(camera.groundY - camera.originY,
-	camera.scale * R.coords.depthOf(camera.targetDistance, camera), 1e-6,
-	'by exactly the depth of the climb');
+close(camera.groundY, camera.originY + camera.scale * R.coords.depthOf(200000, camera), 1e-6,
+	'the ground has sunk below the origin line by exactly the climb');
+assert.ok(camera.groundY > camera.height, 'and off the bottom of the viewport');
+close(R.coords.distanceAt(R.coords.depthOf(200000, camera), camera), 200000, 1e-4,
+	'the climb inverts through the depth');
 close(camera.period, Math.PI * 2 * camera.angularScale, 1e-9, 'the period is still 2 pi of the angular scale');
 close(camera.angularScale, camera.scale, 1e-9, 'and in the system view both axes share one scale');
+assert.ok(R.sky.outline(-1, game).visible === false,
+	'the world is the ground under the pole, not a lens above the hull');
 
 // A ship out at the moon's distance is still fitted with the whole system: the
 // shared scale widens rather than dropping the catalog off the top.
 game.rocket.wy = 23 * planet.radius;
 settle(8);
-close(camera.targetDistance, planet.radius + 23 * planet.radius, 1e-2, 'the target is the ship out at 24 radii');
-assert.ok(camera.extent >= farthest * 0.999, 'the chart still reaches the farthest body');
+close(camera.targetDistance, 23 * planet.radius, 1e-2,
+	'the target is still the hull, out at 23 radii above the pole');
+assert.ok(camera.extent > 2500 * planet.radius,
+	'the chart still spans the catalog (' + (camera.extent / planet.radius).toFixed(0) + ' radii)');
 camera.project(0, farthest - planet.radius, screen);
 assert.ok(screen.y >= camera.topY() - 1 && screen.y < camera.height,
-	'and that body is still on screen');
+	'and the farthest body is still on screen');
 
 // ---------------------------------------------------------------------------
 // A zoom moves the view, never the law, and never the ground under the target.

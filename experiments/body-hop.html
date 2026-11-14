@@ -57,10 +57,14 @@
 <canvas id="c"></canvas>
 <div id="hud">
 	<h1>CHART LAB / ONE LOG-POLAR MAP</h1>
-	<p>The probe is the camera's target once it is above the air: the hull holds
-	its line and the ground sinks below it by exactly the climb. Drag the sky
-	down to unwrap the chart onto whatever you grabbed, drag sideways to look
-	around it, wheel to zoom, click a body to seat the chart on it.</p>
+	<p>The probe is the camera's target, and once it is above the air the chart
+	is read from its own place: the log pole travels out of the world and stops
+	on the surface under the probe, so the hull holds the origin line, the world
+	curves away below it, and every other body is a lens charted from that pole.
+	Drag the probe anywhere to fly it; fly it onto a body and the
+	chart unwraps that body into flat ground. Drag the sky down to unwrap the
+	chart onto whatever you grabbed, drag sideways to look around it, wheel to
+	zoom, click a body to seat the chart on it.</p>
 	<div id="readout">booting</div>
 </div>
 <div id="controls">
@@ -70,7 +74,7 @@
 	<button id="world">Next world</button>
 	<button id="reset">Reset view</button>
 	<input id="slider" type="range" min="0" max="1000" step="1" value="0" title="probe altitude">
-	<span id="hint">drag the probe up · drag the sky down to unwrap · wheel zooms · click a body</span>
+	<span id="hint">drag the probe to fly it · drag the sky down to unwrap · wheel zooms · click a body</span>
 </div>
 
 <script src="../js/namespaces.js"></script>
@@ -100,6 +104,7 @@
 	var worldButton = document.getElementById('world');
 	var resetButton = document.getElementById('reset');
 	var probe = { wx: 0, wy: 0 };
+	var probeGrabX = 0;
 
 	// A minimal game: the renderer reads a ship position and a sim clock, and the
 	// chart solves its pose from it. There is no physics on this page — the
@@ -113,6 +118,7 @@
 	var previous = 0;
 	var probeGrabY = 0;
 	var scratch = { x: 0, y: 0 };
+	var plane = { x: 0, y: 0 };
 	var worldIndex = 0;
 	// The slider is a log control on a power taper: one drag covers metres to
 	// the far side of the catalog, and low altitudes still get most of it.
@@ -143,21 +149,54 @@
 		return maxAltitude * Math.pow(value / 1000, sliderPower);
 	}
 
+	// Where the log pole stands on the ray from the pivot's centre to the probe:
+	// at the centre while the probe is in the air, out on the hull once it is
+	// not. This is the whole "the ship becomes the centre of the scale" claim,
+	// quoted as a number next to the chart that shows it.
+	function poleState() {
+		var camera = R.camera;
+		var pivot = R.sky.pivot;
+		var ground = R.render.curves.ground;
+		var toPole;
+		var toProbe;
+
+		R.sky.shipPlane(game, plane);
+		toPole = Math.hypot(camera.poleX - pivot.x, camera.poleY - pivot.y);
+		toProbe = Math.hypot(camera.poleX - plane.x, camera.poleY - plane.y);
+		if (toProbe < pivot.radius * 0.001) {
+			return 'on the probe  ·  the chart is read from the hull';
+		}
+		if (ground === -2) {
+			return 'clear of ' + nameOf(pivot.index) + '  ·  it is a lens below';
+		}
+		if (toPole < pivot.radius * 0.001) {
+			return 'at the centre of ' + nameOf(pivot.index) +
+				'  ·  its surface is flat ground';
+		}
+		if (R.sky.poleInside(pivot.radius)) {
+			return (toPole / pivot.radius).toFixed(2) + ' of the way out of ' +
+				nameOf(pivot.index) + '  ·  its surface curves';
+		}
+		return 'on ' + nameOf(pivot.index) + ' under the probe  ·  its surface curves away';
+	}
+
 	function updateReadout() {
 		var camera = R.camera;
 		var view = R.sky.view;
 		var radius = R.world.planet.radius;
+		var state;
 
 		camera.project(probe.wx, probe.wy, scratch);
+		state = poleState();
 		readout.textContent =
 			'probe   alt ' + Math.round(probe.wy) + ' m  (' + (probe.wy / radius).toFixed(2) + ' R)  ' +
 				(probe.wy > view.atmosphereTop ? 'above air' : 'in air') + '\n' +
 			'screen  x ' + Math.round(scratch.x) + '  y ' + Math.round(scratch.y) + ' px\n' +
-			'pivot   ' + nameOf(R.sky.pivot.index) + '   ground ' + nameOf(R.sky.groundBody()) + '\n' +
-			'pole    ' + (Math.sqrt(camera.poleX * camera.poleX + camera.poleY * camera.poleY) / radius).toFixed(2) +
-				' R from the world centre\n' +
-			'target  ' + (camera.targetDistance / radius).toFixed(2) + ' R from the pole   fly ' +
-				camera.fly.toFixed(3) + '\n' +
+			'pivot   ' + nameOf(R.sky.pivot.index) + '   ground ' +
+				nameOf(R.render.curves.ground) + (R.sky.pivot.approach ? '  (flew here)' : '') + '\n' +
+			'pole    ' + state + '\n' +
+			'target  ' + (camera.targetDistance / radius).toFixed(3) + ' R from the pole   fly ' +
+				camera.fly.toFixed(3) + '   ladder start ' + (camera.ladderRef / radius).toFixed(2) + ' R\n' +
 			'chart   range ' + camera.range.toFixed(3) + ' nats   scale ' + camera.scale.toFixed(1) +
 				' px/nat   zoom ' + camera.zoom.toFixed(2) + '\n' +
 			'extent  ' + Math.round(camera.extent / 1000) + ' km   period ' + Math.round(camera.period) + ' px\n' +
@@ -293,21 +332,27 @@
 		}
 		climbing = false;
 		climbButton.dataset.active = 'false';
+		probeGrabX = x;
 		probeGrabY = y;
 		return true;
 	};
 	R.input.gestureMove = function(x, y, camera) {
-		// One pixel of pointer is one pixel of chart. Held against the top edge the
-		// ladder keeps climbing, so a single drag can reach the far side of the
-		// catalog.
+		// One pixel of pointer is one pixel of chart, on both axes: sideways is
+		// longitude, up is the ladder. Held against the top edge the ladder keeps
+		// climbing, so a single drag can reach the far side of the catalog — and
+		// flying the probe onto a body is what hands the chart over to it.
 		var edge = R.util.clamp((80 - y) / 80, 0, 1) * 0.35;
 		var units = R.coords.ladder(probe.wy, camera) - (y - probeGrabY) / camera.scale + edge;
+		var wx = probe.wx + (x - probeGrabX) / Math.max(1e-9, camera.angularScale) * camera.worldRadius;
 
+		probeGrabX = x;
 		probeGrabY = y;
+		probe.wx = R.util.wrapDelta(wx, R.world.planet.circumference);
 		probe.wy = R.util.clamp(R.coords.unladder(Math.max(0, units), camera.logScale,
 			camera.ladderQ0, camera.ladderFar), 0, maxAltitude);
 	};
 	R.input.gestureEnd = function() {
+		probeGrabX = 0;
 		probeGrabY = 0;
 	};
 
