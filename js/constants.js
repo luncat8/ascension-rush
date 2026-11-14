@@ -20,15 +20,21 @@
 		zoomMin: 0.2,
 		zoomMax: 5,
 		zoomTau: 0.15,
-		// Share of the ladder kept clear above the ship: 0.08 leaves the hull
-		// eight percent of the height below the top edge.
-		followMargin: 0.08,
-		// Where the ship sits down the viewport once it is above the air: the
-		// camera target follows it from there, so the ground slides off the
-		// bottom instead of the hull leaving the top.
+		// Where the camera target sits down the viewport once the ship is above
+		// the air: the target line moves there, so the ground slides below it
+		// instead of the hull leaving the top. Landed, the target line is the
+		// ground line itself.
 		followHeight: 0.62,
-		// Easing back to the ground when the ship descends into the air.
+		// Where a dragged point in free space ends up: its own ground line, with
+		// dark space below it and an azimuth slice of the system above.
+		freeGroundFraction: 0.86,
+		// Easing the camera target between the ground and the ship, opening up
+		// through the ceiling and closing back down into the air.
+		followOpenTau: 0.3,
 		followCloseTau: 0.5,
+		// Screen columns the ground and atmosphere curves are solved on. One
+		// sqrt per column, so this is cheap enough to be smooth at any width.
+		groundColumns: 240,
 		// The ladder's far-field slope: above a planet's switch altitude one
 		// log unit of the chart covers this many log units of height. Below 1
 		// the top layers are compressed, which is what keeps distant bodies
@@ -48,6 +54,20 @@
 		// of the near and far limbs of the lens.
 		outlineSamples: 14,
 		pivotSeconds: 1.4,
+		// Releasing a drag that did not reach a ground line eases the chart back
+		// to the follow pose over this many seconds, holding the ship still
+		// instead of snapping to it.
+		releaseSeconds: 1.1,
+		// How far a drag must reach its ground line before releasing it seats the
+		// chart on the body that anchor stands on, the way a click would.
+		handSeatFraction: 0.97,
+		// An orbit sample closer to the pole than this multiple of the ground
+		// body's radius is dropped: the log image of a curve through the pole is
+		// singular and no sampling can fix it.
+		orbitPoleGuard: 1.02,
+		// The fitted log span is never narrower than this, so flying out to the
+		// farthest body deep-zooms instead of dividing by zero.
+		minFitRange: 0.2,
 		// The shared log scale is refitted from the system's extent at this
 		// interval, and eases at different rates outward and inward so the
 		// farthest body stays fitted without the whole chart breathing at the
@@ -55,6 +75,11 @@
 		fitSampleSeconds: 0.4,
 		fitGrowTau: 0.2,
 		fitCloseTau: 0.5,
+		// A span that is only slightly too wide is an orbit-sized swing and is
+		// held; one below `fitCloseRatio` of the current span is a genuine
+		// re-fit and closes at `fitCloseTau`.
+		fitHoldTau: 90,
+		fitCloseRatio: 0.85,
 		trailInterval: 0.2,
 		trailCapacity: 320,
 		traceStrideSteps: 42,
@@ -84,6 +109,10 @@
 		standardGravity: 9.81,
 		referenceArea: 1.6,
 		maxAcceleration: 200,
+		// Test mode: the deck's switch rates a build this many times stronger than
+		// the catalog does. Read it through parts.performanceFactor, so thrust,
+		// delta-v, fuel flow and the structural ceiling all agree on the number.
+		testMultiplier: 20,
 		fixedStep: 1 / 120,
 		maxFrameStep: 1 / 30,
 		maxSubsteps: 32,
@@ -437,6 +466,16 @@
 	];
 
 	constants.render = {
+		// The cutaway under the ground line, as fractions of the ground body's
+		// radius and alphas over its own shade. On a log chart a fraction is a
+		// depth: these three sit a third of a nat apart, so the pixel scale per
+		// kilometre grows with depth and the bands stay a hint rather than a
+		// geology lesson.
+		cutawayBands: [
+			{ fraction: 0.9, alpha: 0.3 },
+			{ fraction: 0.7, alpha: 0.52 },
+			{ fraction: 0.45, alpha: 0.74 }
+		],
 		backgroundTop: '#071322',
 		backgroundBottom: '#142a3a',
 		ground: '#343c36',

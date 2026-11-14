@@ -127,7 +127,10 @@ scale ease across while the screen offsets are solved every frame from an
 anchor — the destination body's surface point nearest the ship — so the anchor
 never moves (measured drift 0.0 px over 87 frames) and the new surface arrives
 as the flat ground. Once seated, the world the ship left is charted as a body
-like any other. `experiments/body-hop.html` exercises this with a point and no
+like any other. Under that ground the body's interior is drawn as three
+concentric bands (`constants.render.cutawayBands`): on a log chart a fraction of
+the radius *is* a depth, so the bands spread downward and read as crust, mantle
+and core with no geology modelled anywhere. `experiments/body-hop.html` exercises this with a point and no
 rocket at all.
 
 Surface and current escape speeds come from `sqrt(2 * g0 * R^2 / r)`, the same
@@ -137,6 +140,15 @@ solid flown trail and the dashed engine-off coast trace stay as they were. No
 force, route, price or flight report changes: the chart is a view. The 0.3.9
 multi-body gravity / Lagrange-point work remains an experiment phase in the
 plan, not wired into the flight loop.
+
+The deck header carries a **Test mode** switch. It rates every build
+`constants.rocket.testMultiplier` (20) times stronger than the catalog does —
+thrust, delta-v, and the acceleration ceiling and airframe ratings that would
+otherwise clamp or wreck such a flight — while masses, costs, wear and fuel flow
+stay the built ones, so a design can be flown hard without rebuilding it. The
+stack in the air is re-rated on the spot (`rocket.rerate`), so the switch can be
+thrown mid-flight. The game ships with it off, and
+`experiments/test-mode-test.js` pins both states.
 
 Plans now use short descriptive filenames (`flight-sky-plan.md`,
 `market-parts-plan.md`, …); subject numbers like 0.3.7 stay inside the
@@ -183,8 +195,11 @@ node experiments/aerodynamics-test.js
 node experiments/flight-test.js
 node experiments/builder-test.js            # rocket-type workshop, snapshots
 node experiments/parts-test.js              # catalog, structure value, service pricing
+node experiments/test-mode-test.js          # the deck's test switch: rated thrust, delta-v, fuel flow, ceilings
 node experiments/service-test.js            # wear, overhaul gate, tank life, repair quote
 node experiments/render-smoke-test.js       # app startup against the real index.html
+node experiments/chart-picture.js           # ASCII picture of the chart per state, into experiments/logs/
+node experiments/chart-picture.js deck zoom # …or just the states you want
 node experiments/autopilot-test.js          # envelope limits, profiles, staging, frame rates
 node experiments/trajectory-test.js         # coast predictor: integrator equivalence, edges
 node experiments/operations-test.js         # fleet, wait reasons, legs, routes, log, offers

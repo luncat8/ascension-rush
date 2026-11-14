@@ -106,7 +106,8 @@
 			finalMass = mass - fuel;
 			if (fuel > 0 && finalMass > 0) {
 				result.deltaV += settings.standardGravity *
-					(engine.ispSea + engine.ispVac) * 0.5 * Math.log(mass / finalMass);
+					(engine.ispSea + engine.ispVac) * 0.5 * Math.log(mass / finalMass) *
+					R.parts.performanceFactor();
 			}
 			mass = finalMass - result.stageDryMass[i];
 			if (mass <= 0) {
@@ -165,6 +166,27 @@
 
 	rocket.stageThrust = function(stage) {
 		return R.parts.stageThrust(stage);
+	};
+
+	// Re-rate a flying stack after the test switch moves: the nominal thrust is
+	// rebuilt from the stage's own parts and full tank at the new factor, and the
+	// health this flight has taken off the engine is put back on top of it. Masses
+	// are the built ones either way, so nothing else about the stack changes.
+	rocket.rerate = function(state) {
+		var stage;
+		var i;
+
+		if (!state || !state.stages) {
+			return;
+		}
+		for (i = 0; i < state.stageCount; i += 1) {
+			stage = state.stages[i];
+			if (!stage.alive) {
+				continue;
+			}
+			stage.thrustNominal = R.parts.stageThrust({ engineId: stage.engineId, fuelMass: stage.fuelMax });
+			stage.thrustMax = stage.thrustNominal * stage.engineHealth;
+		}
 	};
 
 	// The stack a fleet instance would launch with: the type's stages, kept only
@@ -408,7 +430,7 @@
 			finalMass = mass - stage.fuelMass;
 			if (stage.fuelMass > 0 && finalMass > 0) {
 				deltaV += settings.standardGravity * (stage.ispSea + stage.ispVac) * 0.5 *
-					Math.log(mass / finalMass);
+					Math.log(mass / finalMass) * R.parts.performanceFactor();
 			}
 			mass = finalMass - stage.dryMass;
 			if (mass <= 0) {

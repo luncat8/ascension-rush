@@ -21,12 +21,32 @@ var contextMethods = [
 ];
 var i;
 
+// A real canvas swallows a non-finite coordinate and drops the path with it, so
+// the stub refuses one instead: every number the renderer hands the context has
+// to be a pixel that exists. That is the whole chart layer's NaN guard, and it
+// costs nothing here.
+function checkArgs(method, args) {
+	var i;
+
+	for (i = 0; i < args.length; i += 1) {
+		if (typeof args[i] !== 'number') {
+			continue;
+		}
+		assert.ok(Number.isFinite(args[i]),
+			method + ' was handed a non-finite argument at ' + i + ': ' + args[i]);
+	}
+}
+
 for (i = 0; i < contextMethods.length; i += 1) {
-	context[contextMethods[i]] = function() {
-		renderCalls += 1;
-	};
+	context[contextMethods[i]] = (function(method) {
+		return function() {
+			checkArgs(method, arguments);
+			renderCalls += 1;
+		};
+	}(contextMethods[i]));
 }
 context.fillText = function(text) {
+	checkArgs('fillText', arguments);
 	drawnText.push(String(text));
 	renderCalls += 1;
 };
@@ -123,7 +143,6 @@ R.damage.enabled = false;
 
 R.world.initialize();
 R.camera.resize(1280, 720);
-R.camera.follow(0);
 R.render.initialize(context);
 R.render.resize(1280, 720);
 // The chart is fitted from the catalog, so the deck is drawn only after a few
@@ -148,8 +167,106 @@ assert.ok(drawnText.some(function(text) {
 }), 'the atmosphere ceiling is labelled');
 assert.ok(drawnText.indexOf('ESCAPE SPEED') >= 0, 'the deck quotes surface escape speed');
 assert.equal(R.sky.view.planetId, 'verdant', 'the sky view is seeded for the live world');
-assert.ok(R.camera.ceiling > R.world.planet.maxAltitude * 10,
+assert.ok(R.camera.extent > R.world.planet.maxAltitude * 10,
 	'the deck charts the whole system, not just the planet\'s altitude band');
+
+// ---------------------------------------------------------------------------
+// The chart layer in every state the projection can be in: on the deck, above
+// the air with the ship as the centre of the scale, out at a moon's distance,
+// seated on a catalog body, mid-drag with the pole walking out to a surface,
+// and mid-hand-over. Each is drawn through the stub above, so a curve the chart
+// cannot place fails here instead of vanishing in a browser.
+// ---------------------------------------------------------------------------
+
+function chartState(label, setup, frames) {
+	var f;
+
+	R.world.initialize('verdant');
+	R.camera.resize(1280, 720);
+	R.render.resize(1280, 720);
+	R.sky.reset();
+	setup();
+	for (f = 0; f < frames; f += 1) {
+		R.sky.update(smokeGame, 0.016);
+	}
+	renderCalls = 0;
+	drawnText.length = 0;
+	R.render.drawChart(context, smokeGame);
+	assert.ok(renderCalls > 200, label + ': the chart drew (' + renderCalls + ' calls)');
+	return renderCalls;
+}
+
+chartState('the deck', function() {
+	smokeGame.rocket.wy = 0;
+}, 200);
+assert.ok(drawnText.indexOf('HELIOS') >= 0, 'the deck labels the star');
+assert.ok(drawnText.some(function(text) {
+	return text.indexOf('ATMOSPHERE TOP') >= 0;
+}), 'and the ceiling line it is standing under');
+
+chartState('above the air', function() {
+	smokeGame.rocket.wy = 200000;
+}, 400);
+assert.ok(R.camera.originY < R.camera.groundY, 'the ground has sunk below the origin line');
+assert.ok(R.render.curves.topY > R.render.height, 'and the ceiling line has sunk with it');
+assert.equal(drawnText.some(function(text) {
+	return text.indexOf('ATMOSPHERE TOP') >= 0;
+}), false, 'so the ceiling is not labelled from up there');
+
+chartState('out at a moon distance', function() {
+	smokeGame.rocket.wy = 23 * R.world.planet.radius;
+}, 400);
+
+chartState('seated on a moon', function() {
+	smokeGame.rocket.wy = 0;
+	R.sky.seatPivot(3, smokeGame);
+}, 200);
+assert.equal(R.sky.groundBody(), 3, 'the moon is the ground there');
+assert.ok(drawnText.some(function(text) {
+	return text.indexOf('DISTANCE FROM LUNE') >= 0;
+}), 'and the ruler says whose distance it is');
+
+chartState('mid-drag onto a body', function() {
+	var lens;
+
+	smokeGame.rocket.wy = 0;
+	R.sky.update(smokeGame, 0.016);
+	lens = R.sky.outline(3, smokeGame);
+	R.sky.handBegin(lens.centerX, lens.centerY, smokeGame);
+	R.sky.handMove(lens.centerX, (lens.centerY + R.sky.anchor.line) / 2);
+}, 4);
+assert.ok(R.sky.hand.active && R.sky.hand.k > 0.2 && R.sky.hand.k < 0.9, 'the drag is halfway down');
+R.sky.handEnd();
+
+chartState('a pole standing on a surface', function() {
+	var free = { x: 0, y: 0 };
+
+	smokeGame.rocket.wy = 0;
+	R.sky.update(smokeGame, 0.016);
+	R.camera.unprojectPlane(30, 60, free);
+	R.sky.handBegin(30, 60, smokeGame);
+	R.sky.handMove(30, R.sky.anchor.line);
+}, 4);
+assert.equal(R.sky.anchor.ladderRef, 0, 'empty space puts the pole on a surface');
+assert.equal(R.render.curves.radial, false, 'so there is no interior to chart below the line');
+R.sky.handEnd();
+
+chartState('mid-hand-over', function() {
+	smokeGame.rocket.wy = 0;
+	R.sky.seatPivot(2, smokeGame);
+}, 20);
+assert.ok(R.camera.transition.active, 'the hand-over is still running');
+
+// Back to the deck for the rest of the suite.
+R.world.initialize('verdant');
+R.camera.resize(1280, 720);
+R.render.resize(1280, 720);
+R.sky.reset();
+smokeGame.rocket.wy = 0;
+for (i = 0; i < 40; i += 1) {
+	R.sky.update(smokeGame, 0.016);
+}
+drawnText.length = 0;
 
 R.input.pointerActive = true;
 R.input.pointerX = 620;
@@ -183,8 +300,7 @@ flightRocket.wy = 1400;
 flightRocket.vx = 240;
 flightRocket.vy = 60;
 flightRocket.throttle = 0.75;
-R.camera.follow(flightRocket.wx);
-R.render.draw({
+var flightGame = {
 	currentPadId: R.world.currentPadId,
 	targetPadId: R.world.targetPadId,
 	phase: 'flying',
@@ -192,8 +308,11 @@ R.render.draw({
 	cash: 29400,
 	timeScaleIndex: R.constants.time.defaultIndex,
 	timeScale: R.constants.time.scales[R.constants.time.defaultIndex],
-	rocket: flightRocket
-});
+	rocket: flightRocket,
+	simTime: 0
+};
+R.sky.update(flightGame, 0.016);
+R.render.draw(flightGame);
 
 // The limiter row is shown in manual flight too, as OFF; with the autopilot on it names the active limits.
 assert.ok(drawnText.indexOf('LIMITER') >= 0, 'flight HUD draws the limiter row');
@@ -217,7 +336,8 @@ var coastGame = {
 var coastError = Math.abs(R.trajectory.update(coastGame).targetError);
 
 assert.ok(R.trajectory.impact.valid, 'the cruising state has a coast impact');
-R.camera.follow(flightRocket.wx);
+coastGame.simTime = 0;
+R.sky.update(coastGame, 0.016);
 drawnText.length = 0;
 R.render.draw(coastGame);
 assert.equal(drawnText.indexOf('OUT OF HORIZON'), -1, 'an in-range forecast replaces the horizon notice');

@@ -161,6 +161,7 @@ var circumference = R.world.planet.circumference;
 var wrapGame = {
 	phase: 'flying',
 	targetPadId: R.world.pads[0].id,
+	simTime: 0,
 	rocket: coastState(circumference - 100, 100, 200, -20, Math.PI / 2, 700)
 };
 var impact = trajectory.update(wrapGame);
@@ -176,32 +177,46 @@ assert.equal(impact.safeTouchdown,
 	Math.abs(impact.vy) <= R.world.planet.landingVerticalSpeed && Math.abs(impact.vx) <= R.world.planet.landingHorizontalSpeed,
 	'the safety flag follows the world touchdown limits');
 
-R.camera.resize(1000, 600);
-R.camera.follow(circumference - 100);
-var markerX = trajectory.markerX(impact);
+// The marker is drawn where the chart puts the impact: the lap of the wrap the
+// camera target is in. A coast that goes round the world stays on screen, and
+// the copy that is drawn is the same ground the impact longitude names.
+var markerPoint = { x: 0, y: 0 };
+var markerGround = { x: 0, y: 0 };
 
-assert.ok(markerX >= R.camera.leftWx && markerX < R.camera.leftWx + circumference,
-	'the marker is drawn from the viewport periodic copy of the impact');
-assert.ok(Math.abs(R.util.wrapDelta(markerX - impact.wx, circumference)) < 1e-6,
+function markerScreenX(impactRecord) {
+	R.camera.project(impactRecord.wx, 0, markerPoint);
+	return R.coords.wrapScreenX(markerPoint.x,
+		R.camera.width * R.constants.view.cameraAnchorFraction, R.camera.period);
+}
+
+R.camera.resize(1000, 600);
+R.sky.update(wrapGame, 0.016);
+var markerX = markerScreenX(impact);
+
+assert.ok(markerX > -20 && markerX < R.camera.width + 20,
+	'the marker is drawn from the lap of the wrap the camera target is in');
+R.camera.unproject(markerX, markerPoint.y, markerGround);
+assert.ok(Math.abs(R.util.wrapDelta(markerGround.x - impact.wx, circumference)) < 1e-6,
 	'which is the same ground the impact longitude names');
 
 // A long coast to the west lands behind the viewport's left edge: the same
-// ground is visible as the periodic copy, so the marker must stay on screen.
+// ground is visible as a periodic copy, so the marker must stay on screen.
 R.world.initialize('tinmoon');
 var westGame = {
 	phase: 'flying',
 	targetPadId: R.world.pads[0].id,
+	simTime: 0,
 	rocket: coastState(R.world.planet.circumference * 0.5, 1200, -320, 0, -Math.PI / 2, 700)
 };
 var westImpact = trajectory.update(westGame);
 
-R.camera.follow(westGame.rocket.wx);
+R.sky.update(westGame, 0.016);
 assert.ok(westImpact.valid, 'the long airless coast is inside the horizon');
-assert.ok(westImpact.wx < R.camera.leftWx, 'and its raw longitude falls off the left of the viewport');
-markerX = trajectory.markerX(westImpact);
-assert.ok(markerX >= R.camera.leftWx && markerX < R.camera.leftWx + R.world.planet.circumference,
+markerX = markerScreenX(westImpact);
+assert.ok(markerX > -20 && markerX < R.camera.width + 20,
 	'the periodic copy puts it back inside the viewport');
-assert.ok(Math.abs(R.util.wrapDelta(markerX - westImpact.wx, R.world.planet.circumference)) < 1e-6,
+R.camera.unproject(markerX, markerPoint.y, markerGround);
+assert.ok(Math.abs(R.util.wrapDelta(markerGround.x - westImpact.wx, R.world.planet.circumference)) < 1e-6,
 	'without moving the ground it names');
 R.world.initialize('verdant');
 

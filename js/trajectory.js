@@ -167,13 +167,6 @@
 		return impact;
 	};
 
-	// The ground marker is drawn from the viewport's periodic copy of the
-	// impact longitude: the map shows one whole circumference, so a coast that
-	// lands past the viewport edge is the same ground the player can see.
-	trajectory.markerX = function(impact) {
-		return R.coords.nearestPeriodicX(impact.wx, R.camera.leftWx, R.world.planet.circumference);
-	};
-
 	if (typeof module !== 'undefined' && module.exports) {
 		module.exports = trajectory;
 	}

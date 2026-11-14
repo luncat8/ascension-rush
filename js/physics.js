@@ -86,6 +86,7 @@
 		var accelerationX;
 		var accelerationY;
 		var acceleration;
+		var ceiling;
 		var newVx;
 		var newVy;
 		var newWx;
@@ -129,7 +130,10 @@
 				isp = stage.ispVac;
 			}
 			thrust = stage.thrustMax * state.throttle;
-			massFlow = thrust / (isp * settings.standardGravity);
+			// Test mode rates the engine up without burning fuel faster: the flow
+			// is read at the built thrust, so the extra push is free delta-v rather
+			// than the same delta-v spent twenty times quicker.
+			massFlow = thrust / (isp * settings.standardGravity * R.parts.performanceFactor());
 			burn = Math.min(stage.fuelMass, massFlow * dt);
 			stage.fuelMass -= burn;
 			// Service wear: an engine is rated in seconds at throttle, so the burn
@@ -169,9 +173,12 @@
 		load = Math.sqrt(accelerationX * accelerationX +
 			(accelerationY + gravity) * (accelerationY + gravity));
 		acceleration = Math.sqrt(accelerationX * accelerationX + accelerationY * accelerationY);
-		if (acceleration > settings.maxAcceleration) {
-			accelerationX *= settings.maxAcceleration / acceleration;
-			accelerationY *= settings.maxAcceleration / acceleration;
+		// The ceiling is a structural one, so test mode lifts it with the thrust it
+		// is rating the stack for — otherwise the switch would be clamped away.
+		ceiling = settings.maxAcceleration * R.parts.performanceFactor();
+		if (acceleration > ceiling) {
+			accelerationX *= ceiling / acceleration;
+			accelerationY *= ceiling / acceleration;
 		}
 
 		newVx = oldVx + accelerationX * dt;

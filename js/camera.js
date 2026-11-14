@@ -3,63 +3,111 @@
 
 	var R = root.R || (root.R = {});
 	var camera = R.camera || (R.camera = {});
+	var TWO_PI = Math.PI * 2;
+	var scratch = { x: 0, y: 0 };
 
-	// The chart's projection state. Both of its spellings — the deck's closed
-	// rectilinear form and the general log-polar form away from the world —
-	// read these fields, so there is exactly one place a pan, a zoom or a
-	// follow can move the view.
-	camera.flat = true;
-	camera.leftWx = 0;
-	camera.baseLeftWx = 0;
+	// The chart's projection state, and the only place a pan, a zoom, a follow
+	// or a hand-over can move the view. sky.js solves one pose per frame and
+	// hands it over; coords.js reads it; the renderer and the picker read the
+	// same numbers the projection writes, so nothing can disagree.
+	//
+	// A pose is the pole the log is measured from, the body that pole stands on,
+	// the ladder, the camera target's distance (what the origin line holds), the
+	// origin line itself, and the fitted scale with the log span it was fitted
+	// over. Everything else here is derived.
+
 	camera.width = 1;
 	camera.height = 1;
-	camera.groundY = 1;
 	camera.baseGroundY = 1;
-	camera.usableHeight = 1;
-	camera.pixelsPerMeterX = 1;
-	camera.circumference = 1;
-	// The altitude ladder: planet knee, the switch altitude (as its log) and
-	// the slope beyond it. sky.js and coords.js read all three.
-	camera.logScale = 1;
-	camera.ladderSwitch = 1;
-	camera.ladderQ0 = 0;
-	camera.ladderFar = 1;
-	// The charted extent: the top edge of the deck, and the clamp on any
-	// altitude the chart is asked to place.
-	camera.ceiling = 1;
-	camera.altitudeLogRange = 1;
-	camera.planetId = '';
 
-	// Drag pan, in screen pixels, on top of the followed pose: the follow owns
-	// the base, the pointer owns the pan, and neither overwrites the other. A
-	// seat never clears it, so a hand-over starts where the user left the view.
-	camera.panX = 0;
-	camera.panY = 0;
-	// Vertical follow, in screen pixels: zero while the ship is under its
-	// planet's air, then it slides the chart so the hull sits at the follow
-	// height. The pointer's pan is added on top of it.
-	camera.trackY = 0;
-	// The air column the follow ignores, from sky.js.
-	camera.airTop = 0;
-	// Wheel zoom: 1 is the fitted view, above 1 is closer.
-	camera.zoom = 1;
-	camera.zoomTarget = 1;
-
-	// Log-polar state, used while the chart is seated away from the world.
+	// Live pose. `oy` is the ground line by construction: the ladder starts at
+	// depth zero, so the body under the pole — or the pole itself in free space
+	// — sits exactly on it.
+	camera.poleX = 0;
+	camera.poleY = 0;
 	camera.pivotX = 0;
 	camera.pivotY = 0;
+	camera.ladderRef = 1;
 	camera.pivotRadius = 1;
-	// Radius of the active world: a world state is a radius from that centre.
 	camera.worldRadius = 1;
+	camera.targetDistance = 1;
+	camera.targetX = 0;
+	camera.targetY = 1;
+	camera.scale = 1;
+	camera.fitScale = 1;
+	camera.angularScale = 1;
+	camera.stretch = 1;
+	camera.period = 1;
+	camera.range = 1;
+	camera.extent = 1;
+	camera.originLine = 1;
 	camera.ox = 0;
 	camera.oy = 0;
 	camera.baseOx = 0;
 	camera.baseOy = 0;
-	camera.scalePx = 1;
+	// Screen lines: the ground is depth zero so it is `oy` itself, and the
+	// origin line is the camera target's own depth above it.
+	camera.groundY = 1;
+	camera.originY = 1;
+	camera.logScale = 1;
+	camera.ladderSwitch = 1;
+	camera.ladderQ0 = 0;
+	camera.ladderFar = 1;
+	camera.planetId = '';
 
-	// The ladder's three numbers, from a planet record. The knee sets how much
-	// of the chart the atmosphere gets; the switch and the far slope decide how
-	// much the top layers are compressed.
+	// Wheel zoom: 1 is the fitted view, above 1 is closer. A drag is not a pan
+	// offset: it holds a point of the plane under the pointer, so looking around
+	// without moving the pole is the horizontal part of the same gesture.
+	camera.zoom = 1;
+	camera.zoomTarget = 1;
+	// How much of the chart is the system view rather than the deck. Zero keeps
+	// one circumference per viewport on the tangential axis — the deck has to
+	// show a whole world, and the fitted radial scale is far too small for that
+	// — and one makes both axes share the fitted scale, so a body is round
+	// instead of stretched. sky.js eases it as the target leaves the ground, so
+	// the two regimes are one continuous map rather than a switch.
+	camera.fly = 0;
+
+	function newPose() {
+		return {
+			poleX: 0, poleY: 0, pivotX: 0, pivotY: 0,
+			ladderRef: 1, pivotRadius: 1, knee: 1, far: 1,
+			targetDistance: 1, targetX: 0, targetY: 1,
+			originLine: 1, fitScale: 1, range: 1, extent: 1, fly: 0,
+			hold: false, holdX: 0, holdY: 0, holdSx: 0, holdSy: 0
+		};
+	}
+
+	// The pose sky.js solved this frame, the pose a hand-over started from, and
+	// the blend of the two. A hand-over interpolates from `from` to `want`; with
+	// no hand-over the live pose is `want`.
+	camera.want = newPose();
+	camera.from = newPose();
+	camera.pose = newPose();
+
+	// A hand-over holds one plane point still while the pole, the ladder and the
+	// scale travel to their new values. The anchor's screen place eases to the
+	// rest place the destination pose gives it, so the end of the transition is
+	// the destination pose and nothing snaps.
+	// `sx / sy` is where the held point is on screen this frame: the eased place
+	// the offsets were solved for. A test reads it to check the hand-over, and a
+	// debug overlay can draw the point the chart is travelling under.
+	camera.transition = {
+		active: false,
+		t: 1,
+		k: 1,
+		seconds: 1,
+		anchorX: 0,
+		anchorY: 0,
+		fromSx: 0,
+		fromSy: 0,
+		sx: 0,
+		sy: 0
+	};
+
+	// The ladder's three numbers. The knee sets how much of the chart the
+	// atmosphere gets; the switch and the far slope decide how hard the layers
+	// above it are compressed.
 	camera.setLadder = function(knee, switchAltitude, far) {
 		camera.logScale = Math.max(1e-3, knee);
 		camera.ladderSwitch = Math.max(camera.logScale, switchAltitude);
@@ -67,74 +115,238 @@
 		camera.ladderQ0 = Math.log1p(camera.ladderSwitch / camera.logScale);
 	};
 
-	// The charted extent: everything the chart must place. It is the deck's top
-	// edge and the clamp on any altitude read from the chart.
-	camera.setExtent = function(extent) {
-		camera.ceiling = Math.max(camera.logScale, extent);
-		camera.altitudeLogRange = Math.max(1e-3,
-			R.coords.ladder(camera.ceiling, camera));
-	};
-
-	// The same in the ladder's own units. sky.js hands over the damped range it
-	// is actually drawing, so the deck's closed form and the system view's
-	// general form are the same scale to the last bit — not two fits that nearly
-	// agree.
-	camera.setRangeUnits = function(units) {
-		camera.altitudeLogRange = Math.max(1e-3, units);
-		camera.ceiling = Math.max(camera.logScale,
-			R.coords.unladder(camera.altitudeLogRange, camera.logScale, camera.ladderQ0, camera.ladderFar));
-	};
-
-	camera.setCircumference = function(circumference) {
-		camera.circumference = Math.max(1, circumference);
-		camera.pixelsPerMeterX = camera.width / camera.circumference * camera.zoom;
-	};
-
-	// Seat the chart on a body. `pivotX / pivotY` is that body's centre in the
-	// plane, `pivotRadius` its radius, `extent` the farthest charted distance
-	// from that centre. The shared scale follows from putting the extent at the
-	// top of the viewport, so the whole system shares one scale — the property
-	// that makes distant bodies round instead of squashed.
-	camera.setPolar = function(pivotX, pivotY, pivotRadius, extent) {
-		camera.pivotX = pivotX;
-		camera.pivotY = pivotY;
-		camera.pivotRadius = Math.max(1, pivotRadius);
-		camera.setExtent(extent);
-		camera.scalePx = (camera.baseGroundY - camera.topY()) /
-			Math.max(camera.altitudeLogRange, 0.2) * camera.zoom;
-		camera.baseOx = camera.width * R.constants.view.cameraAnchorFraction;
-		camera.baseOy = camera.baseGroundY;
-		camera.syncPan();
-	};
-
 	camera.topY = function() {
 		return camera.height * R.constants.view.chartTopFraction;
 	};
 
-	// Derived values from the active planet and viewport. A planet change
-	// resets the ladder, pan and zoom to that world's defaults; a resize keeps
-	// pan and zoom, so the view does not jump when the window changes.
-	camera.configure = function() {
-		var planet = R.world.planet;
-		var view = R.constants.view;
+	camera.depth = function(distance) {
+		return R.coords.depthOf(distance, camera);
+	};
 
-		camera.setCircumference(planet.circumference);
-		camera.baseGroundY = camera.height * (1 - view.groundFraction);
-		if (camera.planetId !== planet.id) {
-			camera.planetId = planet.id;
-			camera.panX = 0;
-			camera.panY = 0;
-			camera.zoom = 1;
-			camera.zoomTarget = 1;
-			camera.setLadder(planet.logAltitudeScale, planet.ladderSwitch, view.ladderFar);
-			// Before the sky has charted anything, the deck fits the planet's
-			// own altitude band.
-			camera.setExtent(planet.maxAltitude);
-			camera.syncPan();
+	// The screen lines the coords and the renderer read: the pose is complete once
+	// its offsets are solved, so these two are derived and nothing else is.
+	camera.syncLines = function() {
+		camera.ox = camera.baseOx;
+		camera.oy = camera.baseOy;
+		// The ground is depth zero, so the ground line is `oy` itself; the origin
+		// line is the camera target's own depth above it. Landed, the two are the
+		// same line; above the air the target is the ship and the ground has sunk
+		// below it by exactly the climb.
+		camera.groundY = camera.oy;
+		camera.originY = camera.oy - camera.scale * camera.depth(camera.targetDistance);
+	};
+
+	function applyPose(next) {
+		var targetAngle;
+		var deckStretch;
+		var holdAngle;
+		var holdDepth;
+
+		camera.poleX = next.poleX;
+		camera.poleY = next.poleY;
+		camera.pivotX = next.pivotX;
+		camera.pivotY = next.pivotY;
+		camera.ladderRef = Math.max(0, next.ladderRef);
+		camera.pivotRadius = Math.max(1e-6, next.pivotRadius);
+		camera.targetDistance = Math.max(1e-9, next.targetDistance);
+		camera.targetX = next.targetX;
+		camera.targetY = next.targetY;
+		camera.fly = R.util.clamp(next.fly, 0, 1);
+		camera.range = Math.max(1e-3, next.range);
+		camera.originLine = next.originLine;
+		camera.setLadder(next.knee, camera.ladderSwitch, next.far);
+		camera.fitScale = Math.max(1e-6, next.fitScale);
+		camera.scale = camera.fitScale * camera.zoom;
+		// One circumference per viewport on the deck, one shared scale in the
+		// system view, and every blend in between.
+		deckStretch = camera.width / (TWO_PI * camera.fitScale);
+		camera.stretch = deckStretch + (1 - deckStretch) * camera.fly;
+		camera.angularScale = camera.scale * camera.stretch;
+		camera.period = TWO_PI * camera.angularScale;
+		if (next.hold) {
+			// A drag holds its own point under the pointer instead of the target
+			// on its line: same solve, different anchor.
+			holdAngle = Math.atan2(next.holdX - camera.poleX, next.holdY - camera.poleY);
+			holdDepth = camera.depth(Math.max(1e-9, Math.hypot(next.holdX - camera.poleX,
+				next.holdY - camera.poleY)));
+			camera.baseOx = next.holdSx - camera.angularScale * holdAngle;
+			camera.baseOy = next.holdSy + camera.scale * holdDepth;
+		} else {
+			targetAngle = Math.atan2(next.targetX - camera.poleX, next.targetY - camera.poleY);
+			camera.baseOx = camera.width * R.constants.view.cameraAnchorFraction -
+				camera.angularScale * targetAngle;
+			camera.baseOy = next.originLine + camera.scale * camera.depth(camera.targetDistance);
+		}
+		camera.extent = R.coords.distanceAt(camera.depth(camera.targetDistance) + camera.range, camera);
+		camera.syncLines();
+	}
+
+	function copyPose(from, to) {
+		to.poleX = from.poleX;
+		to.poleY = from.poleY;
+		to.pivotX = from.pivotX;
+		to.pivotY = from.pivotY;
+		to.ladderRef = from.ladderRef;
+		to.pivotRadius = from.pivotRadius;
+		to.knee = from.knee;
+		to.far = from.far;
+		to.targetDistance = from.targetDistance;
+		to.targetX = from.targetX;
+		to.targetY = from.targetY;
+		to.originLine = from.originLine;
+		to.fitScale = from.fitScale;
+		to.range = from.range;
+		to.extent = from.extent;
+		to.fly = from.fly;
+		to.hold = from.hold;
+		to.holdX = from.holdX;
+		to.holdY = from.holdY;
+		to.holdSx = from.holdSx;
+		to.holdSy = from.holdSy;
+		return to;
+	}
+
+	// Distances, scales and the ladder's knee blend geometrically: on a log
+	// chart a linear lerp of any of them crawls through the middle of a
+	// hand-over and then rushes the end.
+	function blendPose(from, to, k, out) {
+		out.poleX = from.poleX + (to.poleX - from.poleX) * k;
+		out.poleY = from.poleY + (to.poleY - from.poleY) * k;
+		out.pivotX = from.pivotX + (to.pivotX - from.pivotX) * k;
+		out.pivotY = from.pivotY + (to.pivotY - from.pivotY) * k;
+		out.ladderRef = from.ladderRef + (to.ladderRef - from.ladderRef) * k;
+		out.pivotRadius = from.pivotRadius + (to.pivotRadius - from.pivotRadius) * k;
+		out.targetX = from.targetX + (to.targetX - from.targetX) * k;
+		out.targetY = from.targetY + (to.targetY - from.targetY) * k;
+		out.originLine = from.originLine + (to.originLine - from.originLine) * k;
+		out.range = from.range + (to.range - from.range) * k;
+		out.extent = from.extent + (to.extent - from.extent) * k;
+		out.fly = from.fly + (to.fly - from.fly) * k;
+		out.far = from.far + (to.far - from.far) * k;
+		out.knee = from.knee * Math.pow(Math.max(1e-3, to.knee) / Math.max(1e-3, from.knee), k);
+		out.targetDistance = from.targetDistance *
+			Math.pow(Math.max(1e-9, to.targetDistance) / Math.max(1e-9, from.targetDistance), k);
+		out.fitScale = from.fitScale *
+			Math.pow(Math.max(1e-9, to.fitScale) / Math.max(1e-9, from.fitScale), k);
+		return out;
+	}
+
+	// Solve the pose sky.js handed over. With no hand-over this is the whole
+	// frame's camera; during one the anchor's screen place runs from where the
+	// gesture started to where the destination pose puts it, and the offsets are
+	// solved from that place — so the chart travels under a point the player can
+	// watch, and the last frame needs no correction at all.
+	//
+	// The destination place is read from the destination pose itself rather than
+	// from the blend: the blend's own projection of the anchor swings by
+	// thousands of pixels mid-transition (halfway between two poles and two
+	// ladders is nowhere in particular), which would sweep the anchor across the
+	// screen instead of holding it.
+	camera.setPose = function(next) {
+		var transition = camera.transition;
+		var restX;
+		var restY;
+		var k;
+
+		copyPose(next, camera.want);
+		if (!transition.active) {
+			copyPose(camera.want, camera.from);
+			applyPose(camera.want);
 			return;
 		}
-		camera.setExtent(camera.ceiling);
-		camera.syncPan();
+		k = transition.k;
+		applyPose(camera.want);
+		R.coords.planeToScreen(transition.anchorX, transition.anchorY, camera, scratch);
+		// In the lap the anchor started in, so a period of wrap — the chart's own
+		// period, which travels during the hand-over — is never read as a jump.
+		restX = R.coords.wrapScreenX(scratch.x, transition.fromSx, camera.period);
+		restY = scratch.y;
+		blendPose(camera.from, camera.want, k, camera.pose);
+		applyPose(camera.pose);
+		R.coords.planeToScreen(transition.anchorX, transition.anchorY, camera, scratch);
+		transition.sx = transition.fromSx + (restX - transition.fromSx) * k;
+		transition.sy = transition.fromSy + (restY - transition.fromSy) * k;
+		camera.baseOx += transition.sx - scratch.x;
+		camera.baseOy += transition.sy - scratch.y;
+		camera.syncLines();
+	};
+
+	// Start a hand-over from the pose on screen. `anchorX / anchorY` is the plane
+	// point that must not move; its screen place is read from the live pose, so
+	// the first frame of the transition reproduces the last frame before it.
+	camera.beginTransition = function(anchorX, anchorY, seconds) {
+		var transition = camera.transition;
+
+		// `from` is the pose actually on screen, which during a previous
+		// transition is the live one, not that transition's destination.
+		camera.from.poleX = camera.poleX;
+		camera.from.poleY = camera.poleY;
+		camera.from.pivotX = camera.pivotX;
+		camera.from.pivotY = camera.pivotY;
+		camera.from.ladderRef = camera.ladderRef;
+		camera.from.pivotRadius = camera.pivotRadius;
+		camera.from.knee = camera.logScale;
+		camera.from.far = camera.ladderFar;
+		camera.from.targetDistance = camera.targetDistance;
+		camera.from.targetX = camera.targetX;
+		camera.from.targetY = camera.targetY;
+		camera.from.originLine = camera.originLine;
+		camera.from.fitScale = camera.fitScale;
+		camera.from.range = camera.range;
+		camera.from.extent = camera.extent;
+		camera.from.fly = camera.fly;
+		transition.anchorX = anchorX;
+		transition.anchorY = anchorY;
+		transition.seconds = Math.max(0.05, seconds);
+		transition.t = 0;
+		transition.k = 0;
+		R.coords.planeToScreen(anchorX, anchorY, camera, scratch);
+		transition.fromSx = scratch.x;
+		transition.fromSy = scratch.y;
+		transition.active = true;
+		return transition;
+	};
+
+	camera.stepTransition = function(dt) {
+		var transition = camera.transition;
+		var t;
+
+		if (!transition.active) {
+			return false;
+		}
+		t = Math.min(1, transition.t + dt / transition.seconds);
+		transition.t = t;
+		transition.k = t * t * (3 - 2 * t);
+		if (t >= 1) {
+			transition.active = false;
+		}
+		return transition.active;
+	};
+
+	// Snap a hand-over to its destination: a resize, a restart or a world switch
+	// has no business animating.
+	camera.endTransition = function() {
+		camera.transition.active = false;
+		camera.transition.t = 1;
+		camera.transition.k = 1;
+	};
+
+	// Derived values from the active planet and the viewport. A planet change
+	// resets the ladder and the zoom to that world's defaults; a resize keeps the
+	// zoom, so the view does not jump when the window changes.
+	camera.configure = function() {
+		var planet = R.world.planet;
+
+		camera.baseGroundY = camera.height * (1 - R.constants.view.groundFraction);
+		camera.worldRadius = planet.radius;
+		camera.ladderSwitch = planet.ladderSwitch;
+		if (camera.planetId === planet.id) {
+			return;
+		}
+		camera.planetId = planet.id;
+		camera.zoom = 1;
+		camera.zoomTarget = 1;
+		camera.setLadder(planet.logAltitudeScale, planet.ladderSwitch, R.constants.view.ladderFar);
 	};
 
 	camera.resize = function(width, height) {
@@ -143,96 +355,34 @@
 		camera.configure();
 	};
 
-	// Effective pose = followed base + pointer pan + wheel zoom. Coords and the
-	// renderer read only these fields.
-	camera.syncPan = function() {
-		var anchorWidth = camera.width * R.constants.view.cameraAnchorFraction;
-
-		if (camera.flat) {
-			// The deck zooms about the ship, which the follow keeps at the
-			// anchor fraction, and pans 1:1 with the pointer.
-			camera.pixelsPerMeterX = camera.width / camera.circumference * camera.zoom;
-			camera.leftWx = camera.baseLeftWx + camera.circumference * R.constants.view.cameraAnchorFraction -
-				(anchorWidth + camera.panX) / Math.max(1e-9, camera.pixelsPerMeterX);
-		} else {
-			camera.leftWx = camera.baseLeftWx + camera.panX / Math.max(1e-9, camera.pixelsPerMeterX);
-		}
-		camera.groundY = camera.baseGroundY + camera.trackY + camera.panY;
-		camera.usableHeight = (camera.baseGroundY - camera.topY()) * camera.zoom;
-		camera.ox = camera.baseOx + camera.panX;
-		// The follow's vertical track moves the whole chart, the lenses
-		// included: a body must stay at the altitude the deck puts it at.
-		camera.oy = camera.baseOy + camera.trackY + camera.panY;
-	};
-
-	camera.panBy = function(dx, dy) {
-		camera.panX += dx;
-		camera.panY += dy;
-		camera.syncPan();
-	};
-
-	camera.resetPan = function() {
-		camera.panX = 0;
-		camera.panY = 0;
+	camera.resetZoom = function() {
 		camera.zoom = 1;
 		camera.zoomTarget = 1;
-		camera.syncPan();
+		camera.syncLines();
 	};
 
-	// Wheel zoom. The target is clamped so a hard flick of the wheel cannot
-	// leave the chart; camera.follow eases it in.
+	// Wheel zoom. The target is clamped so a hard flick cannot leave the chart;
+	// sky.js eases it into `zoom` on the same frame it solves the scale, so a
+	// notch cannot move the ground and the lenses a frame apart. The zoom is about
+	// the camera target, which the origin line holds, so it never moves the
+	// ground line while the ground is the target.
 	camera.zoomBy = function(factor) {
 		var view = R.constants.view;
 
 		camera.zoomTarget = R.util.clamp(camera.zoomTarget * factor, view.zoomMin, view.zoomMax);
 	};
 
-	// Follow the ship: the base longitude keeps it at the anchor fraction, so
-	// the deck pans under it and a hand-over has an anchor to solve against.
-	//
-	// The altitude is not a separate follow: the chart's extent includes the
-	// ship (sky.js), so a rocket above the atmosphere widens the ladder and the
-	// whole chart — ground, air, bodies — stays in one scale. Zoom is eased,
-	// and clamped so the hull cannot leave the top of the deck. `dt` of 0 snaps
-	// (resize, restart).
-	camera.follow = function(wx, wy, dt) {
-		var view = R.constants.view;
-		var step = dt === undefined ? 0.016 : Math.max(0, dt);
+	camera.easeZoom = function(dt) {
 		var target = camera.zoomTarget;
-		var altitude = Math.max(0, wy || 0);
-		var above = camera.airTop > 0 ? R.util.clamp((altitude - camera.airTop) / camera.airTop, 0, 1) : 0;
-		var shipY;
-		var track;
 
-		camera.baseLeftWx = wx - camera.circumference * view.cameraAnchorFraction;
-		if (camera.flat && altitude > 0) {
-			// The ship must stay under the top edge however far the wheel is
-			// turned in: the view pulls back rather than losing the hull.
-			target = Math.min(target, camera.altitudeLogRange * (1 - view.followMargin) /
-				Math.max(1e-6, R.coords.ladder(altitude, camera)));
-		}
-		if (step <= 0) {
+		if (dt <= 0) {
 			camera.zoom = target;
-		} else if (camera.zoom !== target) {
-			camera.zoom += (target - camera.zoom) * (1 - Math.exp(-step / view.zoomTau));
+			return;
 		}
-		// Vertical follow. Under the air the ground line is the camera's target
-		// and nothing moves. Above it the target becomes the ship: the chart
-		// slides so the hull holds the follow height, which takes the ground off
-		// the bottom exactly as far as the climb.
-		// The ship's height on the untracked chart: the track is solved from it,
-		// so the hull ends up exactly on the follow height instead of chasing it.
-		shipY = camera.baseGroundY - (camera.baseGroundY - camera.topY()) * camera.zoom *
-			R.util.clamp(R.coords.ladder(altitude, camera) / camera.altitudeLogRange, 0, 1);
-		track = above > 0 && camera.flat ?
-			above * (camera.height * view.followHeight - shipY) : 0;
-		if (step <= 0) {
-			camera.trackY = track;
-		} else if (camera.trackY !== track) {
-			camera.trackY += (track - camera.trackY) *
-				(1 - Math.exp(-step / (track > camera.trackY ? view.zoomTau : view.followCloseTau)));
+		if (camera.zoom !== target) {
+			camera.zoom += (target - camera.zoom) *
+				(1 - Math.exp(-dt / R.constants.view.zoomTau));
 		}
-		camera.syncPan();
 	};
 
 	camera.project = function(wx, wy, out) {
@@ -241,6 +391,14 @@
 
 	camera.unproject = function(sx, sy, out) {
 		return R.coords.screenToWorld(sx, sy, camera, out);
+	};
+
+	camera.projectPlane = function(px, py, out) {
+		return R.coords.planeToScreen(px, py, camera, out);
+	};
+
+	camera.unprojectPlane = function(sx, sy, out) {
+		return R.coords.screenToPlane(sx, sy, camera, out);
 	};
 
 	if (typeof module !== 'undefined' && module.exports) {

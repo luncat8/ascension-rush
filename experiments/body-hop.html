@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Chart lab — drag, zoom, follow</title>
+<title>Chart lab — drag, unwrap, seat</title>
 <style>
 	html, body {
 		margin: 0;
@@ -22,7 +22,7 @@
 		background: rgba(7, 16, 27, 0.82);
 		border: 1px solid rgba(191, 214, 227, 0.18);
 		border-radius: 10px;
-		width: 316px;
+		width: 336px;
 		pointer-events: none;
 	}
 	#hud h1 { margin: 0 0 6px; font-size: 11px; letter-spacing: 0.14em; color: #96aabd; font-weight: 600; }
@@ -56,19 +56,21 @@
 <body>
 <canvas id="c"></canvas>
 <div id="hud">
-	<h1>CHART LAB / LOG PROJECTION</h1>
-	<p>One chart, one scale. The probe is the camera's target: below the air the
-	ground holds the camera, above it the probe does. Drag to pan, wheel to zoom,
-	click a body to seat the chart on it.</p>
+	<h1>CHART LAB / ONE LOG-POLAR MAP</h1>
+	<p>The probe is the camera's target once it is above the air: the hull holds
+	its line and the ground sinks below it by exactly the climb. Drag the sky
+	down to unwrap the chart onto whatever you grabbed, drag sideways to look
+	around it, wheel to zoom, click a body to seat the chart on it.</p>
 	<div id="readout">booting</div>
 </div>
 <div id="controls">
 	<button id="climb" data-active="true">Auto climb</button>
 	<button id="seat">Seat next body</button>
 	<button id="home">Back to world</button>
+	<button id="world">Next world</button>
 	<button id="reset">Reset view</button>
-	<input id="slider" type="range" min="0" max="90000" step="10" value="0" title="probe altitude">
-	<span id="hint">drag the probe up · drag elsewhere to pan · wheel zooms · click a body</span>
+	<input id="slider" type="range" min="0" max="1000" step="1" value="0" title="probe altitude">
+	<span id="hint">drag the probe up · drag the sky down to unwrap · wheel zooms · click a body</span>
 </div>
 
 <script src="../js/namespaces.js"></script>
@@ -87,32 +89,38 @@
 	'use strict';
 
 	var R = root.R;
-	var canvas = root.document.getElementById('c');
+	var document = root.document;
+	var canvas = document.getElementById('c');
 	var context = canvas.getContext('2d', { alpha: false });
-	var readout = root.document.getElementById('readout');
-	var slider = root.document.getElementById('slider');
-	var climbButton = root.document.getElementById('climb');
-	var seatButton = root.document.getElementById('seat');
-	var homeButton = root.document.getElementById('home');
-	var resetButton = root.document.getElementById('reset');
+	var readout = document.getElementById('readout');
+	var slider = document.getElementById('slider');
+	var climbButton = document.getElementById('climb');
+	var seatButton = document.getElementById('seat');
+	var homeButton = document.getElementById('home');
+	var worldButton = document.getElementById('world');
+	var resetButton = document.getElementById('reset');
 	var probe = { wx: 0, wy: 0 };
 
-	// A minimal game: the renderer reads a ship position and a sim clock, and
-	// the camera follows that position. There is no physics on this page — the
-	// altitude is a number the slider and the climb set.
+	// A minimal game: the renderer reads a ship position and a sim clock, and the
+	// chart solves its pose from it. There is no physics on this page — the
+	// altitude is a number the slider, the climb and the probe drag set.
 	var game = { rocket: probe, simTime: 0, phase: 'demo' };
 	root.R.game = game;
 
 	var climbing = true;
 	var climbPhase = 0;
-	var climbTop = 60000;
-	var MAX_ALT = 90000;
+	var climbTop = 120000;
 	var previous = 0;
 	var probeGrabY = 0;
 	var scratch = { x: 0, y: 0 };
+	var worldIndex = 0;
+	// The slider is a log control on a power taper: one drag covers metres to
+	// the far side of the catalog, and low altitudes still get most of it.
+	var sliderPower = 5;
+	var maxAltitude = 0;
 
 	function resize() {
-		var ratio = root.devicePixelRatio || 1;
+		var ratio = Math.min(2, root.devicePixelRatio || 1);
 		var width = Math.max(1, root.innerWidth);
 		var height = Math.max(1, root.innerHeight);
 
@@ -120,37 +128,51 @@
 		canvas.height = Math.round(height * ratio);
 		context.setTransform(ratio, 0, 0, ratio, 0, 0);
 		R.render.resize(width, height);
-		R.camera.follow(probe.wx, probe.wy, 0);
 	}
 	root.addEventListener('resize', resize);
 
-	function names() {
-		return ['world'].concat(R.constants.sky.bodies.map(function(b) { return b.name; }));
+	function nameOf(index) {
+		return index < -1 ? 'free space' : (index < 0 ? R.world.planet.name : R.constants.sky.bodies[index].name);
+	}
+
+	function sliderOf(altitude) {
+		return Math.round(1000 * Math.pow(Math.max(0, altitude) / maxAltitude, 1 / sliderPower));
+	}
+
+	function altitudeOf(value) {
+		return maxAltitude * Math.pow(value / 1000, sliderPower);
 	}
 
 	function updateReadout() {
 		var camera = R.camera;
-		var pivot = R.sky.pivot;
-		var screen = { x: 0, y: 0 };
+		var view = R.sky.view;
+		var radius = R.world.planet.radius;
 
-		camera.project(probe.wx, probe.wy, screen);
+		camera.project(probe.wx, probe.wy, scratch);
 		readout.textContent =
-			'probe   alt ' + Math.round(probe.wy) + ' m   ' + (probe.wy > camera.airTop ? 'above air' : 'in air') + '\n' +
-			'screen  x ' + Math.round(screen.x) + '  y ' + Math.round(screen.y) + ' px\n' +
-			'pivot   ' + names()[pivot.index + 1] + '\n' +
-			'chart   extent ' + Math.round(camera.ceiling / 1000) + ' km   scale ' + camera.scalePx.toFixed(1) + ' px\n' +
-			'ladder  knee ' + camera.logScale + ' m   switch ' + (camera.ladderSwitch / 1000).toFixed(1) + ' km   far ' + camera.ladderFar.toFixed(2) + '\n' +
-			'camera  pan ' + Math.round(camera.panX) + ',' + Math.round(camera.panY) + '   track ' + Math.round(camera.trackY) + '   zoom ' + camera.zoom.toFixed(2) + '\n' +
-			'view    ' + (camera.flat ? 'deck (closed form)' : 'log-polar');
+			'probe   alt ' + Math.round(probe.wy) + ' m  (' + (probe.wy / radius).toFixed(2) + ' R)  ' +
+				(probe.wy > view.atmosphereTop ? 'above air' : 'in air') + '\n' +
+			'screen  x ' + Math.round(scratch.x) + '  y ' + Math.round(scratch.y) + ' px\n' +
+			'pivot   ' + nameOf(R.sky.pivot.index) + '   ground ' + nameOf(R.sky.groundBody()) + '\n' +
+			'pole    ' + (Math.sqrt(camera.poleX * camera.poleX + camera.poleY * camera.poleY) / radius).toFixed(2) +
+				' R from the world centre\n' +
+			'target  ' + (camera.targetDistance / radius).toFixed(2) + ' R from the pole   fly ' +
+				camera.fly.toFixed(3) + '\n' +
+			'chart   range ' + camera.range.toFixed(3) + ' nats   scale ' + camera.scale.toFixed(1) +
+				' px/nat   zoom ' + camera.zoom.toFixed(2) + '\n' +
+			'extent  ' + Math.round(camera.extent / 1000) + ' km   period ' + Math.round(camera.period) + ' px\n' +
+			'ladder  knee ' + Math.round(camera.logScale) + ' m   switch ' +
+				(camera.ladderSwitch / 1000).toFixed(1) + ' km   far ' + camera.ladderFar.toFixed(2) + '\n' +
+			'lines   ground ' + Math.round(camera.groundY) + '   origin ' + Math.round(camera.originY) +
+				'   hand k ' + R.sky.hand.k.toFixed(3);
 	}
 
-	// Where the follow is aiming: the anchor fraction across, and the follow
-	// height down once the probe is above the air (the ground line before that).
+	// The camera target's own place: the anchor column and the origin line. The
+	// ground line is drawn too, so the hand-over from one to the other is visible
+	// as the gap that opens between them once the probe is above the air.
 	function drawTarget(context) {
 		var camera = R.camera;
 		var x = camera.width * R.constants.view.cameraAnchorFraction;
-		var y = probe.wy > camera.airTop ? camera.height * R.constants.view.followHeight :
-			camera.groundY;
 
 		context.save();
 		context.setLineDash([3, 5]);
@@ -159,14 +181,79 @@
 		context.beginPath();
 		context.moveTo(x, 0);
 		context.lineTo(x, camera.height);
-		context.moveTo(0, y);
-		context.lineTo(camera.width, y);
+		context.moveTo(0, camera.originY);
+		context.lineTo(camera.width, camera.originY);
 		context.stroke();
 		context.setLineDash([]);
 		context.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
 		context.textAlign = 'left';
 		context.fillStyle = 'rgba(244, 199, 106, 0.6)';
-		context.fillText('CAMERA TARGET', x + 8, Math.max(12, y - 7));
+		context.fillText('CAMERA TARGET  ·  ORIGIN LINE', x + 8, Math.max(12, camera.originY - 7));
+		context.restore();
+	}
+
+	// What a drag is aiming at: the ground line of the anchor's own ground state,
+	// the point held under the pointer, and how far the unwrap has got. Releasing
+	// at the line seats the chart there, so the line is the gesture's target.
+	function drawHand(context) {
+		var hand = R.sky.hand;
+		var anchor = R.sky.anchor;
+
+		if (!hand.active) {
+			return;
+		}
+		context.save();
+		context.setLineDash([6, 6]);
+		context.lineWidth = 1;
+		context.strokeStyle = 'rgba(100, 213, 194, 0.55)';
+		context.beginPath();
+		context.moveTo(0, anchor.line);
+		context.lineTo(R.camera.width, anchor.line);
+		context.stroke();
+		context.setLineDash([]);
+		R.camera.projectPlane(hand.referenceX, hand.referenceY, scratch);
+		context.beginPath();
+		context.arc(scratch.x, scratch.y, 7, 0, Math.PI * 2);
+		context.strokeStyle = 'rgba(100, 213, 194, 0.9)';
+		context.stroke();
+		context.beginPath();
+		context.moveTo(scratch.x - 12, scratch.y);
+		context.lineTo(scratch.x + 12, scratch.y);
+		context.moveTo(scratch.x, scratch.y - 12);
+		context.lineTo(scratch.x, scratch.y + 12);
+		context.strokeStyle = 'rgba(100, 213, 194, 0.4)';
+		context.stroke();
+		context.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
+		context.textAlign = 'left';
+		context.fillStyle = 'rgba(140, 232, 216, 0.9)';
+		context.fillText('UNWRAP ONTO ' + nameOf(anchor.bodyIndex).toUpperCase() + '  ·  ' +
+			Math.round(hand.k * 100) + '%', 16, anchor.line - 8);
+		context.restore();
+	}
+
+	// The point a hand-over travels under. It is drawn for the whole transition
+	// because the whole claim is that it does not jump: the chart moves, this does
+	// not, and the frame after the transition ends is a continuation of it.
+	function drawTransition(context) {
+		var transition = R.camera.transition;
+
+		if (!transition.active) {
+			return;
+		}
+		context.save();
+		context.strokeStyle = 'rgba(167, 139, 250, 0.85)';
+		context.lineWidth = 1;
+		context.beginPath();
+		context.moveTo(transition.sx - 9, transition.sy);
+		context.lineTo(transition.sx + 9, transition.sy);
+		context.moveTo(transition.sx, transition.sy - 9);
+		context.lineTo(transition.sx, transition.sy + 9);
+		context.stroke();
+		context.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
+		context.textAlign = 'left';
+		context.fillStyle = 'rgba(167, 139, 250, 0.8)';
+		context.fillText('HAND-OVER ANCHOR  ·  ' + Math.round(transition.k * 100) + '%',
+			transition.sx + 14, transition.sy - 6);
 		context.restore();
 	}
 
@@ -177,8 +264,8 @@
 		previous = now;
 		game.simTime += dt;
 		if (climbing) {
-			// Up, hold, down, hold: the camera's target swaps at the top of the
-			// air and comes back to the ground on the way down.
+			// Up, hold, down, hold: the camera's target swaps at the top of the air
+			// and comes back to the ground on the way down.
 			climbPhase = (climbPhase + dt) % 24;
 			span = climbPhase < 8 ? climbPhase / 8 :
 				(climbPhase < 12 ? 1 : (climbPhase < 20 ? 1 - (climbPhase - 12) / 8 : 0));
@@ -187,16 +274,18 @@
 		R.sky.update(game, dt);
 		R.render.drawChart(context, game);
 		drawTarget(context);
+		drawHand(context);
+		drawTransition(context);
 		R.render.drawProbe(context, probe.wx, probe.wy);
-		slider.value = String(Math.round(probe.wy));
+		slider.value = String(sliderOf(probe.wy));
 		updateReadout();
 		root.requestAnimationFrame(frame);
 	}
 
 	// Grabbing the probe is the direct version of the experiment: the pointer
-	// lifts it in ladder space, and the camera hands its target over as it
-	// crosses the top of the air. Every other press is the chart's own gesture
-	// (drag pans, click seats).
+	// lifts it in ladder space, and the chart hands its target over as it crosses
+	// the top of the air. Every other press is the chart's own gesture — drag
+	// unwraps, click seats.
 	R.input.gestureHook = function(x, y, camera) {
 		camera.project(probe.wx, probe.wy, scratch);
 		if (Math.abs(scratch.x - x) > 26 || Math.abs(scratch.y - y) > 26) {
@@ -208,21 +297,24 @@
 		return true;
 	};
 	R.input.gestureMove = function(x, y, camera) {
-		// One pixel of pointer is one pixel of chart. Held against the top edge
-		// the ladder keeps climbing, so a single drag can reach space.
+		// One pixel of pointer is one pixel of chart. Held against the top edge the
+		// ladder keeps climbing, so a single drag can reach the far side of the
+		// catalog.
 		var edge = R.util.clamp((80 - y) / 80, 0, 1) * 0.35;
-		var units = R.coords.ladder(probe.wy, camera) - (y - probeGrabY) / camera.scalePx + edge;
+		var units = R.coords.ladder(probe.wy, camera) - (y - probeGrabY) / camera.scale + edge;
 
 		probeGrabY = y;
 		probe.wy = R.util.clamp(R.coords.unladder(Math.max(0, units), camera.logScale,
-			camera.ladderQ0, camera.ladderFar), 0, MAX_ALT);
+			camera.ladderQ0, camera.ladderFar), 0, maxAltitude);
+	};
+	R.input.gestureEnd = function() {
+		probeGrabY = 0;
 	};
 
-	slider.max = String(MAX_ALT);
 	slider.addEventListener('input', function() {
 		climbing = false;
 		climbButton.dataset.active = 'false';
-		probe.wy = Number(slider.value);
+		probe.wy = altitudeOf(Number(slider.value));
 	});
 	climbButton.addEventListener('click', function() {
 		climbing = !climbing;
@@ -236,8 +328,17 @@
 	homeButton.addEventListener('click', function() {
 		R.sky.seatPivot(-1, game);
 	});
+	// A world switch is the other hand-over: the physics changes at the boundary
+	// and the chart morphs its radius, gravity and ladder across it.
+	worldButton.addEventListener('click', function() {
+		worldIndex = (worldIndex + 1) % R.planets.list.length;
+		R.world.initialize(R.planets.list[worldIndex].id);
+		maxAltitude = R.world.planet.radius * 3000;
+		R.sky.clearSeat();
+	});
 	resetButton.addEventListener('click', function() {
-		R.camera.resetPan();
+		R.camera.resetZoom();
+		R.sky.seatPivot(-1, game);
 	});
 	root.addEventListener('keydown', function(event) {
 		if (event.key === ' ') {
@@ -246,14 +347,20 @@
 			event.preventDefault();
 		}
 		if (event.key === 'r') {
-			R.camera.resetPan();
+			R.camera.resetZoom();
+			R.sky.seatPivot(-1, game);
+		}
+		if (event.key === 'w') {
+			worldButton.click();
 		}
 	});
 
-	// Start landed, so the first frame is the deck with the whole system low
-	// over the surface. The climb that follows is the experiment: at the top of
-	// the air the camera's target changes from the ground to the probe.
+	// Start landed, so the first frame is the deck with the whole system low over
+	// the surface. The climb that follows is the experiment: at the top of the air
+	// the camera's target changes from the ground to the probe, and the ground
+	// sinks below the origin line by exactly the climb.
 	R.world.initialize(R.planets.defaultId);
+	maxAltitude = R.world.planet.radius * 3000;
 	R.sky.reset();
 	R.render.initialize(context);
 	resize();

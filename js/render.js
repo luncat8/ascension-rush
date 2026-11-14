@@ -3,18 +3,6 @@
 
 	var R = root.R || (root.R = {});
 	var render = R.render || (R.render = {});
-	// Decade ladder; only marks inside the camera's live ceiling are drawn, so
-	// a zoom never stacks clamped labels on the top edge.
-	var altitudeMarks = [
-		{ altitude: 10, label: '10 m' },
-		{ altitude: 100, label: '100 m' },
-		{ altitude: 1000, label: '1 km' },
-		{ altitude: 10000, label: '10 km' },
-		{ altitude: 100000, label: '100 km' },
-		{ altitude: 1000000, label: '1,000 km' },
-		{ altitude: 10000000, label: '10,000 km' }
-	];
-
 	render.context = null;
 	render.width = 1;
 	render.height = 1;
@@ -123,64 +111,95 @@
 		return focus;
 	}
 
+	// The chart is a cylinder: X is an angle, so everything repeats every
+	// `camera.period` pixels and is drawn in every lap that touches the
+	// viewport. That is what lets one fitted scale carry both a whole world's
+	// surface and the system above it, and it is why a seam is never visible.
+	function lapSpan() {
+		return R.coords.lapSpan(R.camera.period, render.width);
+	}
+
 	function padScreenX(pad) {
-		R.camera.project(R.coords.nearestPeriodicX(pad.wx, R.camera.leftWx, R.world.planet.circumference), 0, render.scratch.pad);
+		R.camera.project(pad.wx, 0, render.scratch.pad);
 		return render.scratch.pad.x;
 	}
 
-	function drawArrowHead(context, sx, y, direction, color) {
+	function drawArrowHead(context, sx, sy, direction, color) {
 		context.beginPath();
-		context.moveTo(sx, y);
-		context.lineTo(sx - direction * 9, y - 4);
-		context.lineTo(sx - direction * 9, y + 4);
+		context.moveTo(sx, sy);
+		context.lineTo(sx - direction * 9, sy - 4);
+		context.lineTo(sx - direction * 9, sy + 4);
 		context.closePath();
 		context.fillStyle = color;
 		context.fill();
 	}
 
-	// The shortest wrapped direction between the two pads, drawn on the surface
-	// strip. A return mission adds the leg back above it, so the player can see
-	// the whole trip rather than one arrow at a time.
+	// The leg, sampled along the surface between the two pads: on the deck it is
+	// the straight lane it always was, and off it the line follows the ground
+	// curve instead of cutting across the sky. A return mission adds the leg back
+	// above it, so the player sees the whole trip rather than one arrow at a time.
 	function drawLegArc(context, game) {
 		var focus = legFocus(game);
 		var from = R.world.findPadById(focus.fromPadId);
 		var to = R.world.findPadById(focus.toPadId);
-		var groundY = R.camera.groundY;
-		var width = render.width;
-		var x1;
-		var x2;
+		var camera = R.camera;
+		var point = render.scratch.marker;
+		var span;
+		var previousX;
+		var lastX;
+		var lastY;
+		var x;
+		var i;
 
-		if (!from || !to || from.id === to.id) {
+		if (!from || !to || from.id === to.id || render.curves.ground !== -1) {
 			return;
 		}
-		x1 = padScreenX(from);
-		x2 = padScreenX(to);
-		if (x2 - x1 > width * 0.5) {
-			x2 -= width;
-		} else if (x1 - x2 > width * 0.5) {
-			x2 += width;
-		}
-
+		span = R.util.wrapDelta(to.wx - from.wx, R.world.planet.circumference);
+		context.save();
 		context.lineWidth = 3;
 		context.strokeStyle = focus.active ? 'rgba(100, 213, 194, 0.75)' : 'rgba(100, 213, 194, 0.42)';
 		context.beginPath();
-		context.moveTo(x1, groundY - 3);
-		context.lineTo(x2, groundY - 3);
+		previousX = camera.width * R.constants.view.cameraAnchorFraction;
+		for (i = 0; i <= LEG_SAMPLES; i += 1) {
+			camera.project(from.wx + span * i / LEG_SAMPLES, 0, point);
+			x = R.coords.wrapScreenX(point.x, previousX, camera.period);
+			previousX = x;
+			lastX = x;
+			lastY = point.y - 3;
+			if (i === 0) {
+				context.moveTo(x, lastY);
+			} else {
+				context.lineTo(x, lastY);
+			}
+		}
 		context.stroke();
-		drawArrowHead(context, x2, groundY - 3, x2 >= x1 ? 1 : -1, 'rgba(140, 232, 216, 0.9)');
+		drawArrowHead(context, lastX, lastY, span >= 0 ? 1 : -1, 'rgba(140, 232, 216, 0.9)');
 
 		if (!focus.showReturn) {
+			context.restore();
 			return;
 		}
 		context.setLineDash([6, 6]);
 		context.lineWidth = 2;
 		context.strokeStyle = 'rgba(244, 199, 106, 0.55)';
 		context.beginPath();
-		context.moveTo(x2, groundY - 12);
-		context.lineTo(x1, groundY - 12);
+		previousX = camera.width * R.constants.view.cameraAnchorFraction;
+		for (i = 0; i <= LEG_SAMPLES; i += 1) {
+			camera.project(to.wx - span * i / LEG_SAMPLES, 0, point);
+			x = R.coords.wrapScreenX(point.x, previousX, camera.period);
+			previousX = x;
+			lastX = x;
+			lastY = point.y - 12;
+			if (i === 0) {
+				context.moveTo(x, lastY);
+			} else {
+				context.lineTo(x, lastY);
+			}
+		}
 		context.stroke();
-		context.setLineDash([]);
-		drawArrowHead(context, x1, groundY - 12, x2 >= x1 ? -1 : 1, 'rgba(244, 199, 106, 0.8)');
+		context.setLineDash(dashSolid);
+		drawArrowHead(context, lastX, lastY, span >= 0 ? -1 : 1, 'rgba(244, 199, 106, 0.8)');
+		context.restore();
 	}
 
 	function drawPadMarker(context, pad, sx, surfaceY, isCurrent, isTarget, showLabel) {
@@ -221,34 +240,36 @@
 		context.fillText(pad.name, sx, surfaceY - 31);
 	}
 
+	// Pads belong to the world's surface, so they are drawn only while the world
+	// is the ground, and in every lap of the wrap that reaches the viewport.
 	function drawPads(context, game) {
 		var pads = R.world.pads;
 		var camera = R.camera;
-		var circumference = R.world.planet.circumference;
-		var width = render.width;
-		var surfaceY = camera.groundY;
-		var i;
-		var pad;
-		var padWorldX;
-		var sx;
+		var point = render.scratch.pad;
+		var focus = legFocus(game);
+		var laps = lapSpan();
 		var isCurrent;
 		var isTarget;
-		var focus = legFocus(game);
+		var pad;
+		var x;
+		var copy;
+		var i;
 
+		if (render.curves.ground !== -1) {
+			return;
+		}
 		for (i = 0; i < pads.length; i += 1) {
 			pad = pads[i];
-			padWorldX = camera.flat ? R.coords.nearestPeriodicX(pad.wx, camera.leftWx, circumference) : pad.wx;
-			camera.project(padWorldX, 0, render.scratch.pad);
-			sx = render.scratch.pad.x;
+			camera.project(pad.wx, 0, point);
 			isCurrent = pad.id === focus.fromPadId;
 			isTarget = pad.id === focus.toPadId;
-
-			drawPadMarker(context, pad, sx, surfaceY, isCurrent, isTarget, sx > 40 && sx < width - 40);
-			if (sx < 14) {
-				drawPadMarker(context, pad, sx + width, surfaceY, isCurrent, isTarget, false);
-			}
-			if (sx > width - 14) {
-				drawPadMarker(context, pad, sx - width, surfaceY, isCurrent, isTarget, false);
+			for (copy = -laps; copy <= laps; copy += 1) {
+				x = point.x + copy * camera.period;
+				if (x < -40 || x > render.width + 40) {
+					continue;
+				}
+				drawPadMarker(context, pad, x, point.y, isCurrent, isTarget,
+					x > 40 && x < render.width - 40);
 			}
 		}
 	}
@@ -266,83 +287,209 @@
 		context.globalAlpha = 1;
 	}
 
-	// Space above the atmosphere ceiling is darker than the air column below
-	// it. Both read the eased ceiling, so a world switch moves the line instead
+	// The body under the pole is not a lens: its surface is the ground line and
+	// its interior is the strip below it. Every curve of it — the surface, the
+	// atmosphere ceiling, one interior band — is the same forward ray root per
+	// screen column, so they are solved once a frame into typed arrays and read
+	// by the fills, the labels and the coast marker. One sqrt per column, no
+	// sampled silhouette and no seam, because a column is a ray and the wrap only
+	// repeats it.
+	var COLUMNS = R.constants.view.groundColumns;
+	var LEG_SAMPLES = 24;
+
+	// Heading of the vertical ruler, rebuilt only when the ground changes.
+	render.scaleLabel = { key: -3, text: 'ALTITUDE  /  LOG SCALE' };
+
+	var BANDS = R.constants.render.cutawayBands;
+
+	render.curves = {
+		ground: -1,
+		radius: 0,
+		// Whether the pole is inside the ground sphere, so its surface is a curve
+		// the chart can solve, and how many cutaway bands it is inside, so there is
+		// an interior to draw. A drag walks the pole out of one body and into
+		// another, and between them the ground is the flat line the ladder starts
+		// at.
+		radial: false,
+		bands: 0,
+		air: 0,
+		topY: 0,
+		xs: new Float64Array(COLUMNS + 1),
+		groundYs: new Float64Array(COLUMNS + 1),
+		airYs: new Float64Array(COLUMNS + 1),
+		bandYs: new Float64Array((COLUMNS + 1) * BANDS.length)
+	};
+
+	// One sphere, per screen column: the ray that leaves the pole at that column's
+	// angle exits the sphere at the forward root, and the chart's own depth law
+	// puts that distance on screen.
+	function solveCurve(camera, radius, out, offset) {
+		var xs = render.curves.xs;
+		var i;
+
+		for (i = 0; i <= COLUMNS; i += 1) {
+			out[offset + i] = R.sky.enclosingY(radius, (xs[i] - camera.ox) / camera.angularScale);
+		}
+	}
+
+	// Once per frame, before anything reads the ground.
+	//
+	// The ground sphere is the camera's own pivot: its centre and its blended
+	// radius. In every steady state the pole is exactly that centre, so the
+	// surface is at depth zero — the ground line, flat — and the interior is the
+	// cutaway below it. While a gesture walks the pole out toward a surface the
+	// same sphere bends into a horizon and its interior drops away, which is what
+	// makes a drag read as leaving the ground rather than as a scale change.
+	render.solveGround = function() {
+		var curves = render.curves;
+		var camera = R.camera;
+		var step = render.width / COLUMNS;
+		var i;
+
+		curves.ground = R.sky.groundBody();
+		curves.radius = camera.pivotRadius;
+		curves.air = 0;
+		curves.topY = 0;
+		curves.bands = 0;
+		for (i = 0; i <= COLUMNS; i += 1) {
+			curves.xs[i] = i * step;
+		}
+		curves.radial = R.sky.poleInside(curves.radius);
+		if (!curves.radial) {
+			// Outside the ground sphere there is no surface to solve, and the flat
+			// ground line is what the solved curve tends to as the pole reaches the
+			// surface — so the two regimes meet without a step.
+			for (i = 0; i <= COLUMNS; i += 1) {
+				curves.groundYs[i] = camera.groundY;
+			}
+			return;
+		}
+		solveCurve(camera, curves.radius, curves.groundYs, 0);
+		// The band spheres are concentric and shrink, so the pole is inside the
+		// first n of them and no further: solving one it is outside would ask the
+		// chart for a surface that its ray never meets.
+		curves.bands = 0;
+		for (i = 0; i < BANDS.length; i += 1) {
+			if (!R.sky.poleInside(curves.radius * BANDS[i].fraction)) {
+				break;
+			}
+			solveCurve(camera, curves.radius * BANDS[i].fraction, curves.bandYs, i * (COLUMNS + 1));
+			curves.bands = i + 1;
+		}
+		// Air belongs to the active world, and only while the world is the ground:
+		// charted from another body it is a band at the world's own lens.
+		if (curves.ground !== -1) {
+			return;
+		}
+		curves.air = R.sky.view.atmosphereTop;
+		if (curves.air <= 0) {
+			return;
+		}
+		solveCurve(camera, curves.radius + curves.air, curves.airYs, 0);
+		curves.topY = curves.airYs[COLUMNS >> 1];
+	};
+
+	function traceCurve(context, ys, offset, forward) {
+		var i;
+
+		if (forward) {
+			context.moveTo(render.curves.xs[0], ys[offset]);
+			for (i = 1; i <= COLUMNS; i += 1) {
+				context.lineTo(render.curves.xs[i], ys[offset + i]);
+			}
+			return;
+		}
+		for (i = COLUMNS; i >= 0; i -= 1) {
+			context.lineTo(render.curves.xs[i], ys[offset + i]);
+		}
+	}
+
+	// Space above the atmosphere ceiling is darker than the air column below it.
+	// Both read the same eased ceiling, so a world switch moves the curve instead
 	// of replacing it.
 	function drawSkyShade(context) {
-		var camera = R.camera;
-		var point = render.scratch.marker;
+		var curves = render.curves;
 
-		R.camera.project(0, R.sky.view.atmosphereTop, point);
-		render.airY = R.util.clamp(point.y, 0, camera.groundY);
+		render.airY = curves.topY;
+		if (curves.ground !== -1 || curves.air <= 0) {
+			return;
+		}
+		context.beginPath();
+		traceCurve(context, curves.airYs, 0, true);
+		context.lineTo(render.width, -1);
+		context.lineTo(0, -1);
+		context.closePath();
 		context.fillStyle = 'rgba(3, 8, 20, 0.34)';
-		context.fillRect(0, 0, render.width, render.airY);
+		context.fill();
 	}
 
 	function drawAirBand(context) {
-		var camera = R.camera;
-		var airTop = R.sky.view.atmosphereTop;
-		var key = Math.round(airTop / 100);
-		var y = render.airY;
+		var curves = render.curves;
 		var label;
+		var key;
 
-		// The air column belongs to the deck, where the ground line is the
-		// world's surface. Charted on another body, the world's air is a band at
-		// its own lens, not a wash down to the pivot's ground.
-		if (!camera.flat) {
+		// The band is skipped when it is not the world's, when the world has no
+		// air, and when the ground has sunk far enough that the whole band — and
+		// its label with it — is below the viewport. Above the air the chart is
+		// all sky, so there is nothing to draw and nothing to name.
+		if (curves.ground !== -1 || curves.air <= 0 || curves.topY >= Math.min(R.camera.groundY, render.height)) {
 			render.airLabel.key = -1;
 			return;
 		}
-		// An airless world has no ceiling line to draw or to name.
-		if (airTop <= 0 || y >= camera.groundY) {
-			render.airLabel.key = -1;
-			return;
-		}
+		context.beginPath();
+		traceCurve(context, curves.airYs, 0, true);
+		traceCurve(context, curves.groundYs, 0, false);
+		context.closePath();
 		context.fillStyle = 'rgba(36, 84, 112, 0.20)';
-		context.fillRect(0, y, render.width, camera.groundY - y);
-		context.fillStyle = 'rgba(150, 205, 224, 0.34)';
-		context.fillRect(0, y, render.width, 1);
+		context.fill();
+		context.beginPath();
+		traceCurve(context, curves.airYs, 0, true);
+		context.lineWidth = 1;
+		context.strokeStyle = 'rgba(150, 205, 224, 0.34)';
+		context.stroke();
+		key = Math.round(curves.air / 100);
 		if (key !== render.airLabel.key) {
 			render.airLabel.key = key;
-			label = key >= 10 ? (key / 10).toFixed(1) + ' km' : Math.round(airTop) + ' m';
+			label = key >= 10 ? (key / 10).toFixed(1) + ' km' : Math.round(curves.air) + ' m';
 			render.airLabel.text = 'ATMOSPHERE TOP  ·  ' + label;
 		}
-		if (y < 26) {
-			// The line is at the very top: a label there would collide with the
+		if (curves.topY < 26) {
+			// The ceiling is at the very top: a label there would collide with the
 			// altitude ladder's own heading.
 			return;
 		}
 		context.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
 		context.textAlign = 'left';
 		context.fillStyle = 'rgba(174, 216, 230, 0.82)';
-		context.fillText(render.airLabel.text, 20, y - 6);
+		context.fillText(render.airLabel.text, 20, curves.topY - 6);
 	}
 
 	// A body's lens. Both limbs are already in screen space: each sample angle
-	// gives the two intersections of its ray with the sphere, and the chart's
-	// own log-polar map puts them where they belong. The shape is then the
-	// closed polygon between the near limb and the far limb.
-	function lensPath(context, lens) {
+	// gives the two intersections of its ray with the sphere, and the chart's own
+	// map puts them where they belong. The shape is then the closed polygon
+	// between the near limb and the far limb — never an ellipse guess, which is
+	// what gives a close body its cutaway and a distant one its lens.
+	function lensPath(context, lens, offsetX) {
 		var i;
 
 		context.beginPath();
 		for (i = 0; i < lens.xs.length; i += 1) {
 			if (i === 0) {
-				context.moveTo(lens.xs[0], lens.nearYs[0]);
+				context.moveTo(lens.xs[0] + offsetX, lens.nearYs[0]);
 			} else {
-				context.lineTo(lens.xs[i], lens.nearYs[i]);
+				context.lineTo(lens.xs[i] + offsetX, lens.nearYs[i]);
 			}
 		}
 		for (i = lens.xs.length - 1; i >= 0; i -= 1) {
-			context.lineTo(lens.xs[i], lens.farYs[i]);
+			context.lineTo(lens.xs[i] + offsetX, lens.farYs[i]);
 		}
 		context.closePath();
 	}
 
-	// A body is drawn as its true lens when the lens has size, and as a small
-	// disc when the log chart has squeezed it to a hairline: distant bodies stay
+	// A body is drawn as its true lens when the lens has size, and as a small disc
+	// when the log chart has squeezed it to a hairline: distant bodies stay
 	// visible and clickable without pretending they are wide.
-	function drawSkyBody(context, body, lens, index) {
+	function drawSkyBody(context, body, lens, index, offsetX) {
 		var star = body.kind === 'star';
 		var icon = R.sky.iconRadius(index);
 		var halfWidth;
@@ -353,24 +500,20 @@
 		var angle;
 		var i;
 
-		if (!lens.visible || lens.alpha <= 0.01) {
-			return;
-		}
 		halfWidth = Math.max(1, lens.halfWidth);
 		halfHeight = Math.max(render.minBodyHeight, (lens.nearY - lens.farY) * 0.5);
-		x = lens.centerX;
+		x = lens.centerX + offsetX;
 		mid = lens.centerY;
 		if (x < -halfWidth * 4 || x > render.width + halfWidth * 4) {
 			return;
 		}
-		if (mid - halfHeight > R.camera.groundY || mid + halfHeight < 0) {
+		if (mid - halfHeight > render.height || mid + halfHeight < 0) {
 			return;
 		}
-		thin = halfWidth < icon || halfHeight < icon;
+		thin = halfWidth < icon && halfHeight < icon;
 		if (thin) {
 			halfWidth = icon;
 			halfHeight = icon;
-			mid = lens.centerY;
 		}
 		if (index === R.input.hoverIndex) {
 			context.beginPath();
@@ -411,8 +554,7 @@
 			context.clip();
 			context.globalAlpha = lens.alpha * 0.5;
 			context.fillStyle = body.shade;
-			context.fillRect(x + (1 - lens.shade) * icon * 1.2, mid - icon,
-				icon * 2, icon * 2);
+			context.fillRect(x + (1 - lens.shade) * icon * 1.2, mid - icon, icon * 2, icon * 2);
 			context.restore();
 			context.beginPath();
 			context.arc(x, mid, icon, 0, Math.PI * 2);
@@ -421,11 +563,11 @@
 			context.strokeStyle = 'rgba(226, 240, 247, 0.45)';
 			context.stroke();
 		} else {
-			lensPath(context, lens);
+			lensPath(context, lens, offsetX);
 			context.fillStyle = body.color;
 			context.fill();
-			// The shaded side is turned away from the star, the same lighting
-			// rule the ship uses.
+			// The shaded side is turned away from the star, the same lighting rule
+			// the ship uses.
 			context.save();
 			context.clip();
 			context.globalAlpha = lens.alpha * 0.55;
@@ -433,81 +575,118 @@
 			context.fillRect(x + (1 - lens.shade) * halfWidth * 1.4, mid - halfHeight * 2,
 				halfWidth * 1.6, halfHeight * 4);
 			context.restore();
-			lensPath(context, lens);
+			lensPath(context, lens, offsetX);
 			context.globalAlpha = lens.alpha;
 			context.lineWidth = 1;
 			context.strokeStyle = 'rgba(226, 240, 247, 0.35)';
 			context.stroke();
 		}
 		context.restore();
-		if (render.width >= 650) {
-			// Above the disc normally; under it when the body is charted close to
-			// the top edge, so the name is never clipped away.
-			context.font = '600 9px ui-monospace, SFMono-Regular, Menlo, monospace';
-			context.textAlign = 'center';
-			context.fillStyle = 'rgba(211, 228, 235, 0.82)';
-			context.fillText(body.name.toUpperCase(), x,
-				mid - halfHeight - 6 > 12 ? mid - halfHeight - 6 : mid + halfHeight + 12);
-		}
-	}
-
-	// The body the chart is seated on is the ground, so its whole sphere is
-	// drawn as the cutaway below the ground line: the same map that puts its
-	// surface on the line sends its interior down the screen.
-	function drawGroundBody(context, body) {
-		var camera = R.camera;
-		var top = camera.groundY;
-		var bottom = camera.height;
-		var radius = R.sky.pivot.radius;
-		var y;
-
-		if (bottom - top < 2) {
+		if (render.width < 650) {
 			return;
 		}
-		// The interior is the log band from the surface down to the centre. A
-		// single fill is enough: the layers are a later slice.
-		y = camera.oy - camera.scalePx * Math.log(radius * 0.35);
-		context.fillStyle = body.shade;
-		context.fillRect(0, top, render.width, bottom - top);
-		context.fillStyle = 'rgba(180, 199, 173, 0.16)';
-		context.fillRect(0, Math.min(bottom, y), render.width, 1);
+		// Above the disc normally; under it when the body is charted close to the
+		// top edge, so the name is never clipped away.
+		context.font = '600 9px ui-monospace, SFMono-Regular, Menlo, monospace';
+		context.textAlign = 'center';
+		context.fillStyle = 'rgba(211, 228, 235, 0.82)';
+		context.fillText(body.name.toUpperCase(), x,
+			mid - halfHeight - 6 > 12 ? mid - halfHeight - 6 : mid + halfHeight + 12);
 	}
 
-	// The orbits of the catalog, charted by the same map as the lenses. Each
-	// polyline is drawn in every periodic copy that touches the viewport, and a
-	// sample the chart cannot place (inside the pivot body, or ON the pole)
-	// breaks the path instead of flinging a chord across the screen.
+	// The cutaway: bands of the ground body's interior, painted from the
+	// shallowest down so each one covers the middle of the last. No clipping is
+	// needed — a band's curve is below the surface curve by construction, so the
+	// bands land inside the ground fill — and the depth of a band is a log of its
+	// fraction, which is what makes the pixel scale per kilometre grow downward.
+	function fillCutaway(context, body) {
+		var curves = render.curves;
+		var i;
+
+		context.fillStyle = body.shade;
+		for (i = 0; i < curves.bands; i += 1) {
+			context.globalAlpha = BANDS[i].alpha;
+			context.beginPath();
+			traceCurve(context, curves.bandYs, i * (COLUMNS + 1), true);
+			context.lineTo(render.width, render.height + 1);
+			context.lineTo(0, render.height + 1);
+			context.closePath();
+			context.fill();
+		}
+		context.globalAlpha = 1;
+	}
+
+	// The ground: the surface curve filled to the bottom edge, its cutaway, and
+	// the surface line itself. The curve is the sphere of the body under the
+	// pole solved per screen column, so it is flat while the pole is that body's
+	// centre and bends into a horizon as a drag walks the pole toward a surface.
+	function drawGround(context) {
+		var curves = render.curves;
+		var body = R.sky.bodyOf(curves.ground);
+
+		context.beginPath();
+		traceCurve(context, curves.groundYs, 0, true);
+		context.lineTo(render.width, render.height + 1);
+		context.lineTo(0, render.height + 1);
+		context.closePath();
+		context.fillStyle = curves.ground < 0 ? render.groundPattern : body.color;
+		context.fill();
+		fillCutaway(context, body);
+
+		context.beginPath();
+		traceCurve(context, curves.groundYs, 0, true);
+		context.lineWidth = 1;
+		context.strokeStyle = curves.ground < 0 ? '#b4c7ad' : 'rgba(226, 240, 247, 0.38)';
+		context.stroke();
+	}
+
+	// The orbits of the catalog, charted by the same map as the lenses: a circle
+	// in the plane, not an ellipse on the screen. Each polyline is unwrapped
+	// sample by sample so the atan2 seam is a translate rather than a chord across
+	// the chart, then drawn in every periodic copy that touches the viewport. A
+	// sample the chart cannot place — too close to the log pole, where the image
+	// of the curve is singular — breaks the path.
 	function drawOrbits(context, game) {
 		var bodies = R.constants.sky.bodies;
 		var lens = R.sky.orbitShape;
+		var camera = R.camera;
+		var previousX;
+		var laps;
 		var width = render.width;
+		var started;
+		var copy;
 		var x;
 		var y;
-		var copy;
-		var copies;
-		var started;
 		var b;
 		var j;
 
 		context.save();
 		context.lineWidth = 1;
-		context.strokeStyle = R.camera.flat ? 'rgba(150, 190, 214, 0.16)' : 'rgba(150, 190, 214, 0.22)';
+		// A little brighter with no ground under the pole: there the orbits are
+		// the only structure the chart has.
+		context.strokeStyle = render.curves.radial ?
+			'rgba(150, 190, 214, 0.16)' : 'rgba(150, 190, 214, 0.22)';
+		laps = lapSpan();
 		for (b = 0; b < bodies.length; b += 1) {
+			// An orbit the pole is on is refused by the sampler itself: its image
+			// whips a whole period along the ground line and no sampling fixes it.
 			R.sky.orbit(b);
 			if (!lens.valid || lens.count < 2) {
 				continue;
 			}
-			copies = Math.max(1, Math.ceil(width / Math.max(1, lens.period)) + 1);
-			for (copy = -copies; copy <= copies; copy += 1) {
+			for (copy = -laps; copy <= laps; copy += 1) {
 				started = false;
+				previousX = camera.ox;
 				context.beginPath();
-				for (j = 0; j <= lens.xs.length - 1; j += 1) {
-					x = lens.xs[j] + copy * lens.period;
+				for (j = 0; j < lens.xs.length; j += 1) {
+					x = lens.xs[j];
 					y = lens.ys[j];
 					if (!Number.isFinite(x) || !Number.isFinite(y)) {
 						started = false;
 						continue;
 					}
+					x = R.coords.wrapScreenX(x + copy * lens.period, previousX, lens.period);
+					previousX = x;
 					if (x < -width * 0.25 || x > width * 1.25) {
 						started = false;
 						continue;
@@ -527,35 +706,42 @@
 
 	function drawSkyBodies(context, game) {
 		var bodies = R.constants.sky.bodies;
+		var camera = R.camera;
 		var lens = R.sky.shape;
-		var ground = R.sky.pivot.index;
+		var laps = lapSpan();
+		var copy;
 		var i;
 
 		for (i = -1; i < bodies.length; i += 1) {
-			if (i === ground && !R.sky.pivot.reseating) {
-				drawGroundBody(context, i < 0 ? R.sky.world : bodies[i]);
+			// The body the pole is inside has no lens to draw: its surface is the
+			// ground line and its interior is the cutaway below it.
+			R.sky.outline(i, game);
+			if (!lens.visible) {
 				continue;
 			}
-			R.sky.outline(i, game);
-			drawSkyBody(context, i < 0 ? R.sky.world : bodies[i], lens, i);
+			for (copy = -laps; copy <= laps; copy += 1) {
+				drawSkyBody(context, R.sky.bodyOf(i), lens, i, copy * camera.period);
+			}
 		}
 	}
 
-	// On the deck a longitude is wrapped to the copy nearest the viewport, so a
-	// path that crosses the world seam breaks instead of drawing a line across
-	// the whole chart. Away from the world the chart already has the seam built
-	// in (X is an angle), so the longitude goes through untouched.
-	function chartWorldX(wx) {
-		return R.camera.flat ?
-			R.coords.nearestPeriodicX(wx, R.camera.leftWx, R.world.planet.circumference) : wx;
+	// The flown trail and the engine-off coast trace, both through the camera
+	// projection. A point is unwrapped into the lap of the point before it, so the
+	// world seam is a translate; a point the chart cannot place (too close to the
+	// pole) or too far from its neighbour breaks the line instead of drawing a
+	// chord across the sky.
+	function projectPathPoint(wx, wy, out) {
+		return R.camera.project(wx, wy, out);
 	}
 
-	function projectPathPoint(wx, wy, out) {
-		return R.camera.project(chartWorldX(wx), wy, out);
+	function pathBreak(previousX, x, y) {
+		return !Number.isFinite(x) || !Number.isFinite(y) ||
+			Math.abs(x - previousX) > render.width * 0.5;
 	}
 
 	function drawCoastTrace(context) {
 		var trace = R.trajectory.trace;
+		var period = R.camera.period;
 		var point = render.scratch.path;
 		var previousX = 0;
 		var began = false;
@@ -571,7 +757,9 @@
 		context.beginPath();
 		for (i = 0; i < trace.count; i += 1) {
 			projectPathPoint(trace.points[i * 2], trace.points[i * 2 + 1], point);
-			if (!began || Math.abs(point.x - previousX) > render.width * 0.5) {
+			point.x = R.coords.wrapScreenX(point.x, began ? previousX :
+				render.width * R.constants.view.cameraAnchorFraction, period);
+			if (!began || pathBreak(previousX, point.x, point.y)) {
 				context.moveTo(point.x, point.y);
 			} else {
 				context.lineTo(point.x, point.y);
@@ -586,6 +774,7 @@
 
 	function drawTrailRange(context, first, length, alpha) {
 		var path = R.flightPath;
+		var period = R.camera.period;
 		var point = render.scratch.path;
 		var start = (path.head - path.count + path.capacity) % path.capacity;
 		var previousX = 0;
@@ -600,7 +789,9 @@
 		for (i = first; i < first + length; i += 1) {
 			index = (start + i) % path.capacity;
 			projectPathPoint(path.points[index * 2], path.points[index * 2 + 1], point);
-			if (!began || Math.abs(point.x - previousX) > render.width * 0.5) {
+			point.x = R.coords.wrapScreenX(point.x, began ? previousX :
+				render.width * R.constants.view.cameraAnchorFraction, period);
+			if (!began || pathBreak(previousX, point.x, point.y)) {
 				context.moveTo(point.x, point.y);
 			} else {
 				context.lineTo(point.x, point.y);
@@ -625,45 +816,50 @@
 		drawTrailRange(context, count - tail, tail, 0.85);
 	}
 
-	function drawGround(context) {
-		var groundY = R.camera.groundY;
-		var height = render.height - groundY;
-
-		context.fillStyle = render.groundPattern;
-		context.fillRect(0, groundY, render.width, height);
-		context.fillStyle = 'rgba(202, 219, 185, 0.12)';
-		context.fillRect(0, groundY + height * 0.28, render.width, 1);
-		context.fillStyle = 'rgba(8, 15, 17, 0.24)';
-		context.fillRect(0, groundY + height * 0.72, render.width, 1);
-		context.fillStyle = '#b4c7ad';
-		context.fillRect(0, groundY, render.width, 1);
-	}
+	// Decade ladder of the chart's own vertical axis: distance above the ground
+	// the chart is standing on. Only marks inside the charted extent are drawn, so
+	// a zoom never stacks clamped labels on the top edge, and the marks are the
+	// projection's own curve — a mark is where that distance really is.
+	var distanceMarks = [
+		{ distance: 10, label: '10 m' },
+		{ distance: 100, label: '100 m' },
+		{ distance: 1000, label: '1 km' },
+		{ distance: 10000, label: '10 km' },
+		{ distance: 100000, label: '100 km' },
+		{ distance: 1000000, label: '1,000 km' },
+		{ distance: 10000000, label: '10,000 km' },
+		{ distance: 100000000, label: '100,000 km' }
+	];
 
 	function drawAltitudeScale(context) {
-		var marks = altitudeMarks;
+		var marks = distanceMarks;
 		var camera = R.camera;
-		var point = render.scratch.marker;
-		var i;
+		var curves = render.curves;
+		var heading = render.scaleLabel;
 		var y;
+		var i;
 
-		// The ladder is the active world's altimeter. On the deck it is the
-		// chart's own Y axis; seated elsewhere the axis is distance from the
-		// pivot, so a world-relative scale would lie.
-		if (!camera.flat) {
+		if (!curves.radial) {
 			return;
+		}
+		if (heading.key !== curves.ground) {
+			heading.key = curves.ground;
+			heading.text = curves.ground < 0 ?
+				'ALTITUDE  /  LOG SCALE' :
+				'DISTANCE FROM ' + R.sky.bodyOf(curves.ground).name.toUpperCase() + '  /  LOG SCALE';
 		}
 		context.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
 		context.textAlign = 'left';
 		context.fillStyle = 'rgba(184, 207, 218, 0.72)';
-		context.fillText('ALTITUDE  /  LOG SCALE', 24, 173);
+		context.fillText(heading.text, 24, 173);
 
 		for (i = 0; i < marks.length; i += 1) {
-			if (marks[i].altitude > camera.ceiling) {
+			if (curves.radius + marks[i].distance > camera.extent) {
 				continue;
 			}
-			R.camera.project(0, marks[i].altitude, point);
-			y = point.y;
-			if (y < 20 || y > camera.groundY - 16) {
+			y = camera.oy - camera.scale * R.coords.depthWith(curves.radius + marks[i].distance,
+				camera.ladderRef, camera.logScale, camera.ladderQ0, camera.ladderFar);
+			if (y < 20 || y > camera.height - 12) {
 				continue;
 			}
 			context.fillStyle = 'rgba(190, 215, 224, 0.26)';
@@ -1429,24 +1625,31 @@
 	// one that would break the world's touchdown limits.
 	function drawCoastMarker(context, game) {
 		var impact = R.trajectory.impact;
+		var camera = R.camera;
 		var point = render.scratch.coast;
-		var groundY = R.camera.groundY;
+		var anchorX = camera.width * R.constants.view.cameraAnchorFraction;
+		var laps = lapSpan();
 		var color;
+		var base;
+		var copy;
+		var x;
 
-		if (game.phase !== 'flying' || !impact.valid) {
+		if (game.phase !== 'flying' || !impact.valid || render.curves.ground !== -1) {
 			return;
 		}
-		// The periodic copy always projects inside the viewport, so a coast that
-		// wraps the world keeps its marker; near an edge it is drawn twice, like
-		// the pads are.
-		R.camera.project(R.trajectory.markerX(impact), 0, point);
+		camera.project(impact.wx, 0, point);
+		// The chart wraps, so the impact is read in the lap the camera target is
+		// in and drawn in every lap that reaches the viewport: a coast that goes
+		// round the world keeps its marker, and at a seam it stands on both edges
+		// the way the pads do.
+		base = R.coords.wrapScreenX(point.x, anchorX, camera.period);
 		color = impact.safeTouchdown ? (impact.onTargetPad ? coastColors[2] : coastColors[1]) : coastColors[0];
-		drawCoastMarkerAt(context, point.x, groundY, color);
-		if (point.x < 20) {
-			drawCoastMarkerAt(context, point.x + render.width, groundY, color);
-		}
-		if (point.x > render.width - 20) {
-			drawCoastMarkerAt(context, point.x - render.width, groundY, color);
+		for (copy = -laps; copy <= laps; copy += 1) {
+			x = base + copy * camera.period;
+			if (x < -20 || x > render.width + 20) {
+				continue;
+			}
+			drawCoastMarkerAt(context, x, point.y, color);
 		}
 	}
 
@@ -1537,6 +1740,7 @@
 		context.fillStyle = render.skyGradient;
 		context.fillRect(0, 0, render.width, render.height);
 		R.sky.ensure();
+		render.solveGround();
 		drawSkyShade(context);
 		drawStars(context);
 		drawAirBand(context);
@@ -1573,6 +1777,7 @@
 		context.fillStyle = render.skyGradient;
 		context.fillRect(0, 0, render.width, render.height);
 		R.sky.ensure();
+		render.solveGround();
 		drawSkyShade(context);
 		drawStars(context);
 		drawAirBand(context);

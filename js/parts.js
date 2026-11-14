@@ -51,6 +51,20 @@
 			R.util.clamp(strength == null ? 1 : strength, 0.5, 1);
 	};
 
+	// Test mode: the deck's switch flies a build many times harder than the
+	// catalog rates it, so a design can be pushed without rebuilding it. Only
+	// what an engine *delivers* is multiplied — masses, costs and wear are the
+	// built ones — and the modules that read a rating (fuel flow, the
+	// acceleration ceiling, the airframe's limits) multiply with it, so a test
+	// rocket flies the same profile twenty times over instead of emptying its
+	// tanks in a second or shaking itself apart. Every factor is 1 while the
+	// switch is off, which is how the game ships.
+	parts.testMode = false;
+
+	parts.performanceFactor = function() {
+		return parts.testMode ? R.constants.rocket.testMultiplier : 1;
+	};
+
 	// Engine + tank (+ fairing on the top stage) for one stage. Thrust and Isp
 	// come from the engine; the tank sets the weight-per-fuel. A fairing adds its
 	// mass once and is only ever set on the top stage.
@@ -69,12 +83,15 @@
 			tankMass: tankMass,
 			fairingMass: fairingMass,
 			dryMass: engineMass + tankMass + fairingMass,
-			thrust: thrust
+			// The engine's mass is what the built thrust costs; only the thrust a
+			// flight reads is rated up.
+			thrust: thrust * parts.performanceFactor()
 		};
 	};
 
 	parts.stageThrust = function(stage) {
-		return Math.max(0, stage.fuelMass || 0) * parts.engine(stage.engineId).thrustPerFuelMass;
+		return Math.max(0, stage.fuelMass || 0) * parts.engine(stage.engineId).thrustPerFuelMass *
+			parts.performanceFactor();
 	};
 
 	// What a stage's structure is worth, in steel-kg: every part's mass at its

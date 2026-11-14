@@ -80,7 +80,10 @@
 	function stageLimits(stage) {
 		var flight = R.world.planet.flight;
 		var strength = R.util.clamp(stage.strength == null ? 1 : stage.strength, 0.5, 1);
-		var margin = settings.structureMargin * strength;
+		// Test mode rates the airframe with the engine: a stack flying twenty times
+		// harder is twenty times tougher, or the switch would wreck the very stage
+		// it exists to let you watch.
+		var margin = settings.structureMargin * strength * R.parts.performanceFactor();
 
 		limits.acceleration = (flight.maxThrustAcceleration > 0 ? flight.maxThrustAcceleration : 0) * margin;
 		limits.pressure = (flight.maxDynamicPressure > 0 ? flight.maxDynamicPressure : 0) * margin;
@@ -106,7 +109,7 @@
 	// has been lost inside the atmosphere, in pressure too.
 	function payloadStress(state, accel, pressure) {
 		var gLoad = (state.fragileCargo ? settings.fragileGLoad : settings.payloadGLoad) *
-			R.constants.rocket.standardGravity;
+			R.constants.rocket.standardGravity * R.parts.performanceFactor();
 		var overG = excess(accel, gLoad);
 		var overQ = state.fairingLost ? excess(pressure, settings.payloadPressure) : 0;
 

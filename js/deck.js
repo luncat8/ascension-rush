@@ -1432,6 +1432,27 @@
 		}
 	}
 
+	// Test mode: rate every build many times stronger than the catalog does, so a
+	// design can be flown hard without rebuilding it. The stack in the air is
+	// re-rated on the spot, so the switch can be thrown mid-flight, and it is read
+	// back from the parts module rather than kept here — the checkbox shows the
+	// state the flight is actually using.
+	deck.setTestMode = function(enabled) {
+		var game = R.game;
+
+		R.parts.testMode = !!enabled;
+		if (ui.testMode) {
+			ui.testMode.checked = R.parts.testMode;
+		}
+		if (ui.testToggle) {
+			ui.testToggle.classList.toggle('test-mode-on', R.parts.testMode);
+		}
+		if (game && game.rocket) {
+			R.rocket.rerate(game.rocket);
+		}
+		R.operations.touch();
+	};
+
 	deck.render = function(game) {
 		var award = pendingSettlement;
 
@@ -1531,6 +1552,9 @@
 		ui.cash = doc.getElementById('deck-cash');
 		ui.fleetCount = doc.getElementById('deck-fleet');
 		ui.planetButton = doc.getElementById('deck-planet-button');
+		ui.testToggle = doc.getElementById('deck-test-toggle');
+		ui.testMode = doc.getElementById('deck-test-mode');
+		ui.testLabel = doc.getElementById('deck-test-label');
 		ui.tabDispatch = doc.getElementById('tab-dispatch');
 		ui.tabMarket = doc.getElementById('tab-market');
 		ui.tabRoutes = doc.getElementById('tab-routes');
@@ -1647,8 +1671,15 @@
 		ui.routeWarning = doc.getElementById('route-warning');
 		ui.routeSave = doc.getElementById('route-review-save');
 
+		if (ui.testLabel) {
+			ui.testLabel.textContent = 'Test mode — ' + R.constants.rocket.testMultiplier +
+				'x thrust and delta-v';
+		}
 		on(ui.planetButton, 'click', function() {
 			R.menu.show();
+		});
+		on(ui.testMode, 'change', function() {
+			deck.setTestMode(ui.testMode.checked);
 		});
 		on(ui.milestoneToggle, 'click', function() {
 			deck.ladderOpen = !deck.ladderOpen;

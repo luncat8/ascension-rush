@@ -95,7 +95,6 @@
 			canvas.height = Math.round(height * pixelRatio);
 			context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
 			R.render.resize(width, height);
-			R.camera.follow(game.rocket.wx, game.rocket.wy, 0);
 			// The chart is fitted from the catalog: run its frame before the
 			// first paint so the deck is never drawn with an unfitted scale.
 			R.sky.update(game, 0);
@@ -131,7 +130,7 @@
 		R.controls.setTimeScaleIndex(R.constants.time.defaultIndex);
 		R.builder.refresh(game);
 		R.deck.reset(game);
-		R.camera.follow(game.rocket.wx, game.rocket.wy, 0);
+		R.sky.clearSeat();
 		// Begin the gravity / scale morph before the immediate redraw, so a
 		// world switch never snaps the camera to the new values first.
 		R.sky.update(game, 0);

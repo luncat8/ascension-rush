@@ -15,19 +15,28 @@
 	// outline it and the cursor can say it is clickable.
 	input.hoverIndex = -2;
 	input.canvas = null;
+	// True between a press and its release once the pointer has moved past the
+	// slop, so the renderer can say the chart is being held.
+	input.dragging = false;
+	input.dragK = 0;
 	// A page may claim a press for its own object (the chart lab grabs the
-	// probe). While a claim is live the camera ignores the gesture, and the
-	// page gets the moves instead of a pan.
+	// probe). While a claim is live the camera ignores the gesture, and the page
+	// gets the moves instead of a drag.
 	input.gestureHook = null;
 	input.gestureMove = null;
 	input.gestureEnd = null;
 
+	// One pointer position object for the whole session: a move event is as hot
+	// as a frame while the player drags.
+	var point = { x: 0, y: 0 };
+
 	function updateWorldReadout(camera) {
 		camera.unproject(input.pointerX, input.pointerY, input.worldPoint);
-		input.debugText = 'E ' + Math.round(input.worldPoint.x) + ' m  ·  ALT ' + Math.round(input.worldPoint.y) + ' m';
+		input.debugText = 'E ' + Math.round(input.worldPoint.x) + ' m  ·  ALT ' +
+			Math.round(input.worldPoint.y) + ' m';
 	}
 
-	function pickAt(x, y, camera) {
+	function pickAt(x, y) {
 		var game = R.game;
 
 		if (!R.sky || !R.sky.pick || !game) {
@@ -50,22 +59,20 @@
 	};
 
 	// The chart's three gestures, all of them on the camera and none of them in
-	// the game: drag pans, the wheel zooms, a click without a drag re-seats the
-	// chart on the body under the pointer. Everything a gesture needs is the
-	// camera and the catalog, so the test page and the game get the same
+	// the game: a press and a drag takes hold of a point of the plane and
+	// unwraps the space around it, the wheel zooms, and a click without a drag
+	// seats the chart on the body under the pointer. Everything a gesture needs
+	// is the camera and the catalog, so the test page and the game get the same
 	// controls from the same code.
 	input.initialize = function(canvas, camera) {
-		var dragging = false;
-		var moved = false;
+		var state = 0;
 		var downX = 0;
 		var downY = 0;
-		var lastX = 0;
-		var lastY = 0;
 
 		input.canvas = canvas;
 
-		// The test harness has a canvas with no DOM style; the cursor is not
-		// worth a guard at every call site.
+		// The test harness has a canvas with no DOM style; the cursor is not worth
+		// a guard at every call site.
 		function setCursor(shape) {
 			if (canvas.style) {
 				canvas.style.cursor = shape;
@@ -75,15 +82,37 @@
 		function pointOf(event) {
 			var rect = canvas.getBoundingClientRect();
 
-			return {
-				x: (event.clientX - rect.left) / Math.max(1, rect.width) * camera.width,
-				y: (event.clientY - rect.top) / Math.max(1, rect.height) * camera.height
-			};
+			point.x = (event.clientX - rect.left) / Math.max(1, rect.width) * camera.width;
+			point.y = (event.clientY - rect.top) / Math.max(1, rect.height) * camera.height;
+			return point;
 		}
 
 		function updateHover() {
-			input.hoverIndex = input.pointerActive ? pickAt(input.pointerX, input.pointerY, camera) : -2;
-			setCursor(input.hoverIndex > -2 ? 'pointer' : (dragging ? 'grabbing' : 'grab'));
+			input.hoverIndex = input.pointerActive ? pickAt(input.pointerX, input.pointerY) : -2;
+			setCursor(input.hoverIndex > -2 ? 'pointer' : (input.dragging ? 'grabbing' : 'grab'));
+		}
+
+		// A release decides between the two things a drag can mean: far enough
+		// toward its ground line and the chart seats on the body that anchor
+		// stands on, exactly as a click would; short of it and the chart eases
+		// back to the follow, holding the ship still on the way.
+		function endDrag() {
+			var seat;
+
+			if (state !== 'drag') {
+				return;
+			}
+			state = 0;
+			input.dragging = false;
+			input.dragK = 0;
+			seat = R.sky.handEnd();
+			// A seat that cannot start — the chart already stands there, or a
+			// hand-over is running — falls back to the follow ease, so a release
+			// is never a snap back to the ship.
+			if (seat < -1 || !R.sky.seatPivot(seat, R.game)) {
+				R.sky.releaseToFollow(R.game);
+			}
+			updateHover();
 		}
 
 		function onPointerMove(event) {
@@ -97,47 +126,44 @@
 			input.pointerY = point.y;
 			input.pointerActive = true;
 			updateWorldReadout(camera);
-			if (dragging === 'claimed') {
+			if (state === 'claimed') {
 				if (input.gestureMove) {
 					input.gestureMove(point.x, point.y, camera);
 				}
 				return;
 			}
-			if (!dragging) {
+			if (state === 0) {
 				updateHover();
 				return;
 			}
-			dx = point.x - lastX;
-			dy = point.y - lastY;
-			lastX = point.x;
-			lastY = point.y;
-			if (!moved && Math.abs(point.x - downX) + Math.abs(point.y - downY) <
-				R.constants.view.dragSlopPx) {
+			dx = point.x - downX;
+			dy = point.y - downY;
+			if (!input.dragging && Math.abs(dx) + Math.abs(dy) < R.constants.view.dragSlopPx) {
 				return;
 			}
-			moved = true;
-			setCursor('grabbing');
-			camera.panBy(dx, dy);
+			if (!input.dragging) {
+				input.dragging = true;
+				state = 'drag';
+				R.sky.handBegin(downX, downY, R.game);
+				setCursor('grabbing');
+			}
+			input.dragK = R.sky.hand.k;
+			R.sky.handMove(point.x, point.y);
 		}
 
 		function onPointerDown(event) {
 			var point = pointOf(event);
 
-			if (input.gestureHook && input.gestureHook(point.x, point.y, camera)) {
-				input.pointerX = point.x;
-				input.pointerY = point.y;
-				input.pointerActive = true;
-				dragging = 'claimed';
-				return;
-			}
-			dragging = true;
-			moved = false;
-			downX = lastX = point.x;
-			downY = lastY = point.y;
 			input.pointerX = point.x;
 			input.pointerY = point.y;
 			input.pointerActive = true;
-			setCursor('grabbing');
+			if (input.gestureHook && input.gestureHook(point.x, point.y, camera)) {
+				state = 'claimed';
+				return;
+			}
+			state = 'press';
+			downX = point.x;
+			downY = point.y;
 			if (canvas.setPointerCapture) {
 				canvas.setPointerCapture(event.pointerId);
 			}
@@ -147,29 +173,31 @@
 		function onPointerUp(event) {
 			var index;
 
-			if (dragging === 'claimed') {
-				dragging = false;
+			if (state === 'claimed') {
+				state = 0;
 				if (input.gestureEnd) {
 					input.gestureEnd();
 				}
 				return;
 			}
-			if (!dragging) {
+			if (state === 'drag') {
+				endDrag();
 				return;
 			}
-			dragging = false;
+			if (state !== 'press') {
+				return;
+			}
+			state = 0;
 			if (canvas.releasePointerCapture && canvas.hasPointerCapture &&
 				canvas.hasPointerCapture(event.pointerId)) {
 				canvas.releasePointerCapture(event.pointerId);
 			}
-			if (!moved) {
-				// A click is a seat, not a pan: the body under the pointer
-				// becomes the chart's pole. Empty space is a no-op, so a stray
-				// click never throws the view.
-				index = pickAt(input.pointerX, input.pointerY, camera);
-				if (index >= -1 && R.game) {
-					R.sky.seatPivot(index, R.game);
-				}
+			// A click is a seat, not a drag: the body under the pointer becomes
+			// the chart's ground. Empty space is a no-op, so a stray click never
+			// throws the view.
+			index = pickAt(input.pointerX, input.pointerY);
+			if (index >= -1 && R.game) {
+				R.sky.seatPivot(index, R.game);
 			}
 			updateHover();
 		}
@@ -177,13 +205,18 @@
 		function onPointerLeave() {
 			input.pointerActive = false;
 			input.hoverIndex = -2;
-			if (!dragging) {
+			if (state === 0) {
 				setCursor('');
 			}
 		}
 
 		function onPointerCancel() {
-			dragging = false;
+			if (state === 'drag') {
+				endDrag();
+				return;
+			}
+			state = 0;
+			input.dragging = false;
 			if (input.gestureEnd) {
 				input.gestureEnd();
 			}

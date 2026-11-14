@@ -423,6 +423,23 @@ What changes is what the player can see and read.
   current-altitude escape speeds in the HUD; flag an unbound state only when
   the rocket is above the atmosphere ceiling and its speed reaches
   `v_escape(r)`. There is no escape event, no new force and no mission result.
+- **The ground is a sphere, and its interior is banded.** The ground belongs to
+  the body whose centre the camera's pivot is nearest (`sky.groundBody`), so a
+  drag or a hand-over travels the ground — curve, cutaway and colour — from one
+  body to the other instead of cutting between them. Its surface is the sphere of
+  radius `camera.pivotRadius` read from that pivot, charted per column by the same
+  forward-ray exit the lenses use (`sky.enclosingY`): exactly the flat ground line
+  in every steady state, bending into a horizon while a gesture walks the pivot
+  out toward a surface. Below it, `constants.render.cutawayBands` are concentric
+  spheres at fractions of that radius, painted shallowest first in the body's own
+  shade at a rising alpha. Because the ladder is a log of distance, a fraction
+  *is* a depth, so the bands spread downward on screen and read as crust, mantle
+  and core with no geology modelled anywhere. A band sphere the pivot is outside
+  has no chartable surface — a ray from outside never exits it — so the count
+  solves from the shallowest inward and stops at the first miss
+  (`render.curves.bands`), and when the pivot is outside the ground sphere itself
+  there is no curve at all: the ground is the flat line the solved curve tends to
+  as the pivot reaches the surface, so the two regimes meet without a step.
 - **Atmosphere ceiling.** Define space as the altitude where density falls to
   `constants.sky.atmosphereDensityFraction` of sea-level density: `H *
   ln(1/fraction)`, zero on an airless world. Draw that ceiling as a line, a

@@ -98,7 +98,8 @@
 			}
 			finalMass = mass - stage.fuelMass;
 			if (stage.fuelMass > 0 && finalMass > 0) {
-				deltaV += settings.standardGravity * settings.ispVacuum * Math.log(mass / finalMass);
+				deltaV += settings.standardGravity * settings.ispVacuum * Math.log(mass / finalMass) *
+					R.parts.performanceFactor();
 			}
 			mass = finalMass - stage.dryMass;
 			if (mass <= 0) {

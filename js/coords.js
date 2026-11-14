@@ -3,36 +3,40 @@
 
 	var R = root.R || (root.R = {});
 	var coords = R.coords || (R.coords = {});
+	var TWO_PI = Math.PI * 2;
+	var plane = { x: 0, y: 0 };
 
-	// The chart is the log-polar plane seen from one pivot body.
+	// The chart is ONE log-polar map of the system plane, read from a pole.
 	//
-	// A world state (wx, wy) sits in the plane at `angle = wx / ref` and
-	// `radius = ref + wy`, measured from the pivot body's centre, where `ref`
-	// is that body's radius. The chart then uses ONE scale `s` for both axes:
+	//     angle    a = atan2(px − poleX, py − poleY)
+	//     distance d = |p − pole|
+	//     depth    u = d ≥ r0 ? ladder(d − r0) : −ln(r0 / d)
 	//
-	//     x = ox + s · atan2(dx, dy)
-	//     y = oy − s · ladder(d − ref)                (d ≥ ref, above)
-	//     y = oy + s · log(ref / d)                   (d < ref, below)
+	//     x = ox + angularScale · a
+	//     y = oy − scale · u          with  oy = originY + scale · u(target)
 	//
-	// `ladder` is the altitude ladder below: a log on the planet's knee, with a
-	// gentler slope above the switch altitude so the top layers share the chart
-	// instead of stretching it. Above the switch a distant body sits low over
-	// the surface while the atmosphere keeps full resolution.
+	// `r0` (`camera.ladderRef`) is the distance from the pole where the ladder
+	// starts: the pivot body's radius while the pole is its centre, so the
+	// ladder reads as altitude above that surface, and zero once the pole stands
+	// on a surface or floats in free space. `target` (`camera.targetDistance`)
+	// is the camera target's own distance from the pole, and it is what the
+	// origin line holds: the pivot's surface while the ground is the target, the
+	// ship's own distance once it is above the air. That single substitution is
+	// the whole "the ship becomes the centre of the scale" behaviour — the ship
+	// stays on its line and the ground sinks below it by exactly the climb.
 	//
-	// With the pivot on the active world the polar form reduces exactly to the
-	// deck's closed form: `oy = groundY` puts the surface on the ground line,
-	// atan2 cancels, and the ladder is read straight off the altimeter,
+	// Bodies, orbits, trails, pads, the atmosphere and the cutaway are all
+	// placed by those three lines, so nothing is a sprite in a second
+	// projection and a pick can only agree with a drawing.
 	//
-	//     y = groundY − usable · ladder(wy) / range
-	//
-	// with `range = ladder(chartedExtent)`. The deck writes that in closed form
-	// (X as arc length, Y as the ladder scaled to the charted extent) so the
-	// common case costs no trigonometry; both spellings agree on every
-	// altitude, and the bodies are charted by the same curve the ship flies on.
+	// The ladder is a log on a knee with a gentler slope beyond a switch
+	// altitude. The knee is what spends the chart's height: a metre-scale knee
+	// gives the air column most of the deck and compresses everything above it,
+	// so distant bodies sit low over the horizon instead of stacking at the top
+	// edge; a body-radius knee spreads the catalog by distance ratio instead.
+	// Below the ladder's start the depth is a single log, which keeps a cutaway
+	// shallow and makes the surface the origin in both directions.
 
-	// One log ladder: `knee` is the altitude where it stops being close to
-	// linear, `q0` the log altitude of the switch, `far` the slope beyond it.
-	// `q0` of 0 means a plain log with no far-field compression.
 	coords.ladderOf = function(height, knee, q0, far) {
 		var q = Math.log1p(Math.max(0, height) / Math.max(1e-3, knee));
 
@@ -50,69 +54,104 @@
 		return coords.ladderOf(height, camera.logScale, camera.ladderQ0, camera.ladderFar);
 	};
 
-	coords.worldToScreen = function(wx, wy, camera, out) {
-		var planeX;
-		var planeY;
-		var angle;
-		var distance;
-		var altitude;
+	// The same law against an arbitrary ladder, so the fit can be solved for a
+	// pole and a knee the chart is travelling to rather than only the one it is
+	// drawing with.
+	coords.depthWith = function(distance, ladderRef, knee, q0, far) {
+		var delta = distance - ladderRef;
 
-		if (camera.flat) {
-			out.x = (wx - camera.leftWx) * camera.pixelsPerMeterX;
-			altitude = R.util.clamp(wy, 0, camera.ceiling);
-			// Clamped again after the division so the surface lands exactly on
-			// the ground line and the charted extent exactly on the top edge.
-			out.y = camera.groundY - camera.usableHeight * R.util.clamp(
-				coords.ladder(altitude, camera) / camera.altitudeLogRange, 0, 1);
-			return out;
+		if (delta >= 0) {
+			return coords.ladderOf(delta, knee, q0, far);
 		}
-		planeX = (camera.worldRadius + Math.max(0, wy)) * Math.sin(wx / camera.worldRadius) - camera.pivotX;
-		planeY = (camera.worldRadius + Math.max(0, wy)) * Math.cos(wx / camera.worldRadius) - camera.pivotY;
-		angle = Math.atan2(planeX, planeY);
-		distance = Math.max(1e-9, Math.sqrt(planeX * planeX + planeY * planeY));
-		out.x = camera.ox + camera.scalePx * angle;
-		out.y = distance >= camera.pivotRadius ?
-			camera.oy - camera.scalePx * coords.ladderOf(distance - camera.pivotRadius,
-				camera.logScale, camera.ladderQ0, camera.ladderFar) :
-			camera.oy + camera.scalePx * Math.log(camera.pivotRadius / distance);
+		if (ladderRef <= 0) {
+			return 0;
+		}
+		return -Math.log(ladderRef / Math.max(1e-9, distance));
+	};
+
+	coords.distanceWith = function(depth, ladderRef, knee, q0, far) {
+		if (depth >= 0) {
+			return ladderRef + coords.unladder(depth, knee, q0, far);
+		}
+		return ladderRef * Math.exp(R.util.clamp(depth, -640, 0));
+	};
+
+	coords.depthOf = function(distance, camera) {
+		return coords.depthWith(distance, camera.ladderRef,
+			camera.logScale, camera.ladderQ0, camera.ladderFar);
+	};
+
+	coords.distanceAt = function(depth, camera) {
+		return coords.distanceWith(depth, camera.ladderRef,
+			camera.logScale, camera.ladderQ0, camera.ladderFar);
+	};
+
+	// A world state (wx along the surface, wy above it) is a plane point at the
+	// active world's radius. The catalog lives in the same frame, angle 0 due
+	// north of longitude zero, so one plane holds the ship and every body.
+	coords.planeOfWorld = function(wx, wy, worldRadius, out) {
+		var radius = Math.max(1e-6, worldRadius + Math.max(0, wy || 0));
+		var angle = (wx || 0) / worldRadius;
+
+		out.x = radius * Math.sin(angle);
+		out.y = radius * Math.cos(angle);
 		return out;
+	};
+
+	coords.worldOfPlane = function(px, py, worldRadius, out) {
+		out.x = Math.atan2(px, py) * worldRadius;
+		out.y = Math.sqrt(px * px + py * py) - worldRadius;
+		return out;
+	};
+
+	coords.planeToScreen = function(px, py, camera, out) {
+		var dx = px - camera.poleX;
+		var dy = py - camera.poleY;
+
+		out.x = camera.ox + camera.angularScale * Math.atan2(dx, dy);
+		out.y = camera.oy - camera.scale * coords.depthOf(Math.sqrt(dx * dx + dy * dy), camera);
+		return out;
+	};
+
+	coords.screenToPlane = function(sx, sy, camera, out) {
+		var angle = (sx - camera.ox) / Math.max(1e-9, camera.angularScale);
+		var distance = coords.distanceAt((camera.oy - sy) / Math.max(1e-9, camera.scale), camera);
+
+		out.x = camera.poleX + distance * Math.sin(angle);
+		out.y = camera.poleY + distance * Math.cos(angle);
+		return out;
+	};
+
+	coords.worldToScreen = function(wx, wy, camera, out) {
+		coords.planeOfWorld(wx, wy, camera.worldRadius, plane);
+		return coords.planeToScreen(plane.x, plane.y, camera, out);
 	};
 
 	coords.screenToWorld = function(sx, sy, camera, out) {
-		var angle;
-		var distance;
-		var planeX;
-		var planeY;
-		var u;
-
-		if (camera.flat) {
-			out.x = camera.leftWx + sx / camera.pixelsPerMeterX;
-			u = (camera.groundY - sy) * camera.altitudeLogRange / Math.max(1e-9, camera.usableHeight);
-			out.y = R.util.clamp(coords.unladder(R.util.clamp(u, 0, camera.altitudeLogRange + 1),
-				camera.logScale, camera.ladderQ0, camera.ladderFar), 0, camera.ceiling);
-			return out;
-		}
-		// Chart -> plane point relative to the pivot, then back to a world
-		// radius from the world's centre. This is the exact inverse above.
-		angle = (sx - camera.ox) / camera.scalePx;
-		u = (camera.oy - sy) / camera.scalePx;
-		if (u >= 0) {
-			distance = camera.pivotRadius + coords.unladder(Math.min(u, 640),
-				camera.logScale, camera.ladderQ0, camera.ladderFar);
-		} else {
-			distance = camera.pivotRadius * Math.exp(u);
-		}
-		planeX = camera.pivotX + distance * Math.sin(angle);
-		planeY = camera.pivotY + distance * Math.cos(angle);
-		out.x = Math.atan2(planeX, planeY) * camera.worldRadius;
-		out.y = R.util.clamp(Math.sqrt(planeX * planeX + planeY * planeY) - camera.worldRadius,
-			0, camera.ceiling);
-		return out;
+		coords.screenToPlane(sx, sy, camera, plane);
+		return coords.worldOfPlane(plane.x, plane.y, camera.worldRadius, out);
 	};
 
-	// Wrap a longitude into the viewport starting at leftWx.
-	coords.nearestPeriodicX = function(wx, leftWx, circumference) {
-		return leftWx + R.util.mod(wx - leftWx, circumference);
+	// The chart is a cylinder: X is an angle, so everything repeats every
+	// `period` pixels and a curve is drawn in every lap that touches the
+	// viewport. This puts one screen x in the lap nearest `refX` — a polyline
+	// passes its previous point, a body passes the anchor, and the seam becomes
+	// an exact period translate instead of a jump across the screen.
+	coords.wrapScreenX = function(sx, refX, period) {
+		if (!(period > 0)) {
+			return sx;
+		}
+		return sx - period * Math.round((sx - refX) / period);
+	};
+
+	// Laps either side of one x that cover `width`, so a draw loop covers the
+	// wrap without guessing a copy count.
+	coords.lapSpan = function(period, width) {
+		return period > 0 ? Math.ceil(width * 0.5 / period) + 1 : 0;
+	};
+
+	coords.periodOf = function(angularScale) {
+		return TWO_PI * Math.max(1e-9, angularScale);
 	};
 
 	if (typeof module !== 'undefined' && module.exports) {

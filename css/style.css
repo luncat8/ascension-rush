@@ -363,6 +363,16 @@ input[type="range"] {
 	accent-color: #64d5c2;
 }
 
+/* Test mode rates a build far past its catalog numbers, so the switch says so
+   in a different colour while it is on. */
+.builder-toggle.test-mode-on {
+	color: #ffd479;
+}
+
+.builder-toggle.test-mode-on input {
+	accent-color: #ffd479;
+}
+
 .autopilot-profile {
 	margin: 8px 0 0;
 }

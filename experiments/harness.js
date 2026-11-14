@@ -22,6 +22,7 @@ require('../js/flight-log.js');
 require('../js/mission.js');
 require('../js/aerodynamics.js');
 require('../js/physics.js');
+require('../js/sky.js');
 require('../js/trajectory.js');
 require('../js/autopilot.js');
 require('../js/operations.js');
