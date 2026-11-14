@@ -675,12 +675,67 @@ aerodynamics helpers instead.
   whose last stage cannot land it; 0.3.4 leaves those to fail in flight, and
   0.4's builder rework is the natural place to name them before launch.
 
-## Next Development: View Scale Control
+## View scale control
 
-Add a view scale control in the header/chart UI to switch between projection and scale modes:
+A selector in the top bar (`view`, key `V`) picks how the plane is put on
+screen. The modes are a table, `constants.view.modes`; `sky.setMode(id)` is the
+only switch and `sky.mode` the only state.
 
-1. **Real scale (unprojected):** True-to-scale rendering without special projections.
-2. **Logarithmic surface-centered scale (experimental):** Same as real scale, but using a logarithmic radial/distance scale centered on the nearest surface point.
-3. **Object-relative transformed scale:** Transformed scale relative to the selected object (rocket for now), with the surface of the dominant gravity-influence body unwrapped to a line.
-4. **Gravity-body-relative transformed scale:** Transformed scale relative to the dominant gravity-influence body (the body the rocket orbits or whose gravity influence exceeds other bodies), with its surface unwrapped to a line. This is close to the current mode, which currently has a body-to-star transformation bug, mostly shows space relative to the body surface, and has issues switching to other bodies.
+| id | map | read from | ground |
+| --- | --- | --- | --- |
+| `real` | linear, one scale, no wrap | the hull, at the centre | the world as a circle |
+| `real-log` (experimental) | bearings kept, distance `ln(1 + d / knee)` | the surface point nearest the hull | a circle through the pole, curling away below it |
+| `ship` (default) | log-polar chart | the hull's own ground point once above the air | unwrapped to a line on the deck, a horizon in flight |
+| `body` | log-polar chart | the centre of the body whose influence the hull is in | always unwrapped to the flat ground line, one circumference per viewport |
 
+**Flat views (`real`, `real-log`).** `coords.flatToScreen / screenToFlat` are
+the whole map: a rotation that puts the active world's local up at the hull on
+top of the screen (so heading, aim and the velocity vector read as they do on
+the chart), one scale, and for the log variant a radial compression about the
+pole. `camera.flat` routes `planeToScreen / screenToPlane` to them and sets
+`camera.period = 0`, so every polyline, pick and readout works unchanged and
+nothing wraps. `camera.setFlat` takes the pose; there is no hand-over to blend,
+so a switch to or from a flat view is a cut that drops any seat and resets the
+wheel.
+
+- Real scale fits itself: the nearest ground stays `flat.groundDrop` of the
+  viewport below the hull, never closer than `flat.minAltitude` of climb would
+  ask, eased geometrically. The wheel multiplies that fit across
+  `flat.zoomMin … zoomMax` — one hull to the whole system — and the zoom itself
+  eases geometrically.
+- The log view fits the farthest charted surface inside the disc above the
+  pole with the same damped fit the chart uses. When another body's surface
+  becomes the nearest, the pole travels there over `flat.swapSeconds`.
+- A body is its own circle through the map (`sky.outline` returns a ring), the
+  body underfoot included: there is no ground curve, no cutaway and no lens.
+  The ring and the orbits are sampled geometrically away from the point
+  nearest the pole, so a horizon filling the screen is as smooth as a far disc.
+  The night side is the half turned from the star. The air is a ring too.
+- Pads and the coast marker are drawn in their surface's own frame
+  (`enterSurfaceFrame`), and dropped when the world is a few pixels across.
+- The ruler is a decade bar in real scale and decade rings about the pole in
+  the log view.
+- No drag and no click-seat: a flat view has no pole to walk.
+
+**Chart views (`ship`, `body`).** One map; they differ only in the goals
+`solveTarget` eases toward, so switching between them is a morph. `body` keeps
+`fly` and `orbit` at zero on the world: the pole stays at the centre, the
+target stays the surface, and the hull is a marker above a flat ground line.
+Which body that is follows the hull: a catalog body inside its
+`approachRadii / departRadii` reach (as in `ship`), otherwise the world out to
+`worldDepartRadii`, and the star beyond — handed back inside
+`worldApproachRadii`. Each change is the ordinary pivot hand-over. A seat the
+player clicked is never taken away.
+
+"Influence" is geometric reach, not force: only the active world gravitates.
+When the 0.3.9 experiment gives bodies mass, `sky.approachIndex` is the one
+place to swap reach for a sphere-of-influence test.
+
+Validation: `experiments/view-mode-test.js` (maps, round trips, fits, pole
+travel, star hand-over and return, mode switches) and the flat states in
+`experiments/render-smoke-test.js`.
+
+Open: drag-pan and focus-on-body in the flat views; a blended cut between flat
+and chart; `real-log` squeezes far bodies into slivers, which is the map being
+honest but may want a minimum-size disc; the `body` view seated on a catalog
+body repeats its surface many laps across the viewport.

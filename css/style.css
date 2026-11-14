@@ -1132,6 +1132,24 @@ input[type="range"] {
 	font-size: 10px;
 }
 
+.view-control {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding-left: 10px;
+	border-left: 1px solid rgba(139, 179, 209, 0.22);
+	color: #9fb4c4;
+}
+
+.view-control select {
+	padding: 2px 4px;
+	border: 1px solid rgba(139, 179, 209, 0.3);
+	border-radius: 4px;
+	background: #0b1828;
+	color: #e7eff6;
+	font: inherit;
+}
+
 .time-scale-value {
 	min-width: 34px;
 	text-align: center;

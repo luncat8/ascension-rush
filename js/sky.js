@@ -8,6 +8,7 @@
 	var bodies = settings.bodies;
 	var TWO_PI = Math.PI * 2;
 	var SAMPLES = settings.outlineSamples;
+	var RING = viewSettings.flat.ringSamples;
 
 	// The chart stands on exactly one body — its **pivot** — and everything else
 	// in the catalog is a body of the same plane, drawn as the lens its sphere
@@ -92,7 +93,16 @@
 		shade: 1,
 		xs: new Float64Array(SAMPLES + 1),
 		nearYs: new Float64Array(SAMPLES + 1),
-		farYs: new Float64Array(SAMPLES + 1)
+		farYs: new Float64Array(SAMPLES + 1),
+		// A flat view draws a body as its own circle through the view's map: a
+		// closed ring of points, plus where the centre is and which way on
+		// screen points away from the star.
+		ring: false,
+		ringXs: new Float64Array(RING * 2 + 1),
+		ringYs: new Float64Array(RING * 2 + 1),
+		bodyX: 0,
+		bodyY: 0,
+		nightAngle: 0
 	};
 
 	// The damped fit: the shared scale widens at once when a body recedes, holds
@@ -181,6 +191,40 @@
 	};
 	var simTime = 0;
 
+	// The flat views' own state: the body whose surface is nearest the hull,
+	// the pole's travel when that changes, and the eased real-scale fit.
+	var flat = {
+		ready: false,
+		nearest: -2,
+		gap: 0,
+		swap: 1,
+		fromX: 0,
+		fromY: 0,
+		poleX: 0,
+		poleY: 0,
+		scale: 1
+	};
+	var flatPose = {
+		log: false, poleX: 0, poleY: 0, pivotX: 0, pivotY: 0, pivotRadius: 1,
+		targetX: 0, targetY: 0, up: 0, knee: 1, fitScale: 1, extent: 1,
+		centreX: 0, centreY: 0
+	};
+	var surface = { x: 0, y: 0 };
+
+	function modeOf(id) {
+		var modes = viewSettings.modes;
+		var i;
+
+		for (i = 0; i < modes.length; i += 1) {
+			if (modes[i].id === id) {
+				return modes[i];
+			}
+		}
+		return null;
+	}
+
+	sky.mode = modeOf(viewSettings.defaultMode);
+	sky.flat = flat;
 	sky.view = view;
 	sky.pivot = pivot;
 	sky.world = worldBody;
@@ -446,10 +490,39 @@
 		pivot.approach = false;
 		pivot.radius = 0;
 		fit.ready = false;
+		flat.ready = false;
 		hand.active = false;
 		R.camera.resetZoom();
 		R.camera.endTransition();
 		sky.ensure();
+	};
+
+	// Change the view scale mode. The two chart modes are one map and ease
+	// into each other; a flat view is a different map, so going to or from one
+	// is a cut, with the wheel back at that view's own fit.
+	sky.setMode = function(id) {
+		var next = modeOf(id);
+		var camera = R.camera;
+
+		if (!next || next === sky.mode) {
+			return false;
+		}
+		if (next.flat || sky.mode.flat) {
+			hand.active = false;
+			camera.endTransition();
+			sky.clearSeat();
+			fit.ready = false;
+			flat.ready = false;
+			camera.zoom = 1;
+			camera.zoomTarget = 1;
+		}
+		sky.mode = next;
+		if (next.flat) {
+			camera.setZoomBand(viewSettings.flat.zoomMin, viewSettings.flat.zoomMax);
+		} else {
+			camera.setZoomBand(viewSettings.zoomMin, viewSettings.zoomMax);
+		}
+		return true;
 	};
 
 	// A new run starts over a new world: drop any seat the previous one left.
@@ -475,7 +548,7 @@
 		var distance;
 
 		sky.ensure();
-		if (R.camera.transition.active || index === pivot.index) {
+		if (sky.mode.flat || R.camera.transition.active || index === pivot.index) {
 			return false;
 		}
 		sky.bodyCentre(index, plane);
@@ -511,7 +584,7 @@
 	// chart re-acquires the rocket instead of snapping to it.
 	sky.releaseToFollow = function(game, seconds) {
 		sky.ensure();
-		if (R.camera.transition.active) {
+		if (sky.mode.flat || R.camera.transition.active) {
 			return false;
 		}
 		sky.shipPlane(game, shipPlane);
@@ -574,8 +647,40 @@
 		if (best > -2) {
 			return best === pivot.index ? -2 : best;
 		}
+		if (sky.mode.bodyCentred) {
+			return influenceBeyondReach();
+		}
 		return pivot.approach && pivot.index >= 0 ? -1 : -2;
 	};
+
+	function starIndex() {
+		var i;
+
+		for (i = 0; i < bodies.length; i += 1) {
+			if (bodies[i].kind === 'star') {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	// The `body` view with the hull inside no catalog body's reach: the world
+	// keeps the chart out to its own reach and the star takes it beyond, with
+	// the same two-radius hysteresis the catalog uses. A seat the player
+	// pointed at is left alone, as everywhere else.
+	function influenceBeyondReach() {
+		var star = starIndex();
+		var held = pivot.index === star;
+		var reach = held ? settings.worldApproachRadii : settings.worldDepartRadii;
+		var beyond = Math.sqrt(shipPlane.x * shipPlane.x + shipPlane.y * shipPlane.y) >
+			reach * view.radius;
+		var want = beyond ? star : -1;
+
+		if (want === pivot.index || (pivot.index >= 0 && !pivot.approach)) {
+			return -2;
+		}
+		return want;
+	}
 
 	// Fly the chart onto the body the ship is standing over, when there is one.
 	function approachSeat(game) {
@@ -629,14 +734,20 @@
 		altitude = shipDistance - pivot.radius;
 		above = R.util.clamp((altitude - view.switchAltitude) /
 			Math.max(1, view.switchAltitude), 0, 1);
+		// The `body` view never leaves the centre: the whole surface stays the
+		// flat ground line and the hull is a marker above it.
+		if (sky.mode.bodyCentred) {
+			above = 0;
+		}
 		goal = pivot.index < 0 ? above : 1;
 		view.fly = ease(view.fly, goal, sky.step, goal > view.fly ?
 			viewSettings.followOpenTau : viewSettings.followCloseTau);
 		// The pole's own travel, which completes a body diameter out rather than
 		// at the ceiling: the far side of the sphere is charted at ladder(2R), so
 		// until the hull is above that the ground would be drawn over it.
-		goal = pivot.index < 0 ? R.util.clamp((altitude - view.switchAltitude) /
-			Math.max(1, 2 * pivot.radius - view.switchAltitude), 0, 1) : 0;
+		goal = pivot.index < 0 && !sky.mode.bodyCentred ?
+			R.util.clamp((altitude - view.switchAltitude) /
+				Math.max(1, 2 * pivot.radius - view.switchAltitude), 0, 1) : 0;
 		view.orbit = ease(view.orbit, goal, sky.step, goal > view.orbit ?
 			viewSettings.followOpenTau : viewSettings.followCloseTau);
 		poleDistance = pivot.radius * view.orbit;
@@ -763,6 +874,9 @@
 
 	sky.handBegin = function(sx, sy, game) {
 		sky.ensure();
+		if (sky.mode.flat) {
+			return false;
+		}
 		R.camera.unprojectPlane(sx, sy, plane);
 		sky.anchorGround(plane.x, plane.y);
 		R.camera.endTransition();
@@ -863,6 +977,100 @@
 		pose.holdSy = hand.pointerY;
 	};
 
+	// ------------------------------------------------------------- flat views
+
+	// The body whose surface is nearest a plane point, and that surface point.
+	function nearestSurface(px, py) {
+		var best = -1;
+		var bestGap = Infinity;
+		var radius;
+		var dx;
+		var dy;
+		var d;
+		var i;
+
+		for (i = -1; i < bodies.length; i += 1) {
+			sky.bodyCentre(i, plane);
+			radius = sky.bodyRadius(sky.bodyOf(i));
+			dx = px - plane.x;
+			dy = py - plane.y;
+			d = Math.sqrt(dx * dx + dy * dy);
+			if (d - radius >= bestGap) {
+				continue;
+			}
+			bestGap = d - radius;
+			best = i;
+			surface.x = d > 1e-9 ? plane.x + dx / d * radius : plane.x;
+			surface.y = d > 1e-9 ? plane.y + dy / d * radius : plane.y + radius;
+		}
+		flat.gap = Math.max(0, bestGap);
+		return best;
+	}
+
+	// Real scale: the hull at the centre, the world's own up at the top, and a
+	// fit that keeps the nearest ground a fixed drop below the hull — the
+	// picture a camera hanging beside the rocket would take.
+	//
+	// The log variant reads the same picture from the nearest surface point:
+	// bearings from it are kept and only distance is compressed, so the
+	// ground curls away below the pole and the whole system fits above it.
+	// When another body becomes the nearest the pole travels to it rather
+	// than cutting.
+	function solveFlat(game) {
+		var camera = R.camera;
+		var options = viewSettings.flat;
+		var rocket = game && game.rocket;
+		var nearest;
+		var goal;
+		var k;
+
+		sky.shipPlane(game, shipPlane);
+		nearest = nearestSurface(shipPlane.x, shipPlane.y);
+		goal = camera.height * options.groundDrop / Math.max(options.minAltitude, flat.gap);
+		if (!flat.ready) {
+			flat.ready = true;
+			flat.nearest = nearest;
+			flat.swap = 1;
+			flat.scale = goal;
+		}
+		if (nearest !== flat.nearest) {
+			flat.nearest = nearest;
+			flat.swap = 0;
+			flat.fromX = flat.poleX;
+			flat.fromY = flat.poleY;
+		}
+		flat.swap = Math.min(1, flat.swap + sky.step / options.swapSeconds);
+		k = smoothstep(flat.swap);
+		flat.poleX = flat.fromX + (surface.x - flat.fromX) * k;
+		flat.poleY = flat.fromY + (surface.y - flat.fromY) * k;
+		flat.scale *= Math.pow(goal / flat.scale, 1 - Math.exp(-sky.step / options.fitTau));
+
+		flatPose.log = sky.mode.log;
+		flatPose.pivotX = pivot.x;
+		flatPose.pivotY = pivot.y;
+		flatPose.pivotRadius = pivot.radius;
+		flatPose.targetX = shipPlane.x;
+		flatPose.targetY = shipPlane.y;
+		flatPose.up = rocket ? (rocket.wx || 0) / camera.worldRadius : 0;
+		flatPose.knee = R.world.planet.logAltitudeScale;
+		flatPose.centreX = camera.width * options.centreX;
+		if (!sky.mode.log) {
+			flatPose.poleX = shipPlane.x;
+			flatPose.poleY = shipPlane.y;
+			flatPose.centreY = camera.height * options.shipY;
+			flatPose.fitScale = flat.scale;
+			flatPose.extent = camera.height / flat.scale;
+			return;
+		}
+		flatPose.poleX = flat.poleX;
+		flatPose.poleY = flat.poleY;
+		flatPose.centreY = camera.height * options.poleY;
+		flatPose.extent = maxExtentFrom(flat.poleX, flat.poleY, game);
+		fit.extent = flatPose.extent;
+		flatPose.fitScale = Math.min(flatPose.centreY - camera.topY(), camera.width * 0.5) /
+			dampedRange(Math.log1p(flatPose.extent / flatPose.knee), sky.step);
+	}
+
 	sky.step = 0;
 
 	sky.update = function(game, dt) {
@@ -886,7 +1094,9 @@
 		}
 		view.morph = Math.min(1, view.morph + step / viewSettings.transformSeconds);
 		blend = smoothstep(view.morph);
-		approachSeat(game);
+		if (!sky.mode.flat) {
+			approachSeat(game);
+		}
 		placePivot();
 
 		// A landed chart compresses the top so distant bodies sit low over the
@@ -915,6 +1125,11 @@
 		// the pose with is the same one the zoom just moved, so a wheel notch
 		// cannot move the ground and the lenses a frame apart.
 		R.camera.easeZoom(step);
+		if (sky.mode.flat) {
+			solveFlat(game);
+			R.camera.setFlat(flatPose);
+			return view;
+		}
 		R.camera.stepTransition(step);
 		if (hand.active) {
 			solveHand(game);
@@ -927,6 +1142,78 @@
 			pivot.reseating = false;
 		}
 		return view;
+	};
+
+	// A circle of the plane through a flat view's map, as `half * 2 + 1` screen
+	// points. The samples start at the point of the circle nearest the pole and
+	// step away from it geometrically on both sides, sized by how close that
+	// point is, so the horizon under a landed hull is as smooth as a moon a
+	// thousand radii out — in either flat map, since both are finest at the
+	// pole.
+	function sampleCircle(cx, cy, rho, half, xs, ys) {
+		var camera = R.camera;
+		var dx = camera.poleX - cx;
+		var dy = camera.poleY - cy;
+		var toPole = Math.atan2(dx, dy);
+		var pixel = (camera.flatLog ? camera.logScale : 1) / camera.scale;
+		var spread = R.util.clamp(Math.log(Math.PI * rho /
+			Math.max(pixel, Math.abs(Math.sqrt(dx * dx + dy * dy) - rho))), 0.01, 30);
+		var full = Math.expm1(spread);
+		var angle;
+		var j;
+
+		for (j = -half; j <= half; j += 1) {
+			angle = toPole + (j < 0 ? -Math.PI : Math.PI) *
+				Math.expm1(spread * Math.abs(j) / half) / full;
+			R.coords.flatToScreen(cx + rho * Math.sin(angle), cy + rho * Math.cos(angle), camera, plane);
+			xs[j + half] = plane.x;
+			ys[j + half] = plane.y;
+		}
+	}
+
+	function ringOf(cx, cy, rho, game) {
+		var camera = R.camera;
+		var dx = camera.poleX - cx;
+		var dy = camera.poleY - cy;
+		var minX = Infinity;
+		var maxX = -Infinity;
+		var minY = Infinity;
+		var maxY = -Infinity;
+		var away;
+		var j;
+
+		sampleCircle(cx, cy, rho, RING, shape.ringXs, shape.ringYs);
+		for (j = 0; j <= RING * 2; j += 1) {
+			minX = Math.min(minX, shape.ringXs[j]);
+			maxX = Math.max(maxX, shape.ringXs[j]);
+			minY = Math.min(minY, shape.ringYs[j]);
+			maxY = Math.max(maxY, shape.ringYs[j]);
+		}
+		shape.ring = true;
+		shape.visible = true;
+		shape.distance = Math.sqrt(dx * dx + dy * dy);
+		shape.halfWidth = (maxX - minX) * 0.5;
+		shape.centerX = (maxX + minX) * 0.5;
+		shape.centerY = (maxY + minY) * 0.5;
+		shape.nearY = maxY;
+		shape.farY = minY;
+		R.coords.flatToScreen(cx, cy, camera, plane);
+		shape.bodyX = plane.x;
+		shape.bodyY = plane.y;
+		if (bodies.length > 0) {
+			sky.planePosition(bodies[0], simTimeOf(game), starPlane);
+			away = Math.atan2(cx - starPlane.x, cy - starPlane.y);
+			R.coords.flatToScreen(cx + rho * Math.sin(away), cy + rho * Math.cos(away), camera, plane);
+			shape.nightAngle = Math.atan2(plane.y - shape.bodyY, plane.x - shape.bodyX);
+		}
+		return shape;
+	}
+
+	// The air shell of the active world as a flat view's ring.
+	sky.airRing = function(game) {
+		shape.alpha = 1;
+		shape.index = -1;
+		return ringOf(0, 0, view.radius + view.atmosphereTop, game);
 	};
 
 	// A body's lens in screen space. With `alpha` its angular radius from the
@@ -957,11 +1244,15 @@
 		shape.visible = false;
 		shape.alpha = 1;
 		shape.index = index;
+		shape.ring = false;
 		if (index < 0) {
 			plane.x = 0;
 			plane.y = 0;
 		} else {
 			sky.planePosition(body, simTimeOf(game), plane);
+		}
+		if (camera.flat) {
+			return ringOf(plane.x, plane.y, rho, game);
 		}
 		dx = plane.x - camera.poleX;
 		dy = plane.y - camera.poleY;
@@ -1088,13 +1379,18 @@
 		// The body the chart stands on does not draw its own orbit: its centre is
 		// the pole, and the image of a circle through the pole whips a whole
 		// period along the ground line.
-		singular = Math.max(1, camera.pivotRadius) * settings.orbitPoleGuard;
+		singular = camera.flat ? 0 : Math.max(1, camera.pivotRadius) * settings.orbitPoleGuard;
 		if (Math.abs(distance - Math.sqrt(camera.poleX * camera.poleX +
 			camera.poleY * camera.poleY)) < singular) {
 			return orbit;
 		}
 		orbit.valid = true;
 		orbit.radius = distance;
+		if (camera.flat) {
+			sampleCircle(0, 0, distance, ORBIT_N >> 1, orbit.xs, orbit.ys);
+			orbit.count = ORBIT_N + 1;
+			return orbit;
+		}
 		for (i = 0; i <= ORBIT_N; i += 1) {
 			angle = TWO_PI * i / ORBIT_N;
 			px = distance * Math.sin(angle);
@@ -1107,8 +1403,9 @@
 				orbit.ys[i] = NaN;
 				continue;
 			}
-			orbit.xs[i] = camera.ox + camera.angularScale * Math.atan2(dx, dy);
-			orbit.ys[i] = sky.depthY(d);
+			R.coords.planeToScreen(px, py, camera, plane);
+			orbit.xs[i] = plane.x;
+			orbit.ys[i] = plane.y;
 			orbit.count += 1;
 		}
 		return orbit;

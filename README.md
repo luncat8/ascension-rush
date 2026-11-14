@@ -145,6 +145,17 @@ geometry, so a circular coast at a body's radius keeps pace with it. Delivery
 autopilot stays below circular speed; manual flight can orbit or escape.
 Multi-body gravity, encounters and landing on catalog bodies remain future work.
 
+The top bar's **view** selector (key `V`) changes how the plane is put on
+screen. *Real scale* is the plane as it is — the hull at the centre, one scale,
+the world a circle — fitted to keep the ground in view and zoomed by the wheel
+from one hull to the whole system. *Real · log* (experimental) keeps every
+bearing from the surface point nearest the hull and compresses only distance,
+so the whole system fits around a ground that curls away below. *Chart · ship*
+is the default log-polar chart read from the hull. *Chart · body* reads the
+same chart from the centre of the body whose reach the hull is in, so that
+body's whole surface stays the flat ground line; far enough out it hands the
+chart to the star. `experiments/view-mode-test.js` pins all four.
+
 The deck header carries a **Test mode** switch. It rates every build
 `constants.rocket.testMultiplier` (20) times stronger than the catalog does —
 thrust, delta-v, and the acceleration ceiling and airframe ratings that would
@@ -160,13 +171,14 @@ documents and in worklog names.
 
 ## Plans (subject numbers inside, short descriptive filenames)
 Active:
-- [`flight-sky-plan.md`](./flight-sky-plan.md) — Aerodynamics, safer guidance, flight diagnostics (0.3.1–0.3.4), the inter-planet sky (0.3.7) and the log-polar system chart with its pivot hand-over (0.3.8).
+- [`flight-sky-plan.md`](./flight-sky-plan.md) — Aerodynamics, safer guidance, flight diagnostics (0.3.1–0.3.4), the inter-planet sky (0.3.7) and the log-polar system chart with its pivot hand-over (0.3.8) and the view scale control.
 - [`campaign-plan.md`](./campaign-plan.md) — Milestones & campaign arc: company milestones, rewards, world unlocks and a dominant-courier end condition.
 - [`deck-hud-plan.md`](./deck-hud-plan.md) — Self-explained deck & HUD.
 - [`damage-rivals-plan.md`](./damage-rivals-plan.md) — Damage & failures (0.5.1) and competitor pressure (0.5.2), both shipped.
 - [`market-parts-plan.md`](./market-parts-plan.md) — Economy balance, parts catalog with service/repair, market prices & contract board.
 
 Increments of the active plans, recorded in `archive/` as they land:
+- [`archive/view-scale-worklog.md`](./archive/view-scale-worklog.md) — View scale control: real scale, real log, chart from the ship, chart from the body.
 - [`archive/0.6.2-worklog.md`](./archive/0.6.2-worklog.md) — Campaign record, four world ladders, gated world menu, settlement card, measured reference runs (0.6.2).
 - [`archive/0.6.1-worklog.md`](./archive/0.6.1-worklog.md) — Company milestones on Verdant and the Gentle-profile lock (0.6.1).
 - [`archive/0.5.2-worklog.md`](./archive/0.5.2-worklog.md) — Rival bidding, isolated autopilot flights, market pressure and scoreboard (0.5.2).

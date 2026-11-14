@@ -67,6 +67,15 @@
 	// instead of stretched. sky.js eases it as the target leaves the ground, so
 	// the two regimes are one continuous map rather than a switch.
 	camera.fly = 0;
+	// The flat views: the plane drawn as it is around `pole`, which sits at
+	// `ox / oy`, with the unit vector (upSin, upCos) at the top of the screen.
+	// `scale` is pixels per metre, or per log unit of `logScale` with `flatLog`.
+	camera.flat = false;
+	camera.flatLog = false;
+	camera.upSin = 0;
+	camera.upCos = 1;
+	camera.zoomMin = R.constants.view.zoomMin;
+	camera.zoomMax = R.constants.view.zoomMax;
 
 	function newPose() {
 		return {
@@ -142,6 +151,7 @@
 		var holdAngle;
 		var holdDepth;
 
+		camera.flat = false;
 		camera.poleX = next.poleX;
 		camera.poleY = next.poleY;
 		camera.pivotX = next.pivotX;
@@ -271,6 +281,42 @@
 		camera.syncLines();
 	};
 
+	// A flat view has no pose to blend: sky.js eases what moves in it, so the
+	// camera only takes the numbers. The ground line stays where the deck has
+	// it, which is what the HUD panels stand on.
+	camera.setFlat = function(next) {
+		camera.endTransition();
+		camera.flat = true;
+		camera.flatLog = next.log;
+		camera.poleX = next.poleX;
+		camera.poleY = next.poleY;
+		camera.pivotX = next.pivotX;
+		camera.pivotY = next.pivotY;
+		camera.pivotRadius = Math.max(1e-6, next.pivotRadius);
+		camera.targetX = next.targetX;
+		camera.targetY = next.targetY;
+		camera.upSin = Math.sin(next.up);
+		camera.upCos = Math.cos(next.up);
+		camera.logScale = Math.max(1e-3, next.knee);
+		camera.fitScale = Math.max(1e-12, next.fitScale);
+		camera.scale = camera.fitScale * camera.zoom;
+		camera.extent = next.extent;
+		camera.fly = 1;
+		camera.period = 0;
+		camera.ox = camera.baseOx = next.centreX;
+		camera.oy = camera.baseOy = next.centreY;
+		camera.groundY = camera.baseGroundY;
+		camera.originY = next.centreY;
+	};
+
+	// The wheel's band belongs to the view: a flat view has to reach from one
+	// hull to the whole system, a chart only trims its fit.
+	camera.setZoomBand = function(min, max) {
+		camera.zoomMin = min;
+		camera.zoomMax = max;
+		camera.zoomTarget = R.util.clamp(camera.zoomTarget, min, max);
+	};
+
 	// Start a hand-over from the pose on screen. `anchorX / anchorY` is the plane
 	// point that must not move; its screen place is read from the live pose, so
 	// the first frame of the transition reproduces the last frame before it.
@@ -367,9 +413,7 @@
 	// the camera target, which the origin line holds, so it never moves the
 	// ground line while the ground is the target.
 	camera.zoomBy = function(factor) {
-		var view = R.constants.view;
-
-		camera.zoomTarget = R.util.clamp(camera.zoomTarget * factor, view.zoomMin, view.zoomMax);
+		camera.zoomTarget = R.util.clamp(camera.zoomTarget * factor, camera.zoomMin, camera.zoomMax);
 	};
 
 	camera.easeZoom = function(dt) {
@@ -379,9 +423,11 @@
 			camera.zoom = target;
 			return;
 		}
+		// Geometric, so a notch is the same gesture at every zoom of a band
+		// six decades wide.
 		if (camera.zoom !== target) {
-			camera.zoom += (target - camera.zoom) *
-				(1 - Math.exp(-dt / R.constants.view.zoomTau));
+			camera.zoom *= Math.pow(target / camera.zoom,
+				1 - Math.exp(-dt / R.constants.view.zoomTau));
 		}
 	};
 

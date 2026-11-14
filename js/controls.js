@@ -41,6 +41,46 @@
 		updateTimeDisplay();
 	}
 
+	function viewSelect() {
+		return root.document && root.document.getElementById('view-mode');
+	}
+
+	// The one way the view scale mode changes, so the selector and the key
+	// cannot disagree.
+	controls.setViewMode = function(id) {
+		var select = viewSelect();
+
+		R.sky.setMode(id);
+		if (select) {
+			select.value = R.sky.mode.id;
+		}
+	};
+
+	function cycleViewMode() {
+		var modes = R.constants.view.modes;
+
+		controls.setViewMode(modes[(modes.indexOf(R.sky.mode) + 1) % modes.length].id);
+	}
+
+	function fillViewSelect(select) {
+		var modes = R.constants.view.modes;
+		var option;
+		var i;
+
+		for (i = 0; i < modes.length; i += 1) {
+			option = root.document.createElement('option');
+			option.value = modes[i].id;
+			option.textContent = modes[i].label;
+			select.appendChild(option);
+		}
+		select.value = R.sky.mode.id;
+		select.addEventListener('change', function() {
+			controls.setViewMode(select.value);
+			// Keys are ignored while a form control has the focus.
+			select.blur();
+		});
+	}
+
 	function onKeyDown(event) {
 		if (isFormTarget(event)) {
 			return;
@@ -59,6 +99,12 @@
 		}
 		if (event.code === 'BracketRight' || event.key === ']') {
 			adjustTimeScale(1);
+			return;
+		}
+		if (event.code === 'KeyV') {
+			if (!event.repeat) {
+				cycleViewMode();
+			}
 			return;
 		}
 		if (event.code === 'KeyA') {
@@ -91,6 +137,7 @@
 		var doc = root.document;
 		var slower = doc && doc.getElementById('time-slower');
 		var faster = doc && doc.getElementById('time-faster');
+		var select = viewSelect();
 
 		root.addEventListener('keydown', onKeyDown);
 		root.addEventListener('keyup', onKeyUp);
@@ -104,6 +151,9 @@
 			faster.addEventListener('click', function() {
 				adjustTimeScale(1);
 			});
+		}
+		if (select) {
+			fillViewSelect(select);
 		}
 		updateTimeDisplay();
 	};
