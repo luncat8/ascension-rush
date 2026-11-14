@@ -222,10 +222,7 @@
 
 		R.camera.project(state.wx, state.wy, headingScreen);
 		if (R.camera.directionLock) {
-			// A locked chart is rolled on screen, and its base line holds the object
-			// it follows rather than the hull. The pointer is read in the chart's own
-			// frame, so the aim is the same gesture whichever axis the camera holds
-			// upright — prograde in one mode, the rocket's nose in the other.
+			// Read the pointer in the same screen frame as the projected rocket.
 			R.camera.unrotateScreen(input.pointerX, input.pointerY, aimPoint);
 		} else {
 			aimPoint.x = input.pointerX;
@@ -236,7 +233,7 @@
 		if (dx * dx + dy * dy < 64) {
 			return;
 		}
-		desiredHeading = Math.atan2(dx, dy);
+		desiredHeading = Math.atan2(dx, dy) + (R.camera.directionLock ? R.camera.lockAngle : 0);
 		controls.applyHeading(state, desiredHeading, dt);
 	};
 

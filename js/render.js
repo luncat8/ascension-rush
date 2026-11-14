@@ -764,76 +764,6 @@
 		context.stroke();
 	}
 
-	// In a direction-lock view above the air the followed object is the rocket
-	// itself: the pole stands on the surface under the hull, the planet surface
-	// has sunk behind the base line and nothing is drawn there. The region
-	// behind the line is the rocket's own interior — a dark hull shell with a
-	// lighter shaft under the hull, ending at the bottom of the screen. It is
-	// the space-regime counterpart of the planet's underground cutaway below
-	// the surface line, so behind the base line there is never empty sky.
-	function drawRocketInterior(context) {
-		var camera = R.camera;
-		var ax = camera.screenOriginX;
-		var ay = camera.screenOriginY;
-		var width = Math.min(460, render.width * 0.5);
-		var shaft = width * 0.5;
-		var depth = render.height + 500;
-		// screenRotation = -directionAngle; the locked axis points screen-up,
-		// so screen-down (behind the line) and screen-right in screen space:
-		var downX = Math.sin(camera.screenRotation);
-		var downY = Math.cos(camera.screenRotation);
-		var rightX = Math.cos(camera.screenRotation);
-		var rightY = -Math.sin(camera.screenRotation);
-		var hw = width * 0.5;
-		var sh = shaft * 0.5;
-		var d;
-
-		context.save();
-		context.setTransform(1, 0, 0, 1, 0, 0);
-
-		// The hull shell: everything behind the base line, full width.
-		context.fillStyle = '#0b151d';
-		context.beginPath();
-		context.moveTo(ax - hw * rightX, ay - hw * rightY);
-		context.lineTo(ax + hw * rightX, ay + hw * rightY);
-		context.lineTo(ax + hw * rightX + depth * downX, ay + hw * rightY + depth * downY);
-		context.lineTo(ax - hw * rightX + depth * downX, ay - hw * rightY + depth * downY);
-		context.closePath();
-		context.fill();
-
-		// The visible interior shaft under the hull, a little lighter than the
-		// surrounding shell, centred on the rocket's screen-up axis.
-		context.fillStyle = '#152a3c';
-		context.beginPath();
-		context.moveTo(ax - sh * rightX, ay - sh * rightY);
-		context.lineTo(ax + sh * rightX, ay + sh * rightY);
-		context.lineTo(ax + sh * rightX + depth * downX, ay + sh * rightY + depth * downY);
-		context.lineTo(ax - sh * rightX + depth * downX, ay - sh * rightY + depth * downY);
-		context.closePath();
-		context.fill();
-
-		// Deck lines inside the shaft, across the screen-right axis, so the
-		// region reads as the inside of the craft rather than a flat block.
-		context.strokeStyle = 'rgba(100, 140, 160, 0.35)';
-		context.lineWidth = 1;
-		for (d = 60; d < depth; d += 90) {
-			context.beginPath();
-			context.moveTo(ax - sh * rightX + d * downX, ay - sh * rightY + d * downY);
-			context.lineTo(ax + sh * rightX + d * downX, ay + sh * rightY + d * downY);
-			context.stroke();
-		}
-
-		// The hull edge at the base line where the rocket meets the view.
-		context.strokeStyle = 'rgba(150, 205, 224, 0.55)';
-		context.lineWidth = 1.5;
-		context.beginPath();
-		context.moveTo(ax - hw * rightX, ay - hw * rightY);
-		context.lineTo(ax + hw * rightX, ay + hw * rightY);
-		context.stroke();
-
-		context.restore();
-	}
-
 	// The orbits of the catalog, charted by the same map as the lenses: a circle
 	// in the plane, not an ellipse on the screen. Each polyline is unwrapped
 	// sample by sample so the atan2 seam is a translate rather than a chord across
@@ -1725,6 +1655,7 @@
 		var vyDir;
 		var target = R.world.findPadById(game.targetPadId);
 		var pointer = render.scratch.pointer;
+		var displayHeading = rocket.heading - (R.camera.directionLock ? R.camera.lockAngle : 0);
 		var deltaX = target ? R.util.wrapDelta(target.wx - rocket.wx, R.world.planet.circumference) : 0;
 
 		// Aim tick ahead of the nose, and dashed line to cursor in manual flight.
@@ -1733,12 +1664,12 @@
 		context.lineWidth = 1.5;
 		context.setLineDash(dashAim);
 		context.beginPath();
-		context.moveTo(rx + Math.sin(rocket.heading) * 34, ry - Math.cos(rocket.heading) * 34);
+		context.moveTo(rx + Math.sin(displayHeading) * 34, ry - Math.cos(displayHeading) * 34);
 		if (!R.autopilot.enabled && R.input.pointerActive) {
 			R.camera.unrotateScreen(R.input.pointerX, R.input.pointerY, pointer);
 			context.lineTo(pointer.x, pointer.y);
 		} else {
-			context.lineTo(rx + Math.sin(rocket.heading) * 62, ry - Math.cos(rocket.heading) * 62);
+			context.lineTo(rx + Math.sin(displayHeading) * 62, ry - Math.cos(displayHeading) * 62);
 		}
 		context.stroke();
 		context.setLineDash(dashSolid);
@@ -1746,8 +1677,8 @@
 		// Prograde velocity vector so drift and sink direction are drawn directly.
 		if (speed > 2) {
 			vLen = R.util.clamp(speed * 0.25, 20, 66);
-			vxDir = rocket.vx / speed;
-			vyDir = -rocket.vy / speed;
+			vxDir = Math.sin(Math.atan2(rocket.vx, rocket.vy) - (R.camera.directionLock ? R.camera.lockAngle : 0));
+			vyDir = -Math.cos(Math.atan2(rocket.vx, rocket.vy) - (R.camera.directionLock ? R.camera.lockAngle : 0));
 			context.strokeStyle = 'rgba(100, 213, 194, 0.85)';
 			context.lineWidth = 1.8;
 			context.beginPath();
@@ -2011,9 +1942,6 @@
 		drawSkyBodies(context, game);
 	drawAltitudeScale(context);
 	drawGround(context);
-	if (R.camera.directionLock && !render.curves.radial) {
-		drawRocketInterior(context);
-	}
 	if (transformed) {
 		context.restore();
 	}
@@ -2057,9 +1985,6 @@
 		drawSkyBodies(context, game);
 	drawAltitudeScale(context);
 	drawGround(context);
-	if (R.camera.directionLock && !render.curves.radial) {
-		drawRocketInterior(context);
-	}
 	drawLegArc(context, game);
 		drawPads(context, game);
 		drawTrajectories(context);
@@ -2069,7 +1994,7 @@
 		if (game.phase === 'flying') {
 			drawFlightGuides(context, game);
 		}
-		R.rocket.draw(context, render.scratch.rocket.x, render.scratch.rocket.y, rocket.heading, flameThrottle);
+		R.rocket.draw(context, render.scratch.rocket.x, render.scratch.rocket.y, rocket.heading - (R.camera.directionLock ? R.camera.lockAngle : 0), flameThrottle);
 		drawExplosion(context, game);
 		if (transformed) {
 			context.restore();

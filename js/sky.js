@@ -702,37 +702,9 @@
 		sky.seatPivot(index, game, sky.mode.bodyCentred || index >= 0);
 	}
 
-	// The camera's target and the log pole, both on the ray from the pivot's
-	// centre to the ship:
-	//
-	//   on the ground   pole = the centre,               target = the surface
-	//   above the air   pole = the hull's ground point,  target = the hull
-	//
-	// The pole is what the ladder starts at and what every bearing is read from,
-	// so above the air the chart is read from the ship's own place: the hull
-	// holds the origin line, the ground sinks below it by exactly the climb, the
-	// body's surface curves away from the hull instead of lying flat under it,
-	// and a body is charted at its own bearing and distance from the hull rather
-	// than riding a level ring around the world.
-	//
-	// The pole stops on the surface instead of going out to the hull because the
-	// chart's height is distance from the pole: from a pole on the hull every
-	// bearing at the same range is at the same height, and the world it left
-	// would be drawn above it.
-	//
-	// A direction-lock view has no fixed ground. Its base line is whatever the
-	// chart is following — the surface under the hull while the rocket is over
-	// it, the hull's own place in space once it is above the air — so the same
-	// two poses serve it: the whole of the universe is in front of that line,
-	// and behind it there is only the planet's interior or the rocket's own.
-	//
-	// The ship's own depth is `ladder(altitude)` at every point of the travel —
-	// the pole and the ladder's start move together — so what the climb moves is
-	// the origin line, from the ground up to the hull, and nothing jumps.
-	//
-	// A seat is an explicit "look at this body": the chart stands on it, its
-	// surface is the flat ground and the ship is a marker above it, so the pole
-	// stays at that body's centre.
+	// Blend from a body-centred surface chart to a chart whose pole is just
+	// behind the rocket along the locked direction. The offset keeps the pole
+	// finite while putting every external bearing above the rocket's base line.
 	function solveTarget(game) {
 		var shipDistance;
 		var poleDistance;
@@ -795,9 +767,23 @@
 			pose.targetX = pivot.x;
 			pose.targetY = pivot.y + targetRadius;
 		}
+		if (directionLock && game && game.rocket) {
+			var rocket = game.rocket;
+			var angle = rocket.heading;
+			var speed = Math.hypot(rocket.vx || 0, rocket.vy || 0);
+			var longitude = rocket.wx / view.radius;
+			var base = Math.max(1, view.radius * 0.001);
+			if (directionLock === 'prograde' && speed > R.aerodynamics.speedEpsilon) {
+				angle = Math.atan2(rocket.vx, rocket.vy);
+			}
+			angle += longitude;
+			pose.poleX += (shipPlane.x - Math.sin(angle) * base - pose.poleX) * view.orbit;
+			pose.poleY += (shipPlane.y - Math.cos(angle) * base - pose.poleY) * view.orbit;
+			pose.ladderRef = (pivot.radius * (1 - view.orbit)) + base * view.orbit;
+		}
 		// The target's own depth holds the surface on the default line or whatever
 		// the lock is following on its own line near the bottom.
-		pose.targetDistance = Math.max(1e-9, targetRadius - poleDistance);
+		pose.targetDistance = Math.max(1e-9, Math.hypot(pose.targetX - pose.poleX, pose.targetY - pose.poleY));
 		pose.originLine = directionLock ? R.camera.height * viewSettings.directionLock.objectY :
 			(pivot.index < 0 ? R.camera.baseGroundY +
 				(R.camera.height * viewSettings.followHeight - R.camera.baseGroundY) * view.fly :
@@ -823,12 +809,8 @@
 		return shipDistance;
 	}
 
-	// Hold the chart's base line on one lower-centre anchor, then roll the
-	// rendered chart about it until either the rocket's velocity or its nose
-	// points screen-up. The anchor holds the camera target — the surface under
-	// the hull while the chart stands on a body, the hull itself in space — so
-	// the line is the followed object's, not always the planet's. The map stays
-	// the same log-polar projection; only its screen frame follows the axis.
+	// Anchor the followed point without rotating the unwrapped chart. The
+	// heading is applied to the rocket and controls, not to the landscape.
 	function lockDirection(game, axis) {
 		var camera = R.camera;
 		var rocket = game && game.rocket;
@@ -845,6 +827,11 @@
 			camera.clearDirectionLock();
 			return;
 		}
+		if (view.fly > 0.999) {
+			sky.shipPlane(game, shipPlane);
+			camera.targetX = shipPlane.x;
+			camera.targetY = shipPlane.y;
+		}
 		dx = camera.targetX - camera.poleX;
 		dy = camera.targetY - camera.poleY;
 		distance = Math.max(1e-9, Math.sqrt(dx * dx + dy * dy));
@@ -857,9 +844,15 @@
 			}
 		}
 		camera.directionLock = true;
-		camera.screenRotation = -directionAngle;
+		camera.screenRotation = 0;
+		camera.lockAngle = directionAngle;
 		camera.screenOriginX = anchorX;
 		camera.screenOriginY = anchorY;
+		// A lock must show at most one full turn: repeated laps would put a
+		// second copy of a rear or side body on the forward sightline.
+		camera.angularScale = Math.max(camera.angularScale, camera.width / (2 * Math.PI));
+		camera.stretch = camera.angularScale / camera.scale;
+		camera.period = 2 * Math.PI * camera.angularScale;
 		camera.baseOx = camera.ox = anchorX - camera.angularScale * positionAngle;
 		camera.baseOy = camera.oy = anchorY + camera.scale * camera.depth(distance);
 		camera.targetDistance = distance;

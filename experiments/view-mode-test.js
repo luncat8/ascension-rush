@@ -210,23 +210,19 @@ assert.ok(Math.abs(screen.y - camera.groundY) < 0.05 && Math.abs(other.y - camer
 camera.project(game.rocket.wx, game.rocket.wy, screen);
 assert.ok(Math.abs(screen.x - camera.screenOriginX) < 1e-6 && screen.y < camera.groundY,
 	'the rocket is charted in front of the base line, on the ray above its ground');
-assert.ok(Math.abs(camera.screenRotation + prograde) < 1e-12,
+assert.ok(Math.abs(camera.lockAngle - prograde) < 1e-12,
 	'the chart rolls against velocity, not attitude');
 R.sky.outline(3, game);
 camera.rotateScreen(R.sky.shape.centerX, R.sky.shape.centerY, screen);
 assert.equal(R.sky.pick(screen.x, screen.y, game), 3,
 	'body picking follows the rolled map');
-camera.rotateScreen(camera.screenOriginX + Math.sin(prograde) * 20,
-	camera.screenOriginY - Math.cos(prograde) * 20, screen);
-assert.ok(Math.abs(screen.x - camera.screenOriginX) < 1e-9 &&
-	screen.y < camera.screenOriginY, 'the prograde direction points straight up on screen');
 camera.rotateScreen(camera.screenOriginX + 43, camera.screenOriginY + 27, screen);
 camera.unrotateScreen(screen.x, screen.y, other);
 assert.ok(Math.hypot(other.x - camera.screenOriginX - 43,
 	other.y - camera.screenOriginY - 27) < 1e-9, 'pointer coordinates invert the view roll');
 game.phase = 'flying';
 R.input.pointerActive = true;
-pointerAngle = 0.2;
+pointerAngle = 0.2 - prograde;
 // The pointer is placed beside the drawn rocket, not beside the base anchor:
 // the anchor holds the object the lock follows, which is the surface while the
 // chart is on the ground.
@@ -240,29 +236,25 @@ assert.ok(Math.abs(R.util.wrapDelta(game.rocket.heading - beforeHeading, 2 * Mat
 	R.constants.rocket.turnRate * 0.1) < 1e-9,
 	'mouse aim is relative to the current screen-up axis');
 frames(1);
-assert.ok(Math.abs(camera.screenRotation + prograde) < 1e-12,
+assert.ok(Math.abs(camera.lockAngle - prograde) < 1e-12,
 	'the prograde camera remains locked to velocity as attitude changes');
 R.sky.setMode('nose');
 frames(1);
 assert.equal(R.sky.mode.id, 'nose', 'nose lock is a separate selectable mode');
-assert.ok(Math.abs(camera.screenRotation + game.rocket.heading) < 1e-12,
+assert.ok(Math.abs(camera.lockAngle - game.rocket.heading) < 1e-12,
 	'the nose mode tracks rocket attitude instead of velocity');
 heading = game.rocket.heading;
-camera.rotateScreen(camera.screenOriginX + Math.sin(heading) * 20,
-	camera.screenOriginY - Math.cos(heading) * 20, screen);
-assert.ok(Math.abs(screen.x - camera.screenOriginX) < 1e-9 &&
-	screen.y < camera.screenOriginY, 'nose lock keeps the rocket pointed screen-up');
 game.rocket.vx = 0;
 game.rocket.vy = 0;
 R.sky.setMode('prograde');
 frames(1);
-assert.ok(Math.abs(camera.screenRotation + game.rocket.heading) < 1e-12,
+assert.ok(Math.abs(camera.lockAngle - game.rocket.heading) < 1e-12,
 	'prograde falls back to nose direction at rest');
 game.rocket.vx = 3;
 game.rocket.vy = 4;
 prograde = Math.atan2(game.rocket.vx, game.rocket.vy);
 frames(1);
-assert.ok(Math.abs(camera.screenRotation + prograde) < 1e-12,
+assert.ok(Math.abs(camera.lockAngle - prograde) < 1e-12,
 	'prograde reacquires velocity once it is defined');
 game.phase = 'deck';
 R.input.pointerActive = false;
@@ -279,18 +271,51 @@ game.rocket.wy = 8 * radius;
 frames(600);
 assert.ok(camera.fly > 0.999 && R.sky.view.orbit > 0.999,
 	'the lock opens the chart once the hull is above the air');
-assert.ok(camera.ladderRef < 1, 'the ladder starts at the hull ground point, not the planet radius');
-assert.ok(Math.abs(Math.hypot(camera.poleX, camera.poleY) - radius) < 1,
-	'so the pole stands on the surface under the hull');
+R.sky.shipPlane(game, plane);
+assert.ok(Math.hypot(camera.poleX - plane.x, camera.poleY - plane.y) < radius * 0.002,
+	'the projection pole follows the rocket in space');
 camera.project(game.rocket.wx, game.rocket.wy, screen);
-camera.rotateScreen(screen.x, screen.y, other);
-assert.ok(Math.abs(other.x - camera.screenOriginX) < 1e-6 &&
-	Math.abs(other.y - camera.screenOriginY) < 1e-6,
-	'the rocket itself is the base line now');
-assert.ok(camera.groundY > camera.height && camera.originY < camera.groundY,
-	'with the planet surface behind the line, below the chart');
-assert.equal(R.sky.poleOutside(camera.pivotRadius), false,
-	'the pole is still the surface under the hull rather than beyond it');
+assert.ok(Math.hypot(screen.x - camera.screenOriginX, screen.y - camera.screenOriginY) < 0.01,
+	'the rocket is on the base line');
+assert.ok(camera.period >= camera.width - 1e-9,
+	'locked views never repeat a full circle within the viewport');
+assert.equal(R.sky.poleOutside(camera.pivotRadius), true, 'the planet is no longer the projection pole');
+assert.equal(R.sky.outline(-1, game).visible, true, 'the planet is projected as a body');
+// Locked direction stays at screen centre while the rear wraps to the side.
+R.sky.shipPlane(game, plane);
+var forward = game.rocket.wx / radius + prograde;
+camera.projectPlane(plane.x + radius * Math.sin(forward), plane.y + radius * Math.cos(forward), screen);
+screen.x = R.coords.wrapScreenX(screen.x, camera.screenOriginX, camera.period);
+assert.ok(Math.abs(screen.x - camera.screenOriginX) < 0.01 && screen.y < camera.screenOriginY,
+	'locked direction projects upward from the rocket');
+camera.projectPlane(plane.x - radius * Math.sin(forward), plane.y - radius * Math.cos(forward), other);
+other.x = R.coords.wrapScreenX(other.x, camera.screenOriginX, camera.period);
+assert.ok(Math.abs(other.x - camera.screenOriginX) > camera.period * 0.45 && other.y < camera.screenOriginY,
+	'the rear wraps to the edge instead of rotating below the screen');
+assert.ok(Math.abs(other.x - camera.screenOriginX) >= camera.width * 0.5 - 1,
+	'no repeated copy of the rear direction can appear near the forward sightline');
+// Every bearing is above the baseline at the same distance, including behind.
+var baseAngle = game.rocket.wx / radius + prograde;
+var dist = radius * 2;
+var i;
+for (i = 0; i < 8; i += 1) {
+	var bearing = baseAngle + i * Math.PI / 4;
+	camera.projectPlane(camera.poleX + dist * Math.sin(bearing), camera.poleY + dist * Math.cos(bearing), screen);
+	assert.ok(screen.y < camera.screenOriginY, 'all bearings project in front of the baseline');
+	roundTrip(camera.poleX + dist * Math.sin(bearing), camera.poleY + dist * Math.cos(bearing), 'locked chart');
+}
+
+// The world behind an outward-pointing rocket must not be repeated ahead.
+R.sky.setMode('nose');
+game.rocket.heading = 0;
+frames(100);
+var worldLens = R.sky.outline(-1, game);
+assert.ok(worldLens.visible, 'the world remains visible behind the rocket');
+var worldX = R.coords.wrapScreenX(worldLens.centerX, camera.screenOriginX, camera.period);
+assert.ok(Math.abs(worldX - camera.screenOriginX) >= camera.width * 0.49,
+	'the world behind the rocket is drawn at the seam, not on the forward sightline');
+R.sky.setMode('prograde');
+frames(100);
 
 // The star hand-off: the chart leaves the world for the star out at the
 // departure reach, easing the pole and the ladder across.
