@@ -92,15 +92,15 @@
 		traceCapacity: 256,
 		bodies: [
 			{ id: 'helios', name: 'Helios', kind: 'star', color: '#ffe6ae', shade: '#8a6a3a',
-				distanceRadii: 2600, radiusRadii: 170, longitude: 0.06, orbitRate: 0 },
+				distanceRadii: 2600, radiusRadii: 170, longitude: 0.06 },
 			{ id: 'vesper', name: 'Vesper', kind: 'planet', color: '#8fa9d8', shade: '#2b3f68',
-				distanceRadii: 430, radiusRadii: 30, longitude: -0.19, orbitRate: 0.0009 },
+				distanceRadii: 430, radiusRadii: 30, longitude: -0.19 },
 			{ id: 'ember', name: 'Ember', kind: 'planet', color: '#d98b6a', shade: '#5b2c25',
-				distanceRadii: 1180, radiusRadii: 62, longitude: 0.23, orbitRate: 0.0004 },
+				distanceRadii: 1180, radiusRadii: 62, longitude: 0.23 },
 			{ id: 'lune', name: 'Lune', kind: 'moon', color: '#d6ded9', shade: '#3d4a4d',
-				distanceRadii: 24, radiusRadii: 2.1, longitude: 0.13, orbitRate: 0.0022 },
+				distanceRadii: 24, radiusRadii: 2.1, longitude: 0.13 },
 			{ id: 'pale', name: 'Pale', kind: 'moon', color: '#a9b6c8', shade: '#364150',
-				distanceRadii: 58, radiusRadii: 3.2, longitude: -0.09, orbitRate: 0.0013 }
+				distanceRadii: 58, radiusRadii: 3.2, longitude: -0.09 }
 		]
 	};
 
@@ -430,6 +430,8 @@
 		thrustReserve: 0.92,
 		brakeMargin: 1.15,
 		speedCap: 700,
+		// Delivery hops must stay below orbit speed to retain altitude control.
+		circularSpeedFraction: 0.7,
 		// Flight-envelope limits; a limit that is null or not positive is off.
 		// A planet's `flight` block sets them per world and a profile scales
 		// them. Pressure in pascals, acceleration in m/s², angle in degrees.

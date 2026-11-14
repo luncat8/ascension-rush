@@ -137,9 +137,13 @@ Surface and current escape speeds come from `sqrt(2 * g0 * R^2 / r)`, the same
 GM the integrator uses, and an above-atmosphere rocket at that speed is marked
 `UNBOUND`. A labelled atmosphere ceiling, adaptive decade altitude marks, the
 solid flown trail and the dashed engine-off coast trace stay as they were. No
-force, route, price or flight report changes: the chart is a view. The 0.3.9
-multi-body gravity / Lagrange-point work remains an experiment phase in the
-plan, not wired into the flight loop.
+other body exerts gravity or has a landing surface in the flight simulation:
+the active world is the sole gravitating body, and the fixed star is a visual
+light source. Catalog planets and moons follow circular test-particle orbits
+in that world's gravity. The rocket uses the same central field and spherical
+geometry, so a circular coast at a body's radius keeps pace with it. Delivery
+autopilot stays below circular speed; manual flight can orbit or escape.
+Multi-body gravity, encounters and landing on catalog bodies remain future work.
 
 The deck header carries a **Test mode** switch. It rates every build
 `constants.rocket.testMultiplier` (20) times stronger than the catalog does —
@@ -190,6 +194,7 @@ tags, `file://`-friendly). Node smoke/regression tests:
 ```sh
 node experiments/coords-test.js
 node experiments/sky-test.js               # escape speed, log-polar chart, lens projection, pivot hand-over
+node experiments/orbit-test.js             # circular orbits, escape and catalog timing
 node experiments/chart-test.js             # drag pan, wheel zoom, click-to-seat, hover
 node experiments/aerodynamics-test.js
 node experiments/flight-test.js

@@ -264,7 +264,7 @@ assert.ok(dragGame.flight.peakDynamicPressure >= dragGame.flight.currentDynamicP
 assert.ok(dragGame.flight.peakAngleOfAttack > 0, 'atmospheric peak AoA is recorded');
 assert.ok(Number.isFinite(dragGame.flight.peakAngleOfAttackDynamicPressure), 'pressure at peak AoA is available for interpreting the measurement');
 assert.ok(dragGame.rocket.vx < 400, 'atmospheric drag opposes horizontal velocity');
-assert.ok(dragGame.rocket.vy < 0, 'gravity accelerates the rocket downward');
+assert.ok(dragGame.rocket.vy > 0, 'above circular speed the surface curves away faster than gravity pulls down');
 
 dragGame.rocket.wx = R.world.planet.circumference - 2;
 dragGame.rocket.vx = 400;

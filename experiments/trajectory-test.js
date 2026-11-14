@@ -97,7 +97,7 @@ assert.equal(sideEffectGame.phase, before.phase, 'and ends no flight');
 // ---- Vacuum: no drag, so heading is irrelevant and energy is conserved.
 R.world.initialize('tinmoon');
 var tinmoon = R.world.planet;
-var vacuumState = coastState(1200, 500, 120, 40, 0.3, 900);
+var vacuumState = coastState(1200, 500, 30, 0, 0.3, 900);
 var gravitationalParameter = tinmoon.surfaceGravity * tinmoon.radius * tinmoon.radius;
 var startSpeed = Math.sqrt(vacuumState.vx * vacuumState.vx + vacuumState.vy * vacuumState.vy);
 var analyticSpeed = Math.sqrt(
@@ -107,7 +107,8 @@ var analyticSpeed = Math.sqrt(
 
 trajectory.rollout(vacuumState, trajectory.coastStep, trajectory.maxCoastSteps, predicted);
 assert.ok(predicted.valid, 'an airless coast lands inside the horizon');
-assert.equal(predicted.vx, vacuumState.vx, 'with no atmosphere the horizontal speed never changes');
+assert.ok(Math.abs((tinmoon.radius + vacuumState.wy) * vacuumState.vx - tinmoon.radius * predicted.vx) < 0.1,
+	'angular momentum is conserved in a vacuum');
 assert.ok(Math.abs(speedOf(predicted) - analyticSpeed) / analyticSpeed < 0.01,
 	'the vacuum coast conserves energy against the inverse-square field');
 vacuumState.heading = 2.4;
@@ -117,7 +118,7 @@ assert.equal(comparison.wx, predicted.wx, 'and attitude cannot change a drag-fre
 // ---- Drag shortens the coast and slows the arrival.
 R.world.initialize('gossamer');
 var gossamer = R.world.planet;
-var dragState = coastState(2000, 1500, 300, 0, Math.PI / 2, 900);
+var dragState = coastState(2000, 1500, 80, 0, Math.PI / 2, 900);
 var savedDensity = gossamer.seaLevelDensity;
 
 trajectory.rollout(dragState, trajectory.coastStep, trajectory.maxCoastSteps, predicted);
@@ -147,7 +148,7 @@ var grounded = coastState(500, 0, 30, 0, 0, 500);
 trajectory.predictCoast(grounded, predicted);
 assert.equal(predicted.valid, false, 'a rocket on the ground has no coast impact');
 R.world.initialize('tinmoon');
-var distant = coastState(500, 12000, 40, 0, 0, 500);
+var distant = coastState(500, 12000, 0, 0, 0, 500);
 
 trajectory.predictCoast(distant, predicted);
 assert.equal(predicted.valid, false, 'a coast longer than the horizon is reported invalid, not stale');
@@ -206,7 +207,7 @@ var westGame = {
 	phase: 'flying',
 	targetPadId: R.world.pads[0].id,
 	simTime: 0,
-	rocket: coastState(R.world.planet.circumference * 0.5, 1200, -320, 0, -Math.PI / 2, 700)
+	rocket: coastState(R.world.planet.circumference * 0.5, 1200, -30, 0, -Math.PI / 2, 700)
 };
 var westImpact = trajectory.update(westGame);
 

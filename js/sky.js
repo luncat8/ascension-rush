@@ -72,7 +72,7 @@
 	// lens like any other once the chart is seated elsewhere.
 	var worldBody = {
 		id: 'world', name: '', kind: 'world', color: '#b4c7ad', shade: '#232a26',
-		distanceRadii: 0, radiusRadii: 1, longitude: 0, orbitRate: 0
+		distanceRadii: 0, radiusRadii: 1, longitude: 0
 	};
 
 	// Silhouette of the last outlined body, in screen space. The two limbs are
@@ -226,9 +226,14 @@
 	// Orbit and body radii are quoted in active-planet radii, so one table reads
 	// on every world. The plane shares the world's frame (angle from the +Y
 	// axis), so a body at longitude 0 sits due north of the ship at wx 0.
+	// Orbiters are circular test bodies in the active world's gravity; the
+	// fixed star is a background light, not an orbiting body.
 	sky.planePosition = function(body, time, out) {
 		var distance = body.distanceRadii * view.radius;
-		var angle = (body.longitude + time * body.orbitRate / TWO_PI) * TWO_PI;
+		var radius = body.distanceRadii * R.world.planet.radius;
+		var rate = body.kind === 'star' || radius <= 0 ? 0 :
+			Math.sqrt(R.physics.gravitationalParameter() / (radius * radius * radius));
+		var angle = body.longitude * TWO_PI + time * rate;
 
 		out.x = distance * Math.sin(angle);
 		out.y = distance * Math.cos(angle);

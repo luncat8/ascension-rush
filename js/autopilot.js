@@ -273,6 +273,8 @@
 		var thrustAccel;
 		var budget;
 		var gravity;
+		var effectiveGravity;
+		var travelDistance;
 		var horizontalCapability;
 		var brakeAccel;
 		var deltaV;
@@ -335,12 +337,14 @@
 		// descent profiles below plan with thrust the rocket may really use.
 		budget = Math.min(tuning.thrustReserve * thrustAccel, tuning.accelerationCap);
 		gravity = R.physics.gravityAtAltitude(rocket.wy);
+		effectiveGravity = gravity - rocket.vx * rocket.vx / (planet.radius + rocket.wy);
+		travelDistance = adx * (planet.radius + rocket.wy) / planet.radius;
 		// The thrust acceleration a stage needs to fly the descent: braking
 		// sideways and holding altitude at once. It is the same multiple of
 		// gravity the acceleration cap is never allowed to fall below, so a
 		// capped flight and an uncapped one judge a stage by one number.
 		hoverAuthority = tuning.minThrustToWeight * gravity;
-		horizontalCapability = Math.sqrt(Math.max(0, budget * budget - gravity * gravity));
+		horizontalCapability = Math.sqrt(Math.max(0, budget * budget - effectiveGravity * effectiveGravity));
 		horizontalCapability = Math.max(horizontalCapability, 0.12 * budget);
 		brakeAccel = Math.max(0.3, horizontalCapability / tuning.brakeMargin);
 
@@ -421,9 +425,10 @@
 		// pad. The position term converges exponentially instead of overshooting,
 		// and it has no minimum speed: a floor flips the target's sign across the
 		// pad, and the rocket then hunts back and forth above it.
-		brakeProfileSpeed = Math.sqrt(2 * brakeAccel * adx) + 1.5;
+		brakeProfileSpeed = Math.sqrt(2 * brakeAccel * travelDistance) + 1.5;
 		vxDesired = dir * Math.min(
 			tuning.speedCap,
+			tuning.circularSpeedFraction * R.physics.circularSpeedAtAltitude(rocket.wy),
 			brakeProfileSpeed,
 			Math.abs(dx) * tuning.arrivalGain
 		);
@@ -447,14 +452,15 @@
 		// correction. Whatever budget that leaves goes to the horizontal
 		// channel, which is what actually decides whether the rocket reaches
 		// the pad instead of overflying it.
-		requestY = gravity + R.util.clamp(
+		requestY = effectiveGravity + R.util.clamp(
 			tuning.velocityGain * (vyDesired - rocket.vy) + descentFeedForward,
 			-verticalAuthority,
 			verticalAuthority
 		);
 		vectorY = R.util.clamp(requestY, 0, budget);
 		vectorMax = Math.sqrt(Math.max(0, budget * budget - vectorY * vectorY));
-		requestX = tuning.velocityGain * (vxDesired - rocket.vx) - brakeFeedForward;
+		requestX = tuning.velocityGain * (vxDesired - rocket.vx) - brakeFeedForward +
+			rocket.vx * rocket.vy / (planet.radius + rocket.wy);
 		vectorX = R.util.clamp(requestX, -vectorMax, vectorMax);
 		if (tuning.accelerationCap < tuning.thrustReserve * thrustAccel && (requestY > budget || Math.abs(requestX) > vectorMax)) {
 			autopilot.limiter |= autopilot.limitFlags.ACCEL;

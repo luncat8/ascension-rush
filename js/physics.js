@@ -3,6 +3,7 @@
 
 	var R = root.R || (root.R = {});
 	var physics = R.physics || (R.physics = {});
+	var motion = { wx: 0, wy: 0, vx: 0, vy: 0 };
 	var aeroSample = {
 		speed: 0,
 		dynamicPressure: 0,
@@ -61,6 +62,25 @@
 		var speed = Math.sqrt(rocket.vx * rocket.vx + rocket.vy * rocket.vy);
 
 		return rocket.wy > physics.atmosphereTop() && speed >= physics.escapeSpeedAtAltitude(rocket.wy);
+	};
+
+	// Integrate in the instantaneous tangent/radial frame, then rotate the
+	// velocity into the new frame. wx is surface arc length, not flight distance.
+	physics.move = function(wx, wy, vx, vy, accelerationX, accelerationY, dt, out) {
+		var radius = R.world.planet.radius;
+		var tangent = (vx + accelerationX * dt) * dt;
+		var radial = radius + wy + (vy + accelerationY * dt) * dt;
+		var angle = Math.atan2(tangent, radial);
+		var cos = Math.cos(angle);
+		var sin = Math.sin(angle);
+		var nextVx = vx + accelerationX * dt;
+		var nextVy = vy + accelerationY * dt;
+
+		out.wx = wx + radius * angle;
+		out.wy = Math.sqrt(radial * radial + tangent * tangent) - radius;
+		out.vx = nextVx * cos - nextVy * sin;
+		out.vy = nextVx * sin + nextVy * cos;
+		return out;
 	};
 
 	physics.step = function(game, dt) {
@@ -181,10 +201,11 @@
 			accelerationY *= ceiling / acceleration;
 		}
 
-		newVx = oldVx + accelerationX * dt;
-		newVy = oldVy + accelerationY * dt;
-		newWx = oldWx + newVx * dt;
-		newWy = oldWy + newVy * dt;
+		physics.move(oldWx, oldWy, oldVx, oldVy, accelerationX, accelerationY, dt, motion);
+		newVx = motion.vx;
+		newVy = motion.vy;
+		newWx = motion.wx;
+		newWy = motion.wy;
 		if (newWy <= 0) {
 			crossingFraction = oldWy > 0 ? oldWy / (oldWy - newWy) : 0;
 			state.wx = oldWx + (newWx - oldWx) * crossingFraction;

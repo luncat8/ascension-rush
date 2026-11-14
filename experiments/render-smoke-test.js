@@ -340,6 +340,8 @@ var coastGame = {
 	timeScale: R.constants.time.scales[R.constants.time.defaultIndex],
 	rocket: flightRocket
 };
+flightRocket.vx = 80;
+flightRocket.vy = 0;
 var coastError = Math.abs(R.trajectory.update(coastGame).targetError);
 
 assert.ok(R.trajectory.impact.valid, 'the cruising state has a coast impact');

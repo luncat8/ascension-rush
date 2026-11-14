@@ -3,6 +3,7 @@
 
 	var R = root.R || (root.R = {});
 	var trajectory = R.trajectory || (R.trajectory = {});
+	var motion = { wx: 0, wy: 0, vx: 0, vy: 0 };
 	var aeroSample = {
 		speed: 0,
 		dynamicPressure: 0,
@@ -55,6 +56,7 @@
 	trajectory.rollout = function(state, dt, maxSteps, out, trace) {
 		var settings = R.constants.rocket;
 		var mass = Math.max(1, R.rocket.totalMass(state));
+		var fairingAttached = state.fairingAttached;
 		var wx = state.wx;
 		var wy = state.wy;
 		var vx = state.vx;
@@ -72,6 +74,9 @@
 		var newWx;
 		var newWy;
 		var crossingFraction;
+		var referenceArea = state.fairingAttached ?
+			settings.referenceArea * state.fairingDragFraction : settings.referenceArea;
+		var ceiling = settings.maxAcceleration * R.parts.performanceFactor();
 
 		out.valid = false;
 		out.steps = 0;
@@ -81,20 +86,26 @@
 			trace.points[1] = wy;
 		}
 		while (steps < maxSteps) {
+			if (fairingAttached && wy >= R.constants.parts.fairingAltitude) {
+				fairingAttached = false;
+				mass = Math.max(1, mass - state.fairingMass);
+				referenceArea = settings.referenceArea;
+			}
 			density = R.physics.densityAtAltitude(wy);
 			gravity = R.physics.gravityAtAltitude(wy);
-			R.aerodynamics.calculate(density, vx, vy, heading, mass, aeroSample);
+			R.aerodynamics.calculate(density, vx, vy, heading, mass, aeroSample, referenceArea);
 			accelerationX = aeroSample.dragAccelX;
 			accelerationY = aeroSample.dragAccelY - gravity;
 			acceleration = Math.sqrt(accelerationX * accelerationX + accelerationY * accelerationY);
-			if (acceleration > settings.maxAcceleration) {
-				accelerationX *= settings.maxAcceleration / acceleration;
-				accelerationY *= settings.maxAcceleration / acceleration;
+			if (acceleration > ceiling) {
+				accelerationX *= ceiling / acceleration;
+				accelerationY *= ceiling / acceleration;
 			}
-			newVx = vx + accelerationX * dt;
-			newVy = vy + accelerationY * dt;
-			newWx = wx + newVx * dt;
-			newWy = wy + newVy * dt;
+			R.physics.move(wx, wy, vx, vy, accelerationX, accelerationY, dt, motion);
+			newVx = motion.vx;
+			newVy = motion.vy;
+			newWx = motion.wx;
+			newWy = motion.wy;
 			steps += 1;
 			if (trace && steps % trajectory.traceStride === 0 && trace.count < trajectory.traceCapacity) {
 				trace.points[trace.count * 2] = newWx;
