@@ -1097,6 +1097,48 @@ input[type="range"] {
 	border-color: rgba(242, 139, 130, 0.32);
 }
 
+.top-bar {
+	position: fixed;
+	z-index: 4;
+	top: 12px;
+	left: 18px;
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 10px;
+	padding: 6px 10px;
+	border: 1px solid rgba(139, 179, 209, 0.24);
+	border-radius: 6px;
+	background: rgba(7, 17, 30, 0.9);
+	box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+	font: 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.top-bar .builder-toggle {
+	margin: 0;
+}
+
+.time-control {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding-left: 10px;
+	border-left: 1px solid rgba(139, 179, 209, 0.22);
+}
+
+.time-control .ghost-button {
+	margin-top: 0;
+	padding: 3px 7px;
+	font-size: 10px;
+}
+
+.time-scale-value {
+	min-width: 34px;
+	text-align: center;
+	color: #e7eff6;
+	font-weight: 600;
+}
+
 .flight-strip {
 	position: fixed;
 	z-index: 3;

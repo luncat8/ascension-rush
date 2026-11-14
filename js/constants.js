@@ -403,8 +403,8 @@
 	};
 
 	constants.time = {
-		scales: [0.5, 0.75, 1, 1.5, 2, 3, 4],
-		defaultIndex: 4
+		scales: [0.25, 0.5, 1, 2, 4, 8, 16],
+		defaultIndex: 2
 	};
 
 	// Guidance tuning for the autopilot. A planet preset may override any of
