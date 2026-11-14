@@ -8,8 +8,9 @@
 
 	// The chart's projection state, and the only place a pan, a zoom, a follow
 	// or a hand-over can move the view. sky.js solves one pose per frame and
-	// hands it over; coords.js reads it; the renderer and the picker read the
-	// same numbers the projection writes, so nothing can disagree.
+	// hands it over; coords.js reads it; the renderer and picker share its
+	// chart coordinates. A direction lock adds one rigid screen rotation, with an
+	// inverse for pointer readout and picking.
 	//
 	// A pose is the pole the log is measured from, the body that pole stands on,
 	// the ladder, the camera target's distance (what the origin line holds), the
@@ -74,6 +75,39 @@
 	camera.flatLog = false;
 	camera.upSin = 0;
 	camera.upCos = 1;
+	// Direction-locked views use one rigid screen-space camera roll around a
+	// fixed object anchor. Projection and inverse projection continue to share the
+	// same chart; these helpers bridge pointer coordinates to that chart.
+	camera.directionLock = false;
+	camera.screenRotation = 0;
+	camera.screenOriginX = 0;
+	camera.screenOriginY = 0;
+	camera.rotateScreen = function(sx, sy, out) {
+		var dx = sx - camera.screenOriginX;
+		var dy = sy - camera.screenOriginY;
+		var cos = Math.cos(camera.screenRotation);
+		var sin = Math.sin(camera.screenRotation);
+
+		out.x = camera.screenOriginX + dx * cos - dy * sin;
+		out.y = camera.screenOriginY + dx * sin + dy * cos;
+		return out;
+	};
+	camera.unrotateScreen = function(sx, sy, out) {
+		var dx = sx - camera.screenOriginX;
+		var dy = sy - camera.screenOriginY;
+		var cos = Math.cos(camera.screenRotation);
+		var sin = Math.sin(camera.screenRotation);
+
+		out.x = camera.screenOriginX + dx * cos + dy * sin;
+		out.y = camera.screenOriginY - dx * sin + dy * cos;
+		return out;
+	};
+	camera.clearDirectionLock = function() {
+		camera.directionLock = false;
+		camera.screenRotation = 0;
+		camera.screenOriginX = 0;
+		camera.screenOriginY = 0;
+	};
 	camera.zoomMin = R.constants.view.zoomMin;
 	camera.zoomMax = R.constants.view.zoomMax;
 
@@ -286,6 +320,7 @@
 	// it, which is what the HUD panels stand on.
 	camera.setFlat = function(next) {
 		camera.endTransition();
+		camera.clearDirectionLock();
 		camera.flat = true;
 		camera.flatLog = next.log;
 		camera.poleX = next.poleX;

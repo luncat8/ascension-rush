@@ -42,19 +42,36 @@
 		ladderFar: 0.45,
 		// Orbit polylines: samples per orbit circle.
 		orbitSamples: 128,
-		// The view scale control. `flat` modes draw the plane as it is, the
-		// rocket's local up at the top of the screen and no unwrapping; `log`
-		// compresses distance from the pole and nothing else. The chart modes
-		// differ only in what the log is read from: the hull's own ground
-		// point (`ship`) or the centre of the body whose influence the hull is
-		// in (`body`), which keeps that body's whole surface the flat ground.
+		// The flat views preserve the plane or compress only its distance.
+		// Chart views share the log-polar map and differ in what they follow:
+		// `ship` follows the rocket's ground point, `body` follows its current
+		// local visual body, and the direction-lock views keep the rocket low
+		// while aligning either its velocity (`prograde`) or nose (`nose`) up.
 		modes: [
-			{ id: 'real', label: 'Real scale', flat: true, log: false, bodyCentred: false },
-			{ id: 'real-log', label: 'Real · log (exp.)', flat: true, log: true, bodyCentred: false },
-			{ id: 'ship', label: 'Chart · ship', flat: false, log: false, bodyCentred: false },
-			{ id: 'body', label: 'Chart · body', flat: false, log: false, bodyCentred: true }
+			{ id: 'real', label: 'Real scale', description: 'Linear plane; the rocket stays centred and the world stays round.',
+				flat: true, log: false, bodyCentred: false },
+			{ id: 'real-log', label: 'Real · log (exp.)',
+				description: 'Same bearings, compressed distance from the nearest surface point.',
+				flat: true, log: true, bodyCentred: false },
+			{ id: 'ship', label: 'Chart · rocket',
+				description: 'Log-polar chart follows the rocket ground point; the surface becomes a horizon in flight.',
+				flat: false, log: false, bodyCentred: false },
+			{ id: 'body', label: 'Chart · local body',
+				description: 'Automatically centres the local visual body; hand-off is distance-based, not gravity.',
+				flat: false, log: false, bodyCentred: true },
+			{ id: 'prograde', label: 'Prograde lock · rocket',
+				description: 'Keeps the rocket low and aligns its velocity with screen-up; at rest it follows the nose.',
+				flat: false, log: false, bodyCentred: true, directionLock: 'prograde' },
+			{ id: 'nose', label: 'Nose lock · rocket',
+				description: 'Keeps the rocket low and rolls the chart to keep its nose pointed screen-up.',
+				flat: false, log: false, bodyCentred: true, directionLock: 'nose' }
 		],
 		defaultMode: 'ship',
+		directionLock: {
+			// The rocket remains in the lower centre while the map rolls around it.
+			centreX: 0.5,
+			objectY: 0.78
+		},
 		flat: {
 			// Where the rocket (real scale) or the log pole under it sits.
 			centreX: 0.5,
@@ -95,9 +112,8 @@
 		// at the edge of one body's reach from flipping the chart every frame.
 		approachRadii: 6,
 		departRadii: 10,
-		// The `body` view hands the chart to the star once the hull is this
-		// many world radii out and inside no other body's reach, and back to
-		// the world inside the nearer one.
+		// The local-body chart hands to the star at these visual distance bands;
+		// catalog bodies have no gravity model, so this is not an influence radius.
 		worldApproachRadii: 80,
 		worldDepartRadii: 120,
 		// Releasing a drag that did not reach a ground line eases the chart back

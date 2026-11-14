@@ -681,12 +681,14 @@ A selector in the top bar (`view`, key `V`) picks how the plane is put on
 screen. The modes are a table, `constants.view.modes`; `sky.setMode(id)` is the
 only switch and `sky.mode` the only state.
 
-| id | map | read from | ground |
+| id | map | follows | ground |
 | --- | --- | --- | --- |
-| `real` | linear, one scale, no wrap | the hull, at the centre | the world as a circle |
-| `real-log` (experimental) | bearings kept, distance `ln(1 + d / knee)` | the surface point nearest the hull | a circle through the pole, curling away below it |
-| `ship` (default) | log-polar chart | the hull's own ground point once above the air | unwrapped to a line on the deck, a horizon in flight |
-| `body` | log-polar chart | the centre of the body whose influence the hull is in | always unwrapped to the flat ground line, one circumference per viewport |
+| `real` | linear, one scale, no wrap | rocket at viewport centre | the world as a circle |
+| `real-log` (experimental) | bearings kept, distance `ln(1 + d / knee)` | nearest surface point to the rocket | the nearest body's ring through that point |
+| `ship` (default) | log-polar chart | rocket's ground point in flight | unwrapped on the deck, a horizon in flight |
+| `body` | log-polar chart | centre of the automatically selected local visual body | that body's surface as the flat ground line |
+| `prograde` | body-centred log-polar chart, screen-rolled | rocket near lower centre, velocity upright | same unwrapped surface line, rotated with velocity |
+| `nose` | body-centred log-polar chart, screen-rolled | rocket near lower centre, nose upright | same unwrapped surface line, rotated with rocket attitude |
 
 **Flat views (`real`, `real-log`).** `coords.flatToScreen / screenToFlat` are
 the whole map: a rotation that puts the active world's local up at the hull on
@@ -717,25 +719,35 @@ wheel.
   the log view.
 - No drag and no click-seat: a flat view has no pole to walk.
 
-**Chart views (`ship`, `body`).** One map; they differ only in the goals
-`solveTarget` eases toward, so switching between them is a morph. `body` keeps
-`fly` and `orbit` at zero on the world: the pole stays at the centre, the
-target stays the surface, and the hull is a marker above a flat ground line.
-Which body that is follows the hull: a catalog body inside its
-`approachRadii / departRadii` reach (as in `ship`), otherwise the world out to
-`worldDepartRadii`, and the star beyond — handed back inside
-`worldApproachRadii`. Each change is the ordinary pivot hand-over. A seat the
-player clicked is never taken away.
+**Chart views (`ship`, `body`, `prograde`, `nose`).** They share one log-polar
+map. `ship` follows the rocket's ground point so the body curves away as the
+rocket climbs. `body` automatically chooses the nearby visual body, keeps the
+pole at its centre and targets its surface, leaving the rocket as a marker above
+a flat ground line. A clicked seat from `ship` is not sticky in any body-centred
+mode. `prograde` and `nose` use that same automatic body selection and pole,
+but target the rocket near the lower centre. `prograde` rolls the chart so the
+velocity vector points screen-up (falling back to the nose at rest); `nose`
+rolls it by rocket attitude instead. The nose therefore need not point up in
+prograde view, nor the velocity in nose view. The scenery, aim guides and
+surface line roll around the locked direction. Pointer readout and body picking
+inverse-rotate into the shared chart before unprojection. Mouse aim is relative
+to the direction held screen-up. Drag-pan is disabled in both tracking views.
 
-"Influence" is geometric reach, not force: only the active world gravitates.
-When the 0.3.9 experiment gives bodies mass, `sky.approachIndex` is the one
-place to swap reach for a sphere-of-influence test.
+The local body is currently chosen by visual distance bands with hysteresis,
+not gravity: the catalog bodies have no masses and only the active world
+exerts force. In `body`, `prograde` and `nose`, a nearby catalog body can take
+the pole; outside the world's wider visual reach the star takes it, with an
+eased pivot hand-over. This is a chart convention, not a physical sphere of
+influence. A future multi-body model can replace `sky.approachIndex`'s reach
+tests with a force or patched-conic criterion without changing the view modes'
+meanings.
 
-Validation: `experiments/view-mode-test.js` (maps, round trips, fits, pole
-travel, star hand-over and return, mode switches) and the flat states in
-`experiments/render-smoke-test.js`.
+Validation: `experiments/view-mode-test.js` covers all six maps, round trips,
+fits, nearest-surface handover continuity, star hand-over, and both direction
+locks; `experiments/render-smoke-test.js` exercises both locked renderers and
+flat states.
 
 Open: drag-pan and focus-on-body in the flat views; a blended cut between flat
-and chart; `real-log` squeezes far bodies into slivers, which is the map being
-honest but may want a minimum-size disc; the `body` view seated on a catalog
-body repeats its surface many laps across the viewport.
+and chart; `real-log` compresses far bodies into slivers, which is honest but
+may want a minimum-size disc; `body`, `prograde` and `nose` repeat the chart
+surface across multiple cylindrical laps.

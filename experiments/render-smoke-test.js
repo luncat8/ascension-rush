@@ -253,6 +253,25 @@ chartState('the body view above the air', function() {
 	smokeGame.rocket.wy = 200000;
 }, 400);
 assert.equal(R.render.curves.radial, true, 'the body view keeps the pole inside the world');
+chartState('prograde lock', function() {
+	R.sky.setMode('prograde');
+	smokeGame.rocket.heading = 0.8;
+	smokeGame.rocket.vx = 3;
+	smokeGame.rocket.vy = 4;
+	smokeGame.rocket.wy = 2000;
+}, 200);
+assert.equal(R.camera.directionLock, true, 'the chart renderer applies prograde lock');
+assert.ok(Math.abs(R.camera.screenRotation + Math.atan2(3, 4)) < 1e-12,
+	'the prograde roll follows the velocity vector');
+R.render.draw(smokeGame);
+chartState('nose lock', function() {
+	R.sky.setMode('nose');
+	smokeGame.rocket.heading = 0.8;
+	smokeGame.rocket.wy = 2000;
+}, 200);
+assert.ok(Math.abs(R.camera.screenRotation + 0.8) < 1e-12,
+	'the separate nose view follows rocket attitude');
+R.render.draw(smokeGame);
 R.sky.setMode('ship');
 
 chartState('mid-drag onto a body', function() {
