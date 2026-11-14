@@ -210,6 +210,7 @@
 		centreX: 0, centreY: 0
 	};
 	var surface = { x: 0, y: 0 };
+	var pickScreen = { x: 0, y: 0 };
 
 	function modeOf(id) {
 		var modes = viewSettings.modes;
@@ -494,6 +495,7 @@
 		hand.active = false;
 		R.camera.resetZoom();
 		R.camera.endTransition();
+		R.camera.clearDirectionLock();
 		sky.ensure();
 	};
 
@@ -515,6 +517,12 @@
 			flat.ready = false;
 			camera.zoom = 1;
 			camera.zoomTarget = 1;
+		}
+		if (next.directionLock !== sky.mode.directionLock) {
+			fit.ready = false;
+		}
+		if (!next.directionLock) {
+			camera.clearDirectionLock();
 		}
 		sky.mode = next;
 		if (next.flat) {
@@ -606,14 +614,10 @@
 		pivot.radius = bodies[pivot.index].radiusRadii * view.radius;
 	}
 
-	// Which body the ship is standing over. A body the ship has flown inside
-	// reaches for the chart — the same seat a click on it gives, so its surface
-	// arrives as the flat ground under the hull instead of the hull stopping in
-	// front of a lens — and it keeps it until the ship is clear of the wider
-	// departure reach. The two reaches are the hysteresis: a hull parked at the
-	// edge of one body's reach cannot make the chart flip every frame. Nothing
-	// in the catalog reaching leaves a seat the player asked for alone, and
-	// hands an approach seat back to the world.
+	// Choose a visual local body by normalized distance and hysteresis, not by
+	// gravity: the catalog has no masses yet. Body-centred modes always follow
+	// the rocket's current local body, even when another mode left a manual seat;
+	// only a seat made automatic by this reach test gets the wider departure band.
 	//
 	// Returns the index to seat, or -2 to leave the pivot where it is.
 	sky.approachIndex = function(game) {
@@ -637,7 +641,7 @@
 			dx = shipPlane.x - plane.x;
 			dy = shipPlane.y - plane.y;
 			gap = Math.sqrt(dx * dx + dy * dy) / radius -
-				(i === pivot.index ? settings.departRadii : settings.approachRadii);
+				(pivot.approach && i === pivot.index ? settings.departRadii : settings.approachRadii);
 			if (gap >= 0 || (best > -2 && gap >= bestGap)) {
 				continue;
 			}
@@ -645,10 +649,16 @@
 			bestGap = gap;
 		}
 		if (best > -2) {
-			return best === pivot.index ? -2 : best;
+			if (best === pivot.index) {
+				if (sky.mode.bodyCentred) {
+					pivot.approach = true;
+				}
+				return -2;
+			}
+			return best;
 		}
 		if (sky.mode.bodyCentred) {
-			return influenceBeyondReach();
+			return outerVisualReachIndex();
 		}
 		return pivot.approach && pivot.index >= 0 ? -1 : -2;
 	};
@@ -664,11 +674,10 @@
 		return -1;
 	}
 
-	// The `body` view with the hull inside no catalog body's reach: the world
-	// keeps the chart out to its own reach and the star takes it beyond, with
-	// the same two-radius hysteresis the catalog uses. A seat the player
-	// pointed at is left alone, as everywhere else.
-	function influenceBeyondReach() {
+	// With no nearby catalog body, keep the chart on the world until the hull
+	// passes its outer visual band, then hand it to the star. This is a readable
+	// chart transition, not a physical influence or encounter calculation.
+	function outerVisualReachIndex() {
 		var star = starIndex();
 		var held = pivot.index === star;
 		var reach = held ? settings.worldApproachRadii : settings.worldDepartRadii;
@@ -676,7 +685,8 @@
 			reach * view.radius;
 		var want = beyond ? star : -1;
 
-		if (want === pivot.index || (pivot.index >= 0 && !pivot.approach)) {
+		if (want === pivot.index) {
+			pivot.approach = true;
 			return -2;
 		}
 		return want;
@@ -689,7 +699,7 @@
 		if (index === -2) {
 			return;
 		}
-		sky.seatPivot(index, game, index >= 0);
+		sky.seatPivot(index, game, sky.mode.bodyCentred || index >= 0);
 	}
 
 	// The camera's target and the log pole, both on the ray from the pivot's
@@ -724,6 +734,7 @@
 		var altitude;
 		var above;
 		var goal;
+		var directionLock = sky.mode.directionLock;
 		var dx;
 		var dy;
 
@@ -734,12 +745,12 @@
 		altitude = shipDistance - pivot.radius;
 		above = R.util.clamp((altitude - view.switchAltitude) /
 			Math.max(1, view.switchAltitude), 0, 1);
-		// The `body` view never leaves the centre: the whole surface stays the
-		// flat ground line and the hull is a marker above it.
-		if (sky.mode.bodyCentred) {
+		// The local-body chart holds the surface as ground. Direction-lock views
+		// keep that body pole but target the rocket itself and open the chart.
+		if (sky.mode.bodyCentred && !directionLock) {
 			above = 0;
 		}
-		goal = pivot.index < 0 ? above : 1;
+		goal = directionLock ? 1 : (pivot.index < 0 ? above : 1);
 		view.fly = ease(view.fly, goal, sky.step, goal > view.fly ?
 			viewSettings.followOpenTau : viewSettings.followCloseTau);
 		// The pole's own travel, which completes a body diameter out rather than
@@ -751,9 +762,9 @@
 		view.orbit = ease(view.orbit, goal, sky.step, goal > view.orbit ?
 			viewSettings.followOpenTau : viewSettings.followCloseTau);
 		poleDistance = pivot.radius * view.orbit;
-		targetRadius = pivot.index < 0 ?
+		targetRadius = directionLock ? shipDistance : (pivot.index < 0 ?
 			pivot.radius * Math.pow(shipDistance / Math.max(1e-9, pivot.radius), view.fly) :
-			pivot.radius;
+			pivot.radius);
 		pose.ladderRef = pivot.radius - poleDistance;
 		if (shipDistance > 1e-9) {
 			pose.poleX = pivot.x + dx / shipDistance * poleDistance;
@@ -766,13 +777,13 @@
 			pose.targetX = pivot.x;
 			pose.targetY = pivot.y + targetRadius;
 		}
-		// The target's own distance from the pole: the pivot's radius while the
-		// ground is the target, the hull's altitude once the pole stands under it.
+		// The target's own depth holds the surface on the default line or the
+		// rocket near the bottom in a direction-locked view.
 		pose.targetDistance = Math.max(1e-9, targetRadius - poleDistance);
-		pose.originLine = pivot.index < 0 ?
-			R.camera.baseGroundY + (R.camera.height * viewSettings.followHeight -
-				R.camera.baseGroundY) * view.fly :
-			R.camera.baseGroundY;
+		pose.originLine = directionLock ? R.camera.height * viewSettings.directionLock.objectY :
+			(pivot.index < 0 ? R.camera.baseGroundY +
+				(R.camera.height * viewSettings.followHeight - R.camera.baseGroundY) * view.fly :
+				R.camera.baseGroundY);
 		pose.fly = view.fly;
 		return shipDistance;
 	}
@@ -792,6 +803,51 @@
 		pose.extent = fit.extent;
 		pose.fitScale = (pose.originLine - R.camera.topY()) / Math.max(range, settings.minFitRange);
 		return shipDistance;
+	}
+
+	// Keep the rocket at one lower-centre anchor, then roll the rendered chart
+	// until either its velocity or its nose points screen-up. The map remains
+	// the same log-polar projection; only its screen frame follows the axis.
+	function lockDirection(game, axis) {
+		var camera = R.camera;
+		var rocket = game && game.rocket;
+		var anchorX = camera.width * viewSettings.directionLock.centreX;
+		var anchorY = camera.height * viewSettings.directionLock.objectY;
+		var dx;
+		var dy;
+		var distance;
+		var speed;
+		var positionAngle;
+		var directionAngle;
+
+		if (!rocket) {
+			camera.clearDirectionLock();
+			return;
+		}
+		sky.shipPlane(game, shipPlane);
+		dx = shipPlane.x - camera.poleX;
+		dy = shipPlane.y - camera.poleY;
+		distance = Math.max(1e-9, Math.sqrt(dx * dx + dy * dy));
+		positionAngle = Math.atan2(dx, dy);
+		directionAngle = rocket.heading;
+		if (axis === 'prograde') {
+			speed = Math.hypot(rocket.vx || 0, rocket.vy || 0);
+			if (speed > R.aerodynamics.speedEpsilon) {
+				directionAngle = Math.atan2(rocket.vx, rocket.vy);
+			}
+		}
+		camera.directionLock = true;
+		camera.screenRotation = -directionAngle;
+		camera.screenOriginX = anchorX;
+		camera.screenOriginY = anchorY;
+		camera.baseOx = camera.ox = anchorX - camera.angularScale * positionAngle;
+		camera.baseOy = camera.oy = anchorY + camera.scale * camera.depth(distance);
+		camera.targetDistance = distance;
+		camera.targetX = shipPlane.x;
+		camera.targetY = shipPlane.y;
+		camera.originLine = anchorY;
+		camera.syncLines();
+		camera.extent = R.coords.distanceAt(camera.depth(distance) + camera.range, camera);
 	}
 
 	// The ground state of a plane point: the pole it drags to, the ladder that
@@ -874,7 +930,7 @@
 
 	sky.handBegin = function(sx, sy, game) {
 		sky.ensure();
-		if (sky.mode.flat) {
+		if (sky.mode.flat || sky.mode.directionLock) {
 			return false;
 		}
 		R.camera.unprojectPlane(sx, sy, plane);
@@ -1079,6 +1135,9 @@
 		var blend;
 
 		sky.ensure();
+		if (!sky.mode.directionLock && R.camera.directionLock) {
+			R.camera.clearDirectionLock();
+		}
 		sky.step = step;
 		simTime = simTimeOf(game);
 		if (view.planetId !== planet.id) {
@@ -1137,6 +1196,9 @@
 			solveFollow(game);
 		}
 		R.camera.setPose(pose);
+		if (sky.mode.directionLock) {
+			lockDirection(game, sky.mode.directionLock);
+		}
 		if (pivot.reseating && !R.camera.transition.active) {
 			pivot.previousIndex = -1;
 			pivot.reseating = false;
@@ -1319,6 +1381,11 @@
 		var i;
 		var lens;
 
+		if (camera.directionLock) {
+			camera.unrotateScreen(mx, my, pickScreen);
+			mx = pickScreen.x;
+			my = pickScreen.y;
+		}
 		for (i = -1; i < bodies.length; i += 1) {
 			lens = sky.outline(i, game);
 			if (!lens.visible) {

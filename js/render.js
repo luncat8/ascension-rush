@@ -16,6 +16,7 @@
 		crosshair: { x: 0, y: 0 },
 		coast: { x: 0, y: 0 },
 		marker: { x: 0, y: 0 },
+		pointer: { x: 0, y: 0 },
 		path: { x: 0, y: 0 },
 		tilt: { x: 0, y: 0 }
 	};
@@ -117,7 +118,28 @@
 	// viewport. That is what lets one fitted scale carry both a whole world's
 	// surface and the system above it, and it is why a seam is never visible.
 	function lapSpan() {
-		return R.coords.lapSpan(R.camera.period, render.width);
+		var camera = R.camera;
+		var width = render.width + (camera.directionLock ? render.height : 0);
+
+		return R.coords.lapSpan(camera.period, width);
+	}
+
+	function chartAnchorX(camera) {
+		return camera.directionLock ? camera.screenOriginX :
+			camera.width * R.constants.view.cameraAnchorFraction;
+	}
+
+	function beginCameraTransform(context) {
+		var camera = R.camera;
+
+		if (!camera.directionLock) {
+			return false;
+		}
+		context.save();
+		context.translate(camera.screenOriginX, camera.screenOriginY);
+		context.rotate(camera.screenRotation);
+		context.translate(-camera.screenOriginX, -camera.screenOriginY);
+		return true;
 	}
 
 	function padScreenX(pad) {
@@ -160,7 +182,7 @@
 		context.lineWidth = 3;
 		context.strokeStyle = focus.active ? 'rgba(100, 213, 194, 0.75)' : 'rgba(100, 213, 194, 0.42)';
 		context.beginPath();
-		previousX = camera.width * R.constants.view.cameraAnchorFraction;
+		previousX = chartAnchorX(camera);
 		for (i = 0; i <= LEG_SAMPLES; i += 1) {
 			camera.project(from.wx + span * i / LEG_SAMPLES, 0, point);
 			x = R.coords.wrapScreenX(point.x, previousX, camera.period);
@@ -184,7 +206,7 @@
 		context.lineWidth = 2;
 		context.strokeStyle = 'rgba(244, 199, 106, 0.55)';
 		context.beginPath();
-		previousX = camera.width * R.constants.view.cameraAnchorFraction;
+		previousX = chartAnchorX(camera);
 		for (i = 0; i <= LEG_SAMPLES; i += 1) {
 			camera.project(to.wx - span * i / LEG_SAMPLES, 0, point);
 			x = R.coords.wrapScreenX(point.x, previousX, camera.period);
@@ -276,6 +298,7 @@
 		var x;
 		var copy;
 		var i;
+		var margin = camera.directionLock ? render.height : 40;
 
 		if (render.curves.ground > -1) {
 			return;
@@ -297,7 +320,7 @@
 			}
 			for (copy = -laps; copy <= laps; copy += 1) {
 				x = point.x + copy * camera.period;
-				if (x < -40 || x > render.width + 40) {
+				if (x < -margin || x > render.width + margin) {
 					continue;
 				}
 				drawPadMarker(context, pad, x, point.y, isCurrent, isTarget,
@@ -577,6 +600,7 @@
 		var halfHeight;
 		var thin;
 		var reach;
+		var margin;
 		var x;
 		var mid;
 		var angle;
@@ -586,10 +610,11 @@
 		halfHeight = Math.max(render.minBodyHeight, (lens.nearY - lens.farY) * 0.5);
 		x = lens.centerX + offsetX;
 		mid = lens.centerY;
-		if (x < -halfWidth * 4 || x > render.width + halfWidth * 4) {
+		margin = R.camera.directionLock ? render.height : 0;
+		if (x < -margin - halfWidth * 4 || x > render.width + margin + halfWidth * 4) {
 			return;
 		}
-		if (mid - halfHeight > render.height || mid + halfHeight < 0) {
+		if (mid - halfHeight > render.height + margin || mid + halfHeight < -margin) {
 			return;
 		}
 		thin = halfWidth < icon && halfHeight < icon;
@@ -752,6 +777,7 @@
 		var previousX;
 		var laps;
 		var width = render.width;
+		var margin = camera.directionLock ? render.height : width * 0.25;
 		var started;
 		var copy;
 		var x;
@@ -790,7 +816,7 @@
 					x = previousX + copy * lens.period;
 					// Only the cylinder needs the cull: its laps would otherwise
 					// each draw the whole curve. A flat view draws it once.
-					if (lens.period > 0 && (x < -width * 0.25 || x > width * 1.25)) {
+					if (lens.period > 0 && (x < -margin || x > width + margin)) {
 						started = false;
 						continue;
 					}
@@ -845,7 +871,8 @@
 
 	function drawCoastTrace(context) {
 		var trace = R.trajectory.trace;
-		var period = R.camera.period;
+		var camera = R.camera;
+		var period = camera.period;
 		var point = render.scratch.path;
 		var previousX = 0;
 		var began = false;
@@ -862,7 +889,7 @@
 		for (i = 0; i < trace.count; i += 1) {
 			projectPathPoint(trace.points[i * 2], trace.points[i * 2 + 1], point);
 			point.x = R.coords.wrapScreenX(point.x, began ? previousX :
-				render.width * R.constants.view.cameraAnchorFraction, period);
+				chartAnchorX(camera), period);
 			if (!began || pathBreak(previousX, point.x, point.y)) {
 				context.moveTo(point.x, point.y);
 			} else {
@@ -878,7 +905,8 @@
 
 	function drawTrailRange(context, first, length, alpha) {
 		var path = R.flightPath;
-		var period = R.camera.period;
+		var camera = R.camera;
+		var period = camera.period;
 		var point = render.scratch.path;
 		var start = (path.head - path.count + path.capacity) % path.capacity;
 		var previousX = 0;
@@ -894,7 +922,7 @@
 			index = (start + i) % path.capacity;
 			projectPathPoint(path.points[index * 2], path.points[index * 2 + 1], point);
 			point.x = R.coords.wrapScreenX(point.x, began ? previousX :
-				render.width * R.constants.view.cameraAnchorFraction, period);
+				chartAnchorX(camera), period);
 			if (!began || pathBreak(previousX, point.x, point.y)) {
 				context.moveTo(point.x, point.y);
 			} else {
@@ -1626,6 +1654,7 @@
 		var vxDir;
 		var vyDir;
 		var target = R.world.findPadById(game.targetPadId);
+		var pointer = render.scratch.pointer;
 		var deltaX = target ? R.util.wrapDelta(target.wx - rocket.wx, R.world.planet.circumference) : 0;
 
 		// Aim tick ahead of the nose, and dashed line to cursor in manual flight.
@@ -1636,7 +1665,8 @@
 		context.beginPath();
 		context.moveTo(rx + Math.sin(rocket.heading) * 34, ry - Math.cos(rocket.heading) * 34);
 		if (!R.autopilot.enabled && R.input.pointerActive) {
-			context.lineTo(R.input.pointerX, R.input.pointerY);
+			R.camera.unrotateScreen(R.input.pointerX, R.input.pointerY, pointer);
+			context.lineTo(pointer.x, pointer.y);
 		} else {
 			context.lineTo(rx + Math.sin(rocket.heading) * 62, ry - Math.cos(rocket.heading) * 62);
 		}
@@ -1725,6 +1755,7 @@
 			point.y = input.pointerY;
 		} else {
 			R.camera.project(input.worldPoint.x, input.worldPoint.y, point);
+			R.camera.rotateScreen(point.x, point.y, point);
 		}
 		context.strokeStyle = 'rgba(229, 246, 247, 0.88)';
 		context.lineWidth = 1;
@@ -1778,12 +1809,13 @@
 		var impact = R.trajectory.impact;
 		var camera = R.camera;
 		var point = render.scratch.coast;
-		var anchorX = camera.width * R.constants.view.cameraAnchorFraction;
+		var anchorX = chartAnchorX(camera);
 		var laps = lapSpan();
 		var color;
 		var base;
 		var copy;
 		var x;
+		var margin = camera.directionLock ? render.width + render.height : 20;
 
 		if (game.phase !== 'flying' || !impact.valid || render.curves.ground !== -1) {
 			return;
@@ -1804,7 +1836,7 @@
 		base = R.coords.wrapScreenX(point.x, anchorX, camera.period);
 		for (copy = -laps; copy <= laps; copy += 1) {
 			x = base + copy * camera.period;
-			if (x < -20 || x > render.width + 20) {
+			if (x < -margin || x > render.width + margin) {
 				continue;
 			}
 			drawCoastMarkerAt(context, x, point.y, color);
@@ -1894,11 +1926,14 @@
 	// system, the altitude ladder and the ground. `render.draw` adds the game
 	// on top; the projection test page calls this directly.
 	render.drawChart = function(context, game) {
+		var transformed;
+
 		context.clearRect(0, 0, render.width, render.height);
 		context.fillStyle = render.skyGradient;
 		context.fillRect(0, 0, render.width, render.height);
 		R.sky.ensure();
 		render.solveGround();
+		transformed = beginCameraTransform(context);
 		drawSkyShade(context);
 		drawStars(context);
 		drawAirBand(context, game);
@@ -1906,6 +1941,9 @@
 		drawSkyBodies(context, game);
 		drawAltitudeScale(context);
 		drawGround(context);
+		if (transformed) {
+			context.restore();
+		}
 	};
 
 	// A point marker for the projection page: the thing whose motion the chart
@@ -1914,6 +1952,7 @@
 		var point = render.scratch.marker;
 
 		R.camera.project(wx, wy, point);
+		R.camera.rotateScreen(point.x, point.y, point);
 		context.beginPath();
 		context.arc(point.x, point.y, 5, 0, Math.PI * 2);
 		context.fillStyle = '#f4c76a';
@@ -1930,12 +1969,14 @@
 		var rocket = game.rocket;
 		var stage = R.rocket.activeStage(rocket);
 		var flameThrottle = stage && stage.fuelMass > 0 ? rocket.throttle : 0;
+		var transformed;
 
 		context.clearRect(0, 0, render.width, render.height);
 		context.fillStyle = render.skyGradient;
 		context.fillRect(0, 0, render.width, render.height);
 		R.sky.ensure();
 		render.solveGround();
+		transformed = beginCameraTransform(context);
 		drawSkyShade(context);
 		drawStars(context);
 		drawAirBand(context, game);
@@ -1954,6 +1995,9 @@
 		}
 		R.rocket.draw(context, render.scratch.rocket.x, render.scratch.rocket.y, rocket.heading, flameThrottle);
 		drawExplosion(context, game);
+		if (transformed) {
+			context.restore();
+		}
 		drawMissionPanel(context, game);
 		if (game.phase === 'flying') {
 			drawPilotHud(context, game);

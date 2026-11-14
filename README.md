@@ -145,16 +145,30 @@ geometry, so a circular coast at a body's radius keeps pace with it. Delivery
 autopilot stays below circular speed; manual flight can orbit or escape.
 Multi-body gravity, encounters and landing on catalog bodies remain future work.
 
-The top bar's **view** selector (key `V`) changes how the plane is put on
-screen. *Real scale* is the plane as it is — the hull at the centre, one scale,
-the world a circle — fitted to keep the ground in view and zoomed by the wheel
-from one hull to the whole system. *Real · log* (experimental) keeps every
-bearing from the surface point nearest the hull and compresses only distance,
-so the whole system fits around a ground that curls away below. *Chart · ship*
-is the default log-polar chart read from the hull. *Chart · body* reads the
-same chart from the centre of the body whose reach the hull is in, so that
-body's whole surface stays the flat ground line; far enough out it hands the
-chart to the star. `experiments/view-mode-test.js` pins all four.
+The top bar's **view** selector (key `V`) offers complementary scale and
+reference-frame choices. *Real scale* draws the plane as it is: the hull at the
+centre, one scale, and the world as a circle; it auto-fits nearby ground and
+wheel-zooms from the hull to the wider system. *Real · log* (experimental) keeps
+the same bearings but compresses distance from the nearest surface point, so
+the wider system fits around a ground that curls away below. *Chart · rocket*
+is the default log-polar chart: it follows the rocket's ground point in flight.
+*Chart · local body* automatically selects the nearby visual body, holds its
+centre, and unwraps its surface as the ground line; a clicked seat left by the
+rocket-relative chart does not pin it. Selection uses geometric reach bands
+with hysteresis, not calculated gravity: catalog bodies have no mass and only
+the active world gravitates in the simulation. The star hand-off is likewise a
+visual chart transition, not a physical sphere-of-influence model.
+
+*Prograde lock · rocket* uses that body-centred chart, anchors the rocket near
+the lower centre, and rolls the view so its velocity points screen-up. At rest,
+where prograde is undefined, it follows the nose. *Nose lock · rocket* uses the
+same anchor and body selection but follows rocket attitude instead. In both,
+the surface remains unwrapped in chart space and rolls on screen with the
+locked direction; mouse aim is relative to that direction. The frame transform
+is generic; the rocket is the only selectable object today.
+`experiments/view-mode-test.js` checks all six modes, the nearest-surface
+handover and both lock axes; `experiments/render-smoke-test.js` exercises their
+renderer paths.
 
 The deck header carries a **Test mode** switch. It rates every build
 `constants.rocket.testMultiplier` (20) times stronger than the catalog does —
@@ -171,13 +185,14 @@ documents and in worklog names.
 
 ## Plans (subject numbers inside, short descriptive filenames)
 Active:
-- [`flight-sky-plan.md`](./flight-sky-plan.md) — Aerodynamics, safer guidance, flight diagnostics (0.3.1–0.3.4), the inter-planet sky (0.3.7) and the log-polar system chart with its pivot hand-over (0.3.8) and the view scale control.
+- [`flight-sky-plan.md`](./flight-sky-plan.md) — Aerodynamics, safer guidance, flight diagnostics (0.3.1–0.3.4), the inter-planet sky (0.3.7), the log-polar chart and pivot hand-over (0.3.8), and the view modes including prograde and nose locks.
 - [`campaign-plan.md`](./campaign-plan.md) — Milestones & campaign arc: company milestones, rewards, world unlocks and a dominant-courier end condition.
 - [`deck-hud-plan.md`](./deck-hud-plan.md) — Self-explained deck & HUD.
 - [`damage-rivals-plan.md`](./damage-rivals-plan.md) — Damage & failures (0.5.1) and competitor pressure (0.5.2), both shipped.
 - [`market-parts-plan.md`](./market-parts-plan.md) — Economy balance, parts catalog with service/repair, market prices & contract board.
 
 Increments of the active plans, recorded in `archive/` as they land:
+- [`archive/heading-lock-worklog.md`](./archive/heading-lock-worklog.md) — Prograde and nose-locked rocket views, automatic local-body selection, and clearer chart reference frames.
 - [`archive/view-scale-worklog.md`](./archive/view-scale-worklog.md) — View scale control: real scale, real log, chart from the ship, chart from the body.
 - [`archive/0.6.2-worklog.md`](./archive/0.6.2-worklog.md) — Campaign record, four world ladders, gated world menu, settlement card, measured reference runs (0.6.2).
 - [`archive/0.6.1-worklog.md`](./archive/0.6.1-worklog.md) — Company milestones on Verdant and the Gentle-profile lock (0.6.1).

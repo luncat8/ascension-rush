@@ -29,9 +29,11 @@
 	// One pointer position object for the whole session: a move event is as hot
 	// as a frame while the player drags.
 	var point = { x: 0, y: 0 };
+	var chartPoint = { x: 0, y: 0 };
 
 	function updateWorldReadout(camera) {
-		camera.unproject(input.pointerX, input.pointerY, input.worldPoint);
+		camera.unrotateScreen(input.pointerX, input.pointerY, chartPoint);
+		camera.unproject(chartPoint.x, chartPoint.y, input.worldPoint);
 		input.debugText = 'E ' + Math.round(input.worldPoint.x) + ' m  ·  ALT ' +
 			Math.round(input.worldPoint.y) + ' m';
 	}

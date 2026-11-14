@@ -71,6 +71,7 @@
 			option = root.document.createElement('option');
 			option.value = modes[i].id;
 			option.textContent = modes[i].label;
+			option.title = modes[i].description;
 			select.appendChild(option);
 		}
 		select.value = R.sky.mode.id;
@@ -194,6 +195,7 @@
 		var input = R.input;
 		var dx;
 		var dy;
+		var desiredHeading;
 
 		if (currentGame.phase !== 'flying') {
 			controls.reset();
@@ -223,7 +225,13 @@
 		if (dx * dx + dy * dy < 64) {
 			return;
 		}
-		controls.applyHeading(state, Math.atan2(dx, dy), dt);
+		desiredHeading = Math.atan2(dx, dy);
+		if (R.camera.directionLock) {
+			// Mouse aim is relative to whichever axis the camera holds screen-up:
+			// prograde in one mode, the rocket's nose in the other.
+			desiredHeading -= R.camera.screenRotation;
+		}
+		controls.applyHeading(state, desiredHeading, dt);
 	};
 
 	if (typeof module !== 'undefined' && module.exports) {
