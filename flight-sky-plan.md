@@ -674,3 +674,13 @@ aerodynamics helpers instead.
   The launch gate only certifies the first stage, so a build can still be flown
   whose last stage cannot land it; 0.3.4 leaves those to fail in flight, and
   0.4's builder rework is the natural place to name them before launch.
+
+## Next Development: View Scale Control
+
+Add a view scale control in the header/chart UI to switch between projection and scale modes:
+
+1. **Real scale (unprojected):** True-to-scale rendering without special projections.
+2. **Logarithmic surface-centered scale (experimental):** Same as real scale, but using a logarithmic radial/distance scale centered on the nearest surface point.
+3. **Object-relative transformed scale:** Transformed scale relative to the selected object (rocket for now), with the surface of the dominant gravity-influence body unwrapped to a line.
+4. **Gravity-body-relative transformed scale:** Transformed scale relative to the dominant gravity-influence body (the body the rocket orbits or whose gravity influence exceeds other bodies), with its surface unwrapped to a line. This is close to the current mode, which currently has a body-to-star transformation bug, mostly shows space relative to the body surface, and has issues switching to other bodies.
+

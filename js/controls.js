@@ -21,6 +21,13 @@
 		}
 	}
 
+	function updateTimeDisplay() {
+		var el = root.document && root.document.getElementById('time-scale-value');
+		if (el && R.game) {
+			el.textContent = R.game.timeScale.toFixed(2).replace(/\.?0+$/, '') + 'x';
+		}
+	}
+
 	function adjustTimeScale(step) {
 		var scales = R.constants.time.scales;
 		var index;
@@ -31,6 +38,7 @@
 		index = R.util.clamp(R.game.timeScaleIndex + step, 0, scales.length - 1);
 		R.game.timeScaleIndex = index;
 		R.game.timeScale = scales[index];
+		updateTimeDisplay();
 	}
 
 	function onKeyDown(event) {
@@ -80,9 +88,24 @@
 	}
 
 	controls.initialize = function() {
+		var doc = root.document;
+		var slower = doc && doc.getElementById('time-slower');
+		var faster = doc && doc.getElementById('time-faster');
+
 		root.addEventListener('keydown', onKeyDown);
 		root.addEventListener('keyup', onKeyUp);
 		root.addEventListener('blur', controls.reset);
+		if (slower) {
+			slower.addEventListener('click', function() {
+				adjustTimeScale(-1);
+			});
+		}
+		if (faster) {
+			faster.addEventListener('click', function() {
+				adjustTimeScale(1);
+			});
+		}
+		updateTimeDisplay();
 	};
 
 	controls.reset = function() {
@@ -98,6 +121,7 @@
 		}
 		R.game.timeScaleIndex = R.util.clamp(index, 0, scales.length - 1);
 		R.game.timeScale = scales[R.game.timeScaleIndex];
+		updateTimeDisplay();
 	};
 
 	// Shared actuators: player input and autopilot commands both pass through
