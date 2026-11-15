@@ -197,6 +197,74 @@
 		return best;
 	};
 
+	// A draft build that lifts `payloadMass`: the largest-bay type scaled up,
+	// or the world's reference build when the fleet has nothing bigger. Fuel
+	// is scaled proportionally until the bay covers the cargo plus a small
+	// margin, so the suggestion is a bigger version of a rocket the player
+	// already knows rather than a fresh design. Null when even full tanks
+	// cannot lift it; the workshop is where a different engine or tank would
+	// have to come from.
+	planner.suggestBuild = function(payloadMass) {
+		var types = R.operations.state.types;
+		var planet = R.world.planet;
+		var settings = R.constants.rocket;
+		var partSettings = R.constants.parts;
+		var base = null;
+		var baseFuel = [];
+		var candidate;
+		var target;
+		var factor;
+		var maxed;
+		var i;
+		var j;
+
+		for (i = 0; i < types.length; i += 1) {
+			if (!base || planner.payloadLimit(types[i]) > planner.payloadLimit(base)) {
+				base = types[i];
+			}
+		}
+		candidate = {
+			stageCount: base ? base.stageCount : (planet.defaultFuel || settings.defaultStageFuel).length,
+			stages: []
+		};
+		for (j = 0; j < candidate.stageCount; j += 1) {
+			baseFuel.push(base ? base.stages[j].fuelMass : (planet.defaultFuel || settings.defaultStageFuel)[j]);
+			candidate.stages.push({
+				fuelMass: baseFuel[j],
+				strength: base ? base.stages[j].strength : settings.defaultStageStrength[j],
+				engineId: base ? (base.stages[j].engineId || partSettings.defaultEngineId) : partSettings.defaultEngineId,
+				tankId: base ? (base.stages[j].tankId || partSettings.defaultTankId) : partSettings.defaultTankId,
+				fairingId: base ? base.stages[j].fairingId : null
+			});
+		}
+		target = Math.min(settings.maxPayloadMass, payloadMass + 20);
+		factor = 1;
+		while (factor <= 8) {
+			maxed = true;
+			for (j = 0; j < candidate.stageCount; j += 1) {
+				candidate.stages[j].fuelMass = Math.min(settings.maxFuelMass,
+					Math.max(settings.minFuelMass, Math.round(baseFuel[j] * factor)));
+				if (candidate.stages[j].fuelMass < settings.maxFuelMass) {
+					maxed = false;
+				}
+			}
+			if (statsAt(candidate, 0).payloadLimit >= target) {
+				return {
+					id: null,
+					name: base ? base.name + ' uprated' : planet.name + ' hauler',
+					stageCount: candidate.stageCount,
+					nominalPayload: payloadMass,
+					stages: candidate.stages
+				};
+			}
+			if (maxed) {
+				return null;
+			}
+			factor *= 1.2;
+		}
+		return null;
+	};
+
 	// Measured averages for a route from the log: cash per leg and seconds
 	// per leg. Null when the route has not flown yet.
 	planner.measuredRoute = function(route) {

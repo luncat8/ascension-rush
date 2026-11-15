@@ -3,7 +3,10 @@
 A small 2D rocket-delivery game: wrap-around planets, staged rockets, manual
 flight or autopilot, pad-to-pad delivery, fuel/hull/payload economics, a
 logarithmic altitude view with a log-polar system chart, in-flight damage
-and failures, and a competing logistics company.
+and failures, and a competing logistics company. The ranked opportunity list can also open a
+pre-filled workshop design for an oversized contract when no existing fleet
+type can lift it; save the design as a new rocket type, then build it at the
+contract's origin.
 
 ## Status
 The 0.1 world/render scaffold, the 0.2 playable flight slice, the 0.3

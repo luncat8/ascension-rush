@@ -1406,6 +1406,15 @@ input[type="range"] {
 	cursor: pointer;
 }
 
+.opportunity-row .opp-main {
+	flex: 1;
+}
+
+.opportunity-build {
+	flex: 0 0 auto;
+	white-space: nowrap;
+}
+
 .opportunity-row:hover,
 .compare-row:hover {
 	border-color: rgba(125, 224, 202, 0.55);

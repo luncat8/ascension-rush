@@ -643,20 +643,39 @@
 	}
 
 	function opportunityRow(row) {
-		var button = el('button', 'opportunity-row');
+		var button = el('div', 'opportunity-row');
 		var main = el('span', 'opp-main');
 		var contract = row.contract || null;
 		var fits = contract ? row.fitsType : row.fits;
+		var suggestion = contract && !fits && !row.fittingType ? R.planner.suggestBuild(row.payloadMass) : null;
 		var badgeText = contract ? (fits ? 'CONTRACT · FITS' : 'NEEDS BIGGER ROCKET' +
 			(row.fittingType ? ' · ' + row.fittingType.name : ' · BUILD IN WORKSHOP')) : 'STANDING · FITS';
 
-		button.type = 'button';
+		button.setAttribute('role', 'button');
+		button.tabIndex = 0;
+		on(button, 'keydown', function(event) {
+			if (event.key === 'Enter' || event.key === ' ') {
+				event.preventDefault();
+				button.click();
+			}
+		});
 		main.appendChild(el('strong', null, padName(row.fromPadId) + ' → ' + padName(row.toPadId) +
 			' · ' + mass(row.payloadMass)));
 		main.appendChild(el('small', null, 'pays ' + money(row.reward) + ' ($' + row.pricePerKg.toFixed(2) +
 			'/kg) · fuel ' + money(row.fuelCost) + (contract && contract.fragile ? ' · FRAGILE' : '')));
 		main.appendChild(el('span', 'fit-badge' + (fits ? '' : ' blocked'), badgeText));
 		button.appendChild(main);
+		if (suggestion) {
+			var build = cardButton('Build the rocket that fits', function(event) {
+				if (event && event.stopPropagation) {
+					event.stopPropagation();
+				}
+				loadContract(contract);
+				R.builder.open(R.game, { draft: suggestion, padId: contract.fromPadId });
+			});
+			build.className = 'ghost-button opportunity-build';
+			button.appendChild(build);
+		}
 		button.appendChild(el('span', 'opp-profit ' + (row.profit >= 0 ? 'positive' : 'negative'),
 			profitText(row.profit) + ' · $' + Math.round(row.profitPerMinute) + '/min'));
 		on(button, 'click', function() {
@@ -953,6 +972,11 @@
 			form.contractId = null;
 		}
 	}
+
+	deck.onTypeSaved = function(type) {
+		form.typeId = type.id;
+		form.rocketId = null;
+	};
 
 	function loadContract(contract) {
 		form.sourcePadId = contract.fromPadId;

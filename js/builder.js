@@ -87,20 +87,26 @@
 		}
 	}
 
-	function loadType(type) {
+	// A draft is copied in, never aliased: the workshop edits its own record
+	// and the type it came from stays untouched until save.
+	function copyDraft(source) {
 		var j;
 
-		builder.draft.id = type.id;
-		builder.draft.name = type.name;
-		builder.draft.stageCount = type.stageCount;
-		builder.draft.nominalPayload = type.nominalPayload;
+		builder.draft.id = source.id || null;
+		builder.draft.name = source.name || '';
+		builder.draft.stageCount = source.stageCount;
+		builder.draft.nominalPayload = source.nominalPayload;
 		for (j = 0; j < stageSlots; j += 1) {
-		builder.draft.stages[j].fuelMass = j < type.stageCount ? type.stages[j].fuelMass : settings.minFuelMass;
-		builder.draft.stages[j].strength = j < type.stageCount ? type.stages[j].strength : settings.defaultStageStrength[j];
-		builder.draft.stages[j].engineId = j < type.stageCount ? type.stages[j].engineId : partSettings.defaultEngineId;
-		builder.draft.stages[j].tankId = j < type.stageCount ? type.stages[j].tankId : partSettings.defaultTankId;
-		builder.draft.stages[j].fairingId = j < type.stageCount ? type.stages[j].fairingId : null;
+			builder.draft.stages[j].fuelMass = j < source.stageCount ? source.stages[j].fuelMass : settings.minFuelMass;
+			builder.draft.stages[j].strength = j < source.stageCount ? source.stages[j].strength : settings.defaultStageStrength[j];
+			builder.draft.stages[j].engineId = j < source.stageCount ? source.stages[j].engineId : partSettings.defaultEngineId;
+			builder.draft.stages[j].tankId = j < source.stageCount ? source.stages[j].tankId : partSettings.defaultTankId;
+			builder.draft.stages[j].fairingId = j < source.stageCount ? source.stages[j].fairingId : null;
 		}
+	}
+
+	function loadType(type) {
+		copyDraft(type);
 	}
 
 	function readInputs() {
@@ -379,6 +385,9 @@
 			builder.draft.id = type.id;
 			R.deck.announce('Rocket type ' + type.name + ' saved.');
 		}
+		if (R.deck && R.deck.onTypeSaved) {
+			R.deck.onTypeSaved(type);
+		}
 		update();
 		return true;
 	}
@@ -406,7 +415,12 @@
 			return;
 		}
 		builder.padId = options && options.padId ? options.padId : null;
-		if (options && options.typeId) {
+		if (options && options.draft) {
+			// A pre-filled draft is a new type, never an edit of the type it
+			// was scaled from: saving it must not overwrite that rocket.
+			copyDraft(options.draft);
+			builder.draft.id = null;
+		} else if (options && options.typeId) {
 			loadType(R.operations.findType(options.typeId));
 		} else if (builder.lastPlanetId !== R.world.planet.id) {
 			applyPlanetDefaults();
