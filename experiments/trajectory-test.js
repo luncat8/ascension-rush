@@ -156,6 +156,18 @@ trajectory.rollout(distant, trajectory.coastStep, trajectory.maxCoastSteps * 8, 
 assert.ok(comparison.valid, 'the same state does reach the ground given the steps');
 assert.ok(comparison.seconds > trajectory.coastHorizon, 'and it is the horizon that cut the prediction short');
 
+var longCoast = coastState(500, 1000, 20, 25, 0, 500);
+trajectory.predictCoast(longCoast, predicted, trajectory.trace);
+assert.ok(predicted.valid && predicted.seconds > 100, 'a long coast reaches the ground within the horizon');
+assert.ok(trajectory.trace.count > 256, 'the trace has room for the whole prediction');
+assert.ok(Math.abs(trajectory.trace.points[(trajectory.trace.count - 1) * 2] - predicted.wx) < 0.01,
+	'the final trace point reaches the predicted longitude');
+assert.equal(trajectory.trace.points[(trajectory.trace.count - 1) * 2 + 1], 0,
+	'the final trace point reaches the ground');
+trajectory.predictCoast(distant, predicted, trajectory.trace);
+assert.equal(predicted.valid, false, 'a longer coast still has no impact within the horizon');
+assert.ok(trajectory.trace.count > 256, 'the partial trace extends to the horizon too');
+
 // ---- Wrap-around longitudes and the relation to the selected pad.
 R.world.initialize('verdant');
 var circumference = R.world.planet.circumference;
@@ -266,5 +278,35 @@ coastedWorlds.forEach(function(planetId) {
 	assert.ok(Math.abs(flownGame.lastReport.targetError) <= R.world.planet.landingRadius,
 		planetId + ' and a delivered flight reports a pad error inside the landing radius');
 });
+
+// Tinmoon crosses escape speed on a normal delivery, but the escape-energy
+// indication and an impact inside the forecast horizon are independent.
+R.world.initialize('tinmoon');
+var tinmoonFlight = harness.launch(
+	R.world.pads[0], R.world.pads[2].id,
+	harness.referenceBuild(R.world.planet, R.world.pads[2].id), 'balanced', 2
+);
+var coastCases = { boundHorizon: false, unboundHorizon: false, unboundImpact: false };
+var frames = 0;
+var unbound;
+
+assert.ok(tinmoonFlight, 'the Tinmoon reference build launches');
+while (tinmoonFlight.phase === 'flying' && tinmoonFlight.flight.elapsed < harness.maxSeconds) {
+	R.controls.update(tinmoonFlight, step * tinmoonFlight.timeScale);
+	R.physics.advance(tinmoonFlight, step);
+	frames += 1;
+	if (tinmoonFlight.phase !== 'flying' || frames % 60 !== 0) {
+		continue;
+	}
+	trajectory.update(tinmoonFlight);
+	unbound = R.physics.isUnbound(tinmoonFlight.rocket);
+	coastCases.boundHorizon = coastCases.boundHorizon || (!unbound && !trajectory.impact.valid);
+	coastCases.unboundHorizon = coastCases.unboundHorizon || (unbound && !trajectory.impact.valid);
+	coastCases.unboundImpact = coastCases.unboundImpact || (unbound && trajectory.impact.valid);
+}
+assert.equal(tinmoonFlight.lastReport.status, 'delivered', 'the 120 fps, 2x Tinmoon flight delivers');
+assert.ok(coastCases.boundHorizon, 'a bound coast can exceed the horizon');
+assert.ok(coastCases.unboundHorizon, 'an unbound coast can exceed the horizon');
+assert.ok(coastCases.unboundImpact, 'an unbound coast can still hit the surface');
 
 console.log('Trajectory and coast-impact tests passed.');

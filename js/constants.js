@@ -149,7 +149,6 @@
 		trailInterval: 0.2,
 		trailCapacity: 320,
 		traceStrideSteps: 42,
-		traceCapacity: 256,
 		// World orbit around the star: the active world's centre in heliocentric
 		// coordinates; in the world-centred plane the star appears at the
 		// negated vector. Moons orbit the world, planets orbit the star.

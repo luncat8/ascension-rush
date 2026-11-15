@@ -28,8 +28,8 @@
 	// A strided copy of the same rollout, so the map can draw the coast path
 	// above the atmosphere without integrating a second trajectory. Owned by
 	// the caller; nothing in the predictor allocates.
-	trajectory.traceCapacity = R.constants.sky.traceCapacity;
 	trajectory.traceStride = R.constants.sky.traceStrideSteps;
+	trajectory.traceCapacity = Math.ceil(trajectory.maxCoastSteps / trajectory.traceStride) + 2;
 	trajectory.trace = {
 		points: new Float32Array(trajectory.traceCapacity * 2),
 		count: 0

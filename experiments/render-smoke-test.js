@@ -425,6 +425,54 @@ assert.ok(drawnText.indexOf('OUT OF HORIZON') >= 0, 'an invalid forecast is anno
 assert.equal(drawnText.indexOf('COAST'), -1, 'and no marker is drawn for it');
 R.trajectory.update(coastGame);
 
+// These Tinmoon states are sampled from a reference delivery at 120 fps, 2x.
+// Escape energy and an impact inside the horizon must be shown independently.
+R.world.initialize('tinmoon');
+coastGame.currentPadId = R.world.pads[0].id;
+coastGame.targetPadId = R.world.pads[2].id;
+flightRocket.wx = R.world.pads[0].wx;
+flightRocket.wy = 73;
+flightRocket.vx = -61;
+flightRocket.vy = 27;
+R.trajectory.update(coastGame);
+R.sky.reset();
+R.sky.update(coastGame, 0.016);
+drawnText.length = 0;
+R.render.draw(coastGame);
+assert.ok(drawnText.includes('OUT OF HORIZON'), 'a bound, long coast has no impact within the horizon');
+assert.ok(!drawnText.includes('UNBOUND'), 'a long forecast alone does not imply escape');
+
+flightRocket.wy = 130;
+flightRocket.vx = -88;
+flightRocket.vy = 29;
+R.trajectory.update(coastGame);
+drawnText.length = 0;
+R.render.draw(coastGame);
+assert.ok(drawnText.includes('OUT OF HORIZON'), 'the unbound coast can exceed the horizon');
+assert.ok(drawnText.includes('UNBOUND'), 'escape energy is reported separately');
+assert.ok(!drawnText.includes('COAST'), 'the missing impact has no marker');
+
+flightRocket.wy = 384;
+flightRocket.vx = -89;
+flightRocket.vy = -47;
+R.trajectory.update(coastGame);
+drawnText.length = 0;
+R.render.draw(coastGame);
+assert.ok(drawnText.includes('UNBOUND'), 'an incoming rocket can have escape energy');
+assert.ok(!drawnText.includes('OUT OF HORIZON'), 'its predicted impact is still displayed');
+assert.ok(drawnText.includes('COAST'), 'and the impact has a ground marker');
+
+R.world.initialize('verdant');
+coastGame.currentPadId = R.world.pads[0].id;
+coastGame.targetPadId = R.world.targetPadId;
+flightRocket.wx = flightPad.wx;
+flightRocket.wy = 1400;
+flightRocket.vx = 80;
+flightRocket.vy = 0;
+R.sky.reset();
+R.sky.update(coastGame, 0.016);
+R.trajectory.update(coastGame);
+
 // The map shows one whole circumference, so the marker comes from the
 // viewport's periodic copy of the impact longitude: a coast that wraps the world
 // stays on screen, and at the seam it is drawn on both edges like the pads are.

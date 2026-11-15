@@ -146,9 +146,11 @@ autopilot cruises at a fraction of the speed that holds the line it is flying,
 `sqrt((g + downward) * r)`: above circular speed whenever it is diving, because
 a fast flight has to push down to keep up with the ground. The fraction is what
 leaves thrust in hand — a flight at the hold speed spends its whole budget on the
-vertical and has none left for the pad — and it keeps a delivery below local
-escape speed, so a cut-off coast always comes down. Manual flight can orbit or
-escape the same way.
+vertical and has none left for the pad. The cap does not guarantee a bound coast:
+on low-gravity Tinmoon a delivery can exceed escape speed. The coast forecast
+shows an impact only if it reaches the surface within its 120-second horizon;
+`OUT OF HORIZON` does not prove escape, and even an `UNBOUND` trajectory can hit
+the ground. Manual flight can orbit or escape the same way.
 Multi-body gravity, encounters and landing on catalog bodies remain future work.
 
 The top bar's **view** selector (key `V`) offers complementary scale and
