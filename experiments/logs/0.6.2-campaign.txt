@@ -1,142 +1,178 @@
 === Verdant · reference player · up to 60 legs · market seed 1842843656 · arrives REP 50 · Skybolt Logistics REP 50 skill 0.250 ===
  leg  route                     cargo            profile   result        cash Δ     cash    rival  REP  milestone
    1  Homeport → Farport        120 kg standing  balanced  delivered      $4625   $44625   $40000   51  1 First receipt ($1,000 grant)
-   2  Farport → Westport        120 kg contract  balanced  delivered       $754   $45379   $42446   52  
-   3  Westport → Eastport       120 kg contract  balanced  delivered       $923   $46302   $43250   53  
-   4  Eastport → Westport       120 kg standing  balanced  delivered       $852   $47154   $44503   54  
-   5  Westport → Homeport       120 kg contract  balanced  delivered       $602   $47756   $44503   55  2 On the board (Gentle profile unlocked)
-   6  Homeport → Farport        120 kg standing  balanced  delivered      $2106   $49862   $44503   56  
-   7  Farport → Homeport        120 kg standing  balanced  delivered       $605   $50467   $44503   57  
-   8  Homeport → Farport        120 kg standing  balanced  delivered       $909   $51376   $44503   58  
-   9  Farport → Homeport        120 kg standing  balanced  delivered      $2202   $53578   $44503   59  3 Haulier ($1,500 grant)
-  10  Homeport → Farport        120 kg standing  balanced  delivered       $818   $54396   $47532   60  
-  11  Farport → Homeport        120 kg standing  balanced  delivered       $814   $55209   $47532   61  
-  12  Homeport → Farport        120 kg standing  balanced  delivered       $608   $55817   $47725   62  
-  13  Farport → Homeport        120 kg standing  balanced  delivered       $785   $56602   $47725   63  
-  14  Homeport → Farport        120 kg standing  balanced  delivered       $609   $57212   $47725   64  
-  15  Farport → Homeport        120 kg standing  balanced  delivered      $1629   $58841   $47725   65  4 Reliable service ($2,000 grant · Skybolt Logistics takes notice)
-  16  Homeport → Eastport       120 kg standing  balanced  delivered       $175   $59016   $48043   66  
-  17  Eastport → Farport         60 kg fragile   gentle    delivered      $2831   $61847   $48043   67  5 Long reach ($2,500 grant · Tinmoon opened)
-  18  Farport → Westport        120 kg standing  balanced  delivered      $1346   $63193   $48043   68  
-  19  Westport → Eastport       120 kg standing  balanced  delivered      $2152   $65346   $49872   69  6 Dominant courier (Dominant courier of Verdant)
+   2  Farport → Westport        120 kg contract  balanced  delivered       $584   $45209   $42446   52  
+   3  Westport → Eastport       120 kg contract  balanced  delivered       $937   $46146   $43266   53  
+   4  Eastport → Westport       120 kg standing  balanced  delivered       $684   $46831   $44534   54  
+   5  Westport → Homeport       120 kg contract  balanced  delivered       $440   $47271   $44534   55  2 On the board (Gentle profile unlocked)
+   6  Homeport → Farport        120 kg standing  balanced  delivered      $2121   $49392   $44534   56  
+   7  Farport → Homeport        120 kg standing  balanced  delivered       $436   $49828   $44534   57  
+   8  Homeport → Farport        120 kg standing  balanced  delivered       $742   $50570   $44534   58  
+   9  Farport → Homeport        120 kg standing  balanced  delivered      $2038   $52608   $44534   59  3 Haulier ($1,500 grant)
+  10  Homeport → Farport        120 kg standing  balanced  delivered       $647   $53255   $47578   60  
+  11  Farport → Homeport        120 kg standing  balanced  delivered       $654   $53909   $47578   61  
+  12  Homeport → Farport        120 kg standing  balanced  delivered       $438   $54347   $47578   62  
+  13  Farport → Homeport        120 kg standing  balanced  delivered       $626   $54973   $47578   63  
+  14  Homeport → Farport        120 kg standing  balanced  delivered       $494   $55468   $47578   64  
+  15  Farport → Homeport        120 kg standing  balanced  delivered      $1569   $57037   $48959   65  4 Reliable service ($2,000 grant · Skybolt Logistics takes notice)
+  16  Homeport → Farport        120 kg standing  balanced  delivered       $289   $57326   $48959   66  
+  17  Farport → Homeport        120 kg standing  balanced  delivered       $633   $57959   $48959   67  
+  18  Homeport → Farport        120 kg standing  balanced  delivered       $222   $58181   $49937   68  
+  19  Farport → Homeport        120 kg standing  balanced  delivered       $521   $58703   $49937   69  
+  20  Homeport → Westport       120 kg contract  balanced  delivered       $591   $59293   $49937   70  
+  21  Westport → Eastport       120 kg standing  balanced  delivered      $2044   $61337   $51617   71  
+  22  Eastport → Westport       120 kg standing  balanced  delivered       $645   $61982   $51617   72  
+  23  Westport → Eastport       120 kg standing  balanced  delivered       $592   $62574   $51617   73  
+  24  Eastport → Westport       120 kg standing  balanced  delivered       $504   $63078   $51617   74  
+  25  Westport → Eastport       120 kg standing  balanced  delivered       $536   $63614   $51617   75  
+  26  Eastport → Westport       120 kg standing  balanced  delivered       $683   $64297   $51617   76  
+  27  Westport → Eastport       120 kg standing  balanced  delivered       $520   $64817   $52644   77  
+  28  Eastport → Westport       120 kg standing  balanced  delivered      $-588   $64229   $52644   78  
+  29  Westport → Eastport       120 kg standing  balanced  delivered       $465   $64694   $54587   79  
+  30  Eastport → Westport       120 kg standing  balanced  delivered       $600   $65294   $55575   80  
+  31  Westport → Eastport       120 kg contract  balanced  delivered       $259   $65553   $57355   81  
+  32  Eastport → Farport        120 kg fragile   gentle    delivered      $3921   $69474   $57784   82  5 Long reach ($2,500 grant · Tinmoon opened) + 6 Dominant courier (Dominant courier of Verdant)
 
-Verdant ladder after 19 legs:
+Verdant ladder after 32 legs:
   1 First receipt        leg 1
   2 On the board         leg 5
   3 Haulier              leg 9
   4 Reliable service     leg 15
-  5 Long reach           leg 17
-  6 Dominant courier     leg 19
-  player $65346 · 19 deliveries · REP 69 | Skybolt Logistics $49872 · 7 deliveries · REP 57 · skill 0.445 · failed 0
-  Homeport     player 6 · rival 2
-  Eastport     player 3 · rival 2
-  Farport      player 7 · rival 0
-  Westport     player 3 · rival 3
+  5 Long reach           leg 32
+  6 Dominant courier     leg 32
+  player $69474 · 32 deliveries · REP 82 | Skybolt Logistics $57784 · 12 deliveries · REP 62 · skill 0.620 · failed 0
+  Homeport     player 8 · rival 2
+  Eastport     player 7 · rival 4
+  Farport      player 9 · rival 3
+  Westport     player 8 · rival 3
 
 === Tinmoon · reference player · up to 60 legs · market seed 83481194 · arrives REP 60 · Skybolt Logistics REP 60 skill 0.300 ===
  leg  route                     cargo            profile   result        cash Δ     cash    rival  REP  milestone
    1  Anchor → Rim Relay        120 kg standing  balanced  delivered      $1104   $41104   $40812   61  1 First dust ($250 grant)
-   2  Rim Relay → Anchor        120 kg standing  balanced  delivered       $339   $41442   $41268   62  
-   3  Anchor → Rim Relay        120 kg fragile   gentle    delivered       $437   $41879   $41268   63  
-   4  Rim Relay → Dustfield     120 kg contract  balanced  delivered       $308   $42187   $41268   64  
-   5  Dustfield → Anchor        120 kg contract  balanced  delivered       $498   $42685   $41407   65  2 Rock runner ($400 grant)
-   6  Anchor → Rim Relay        120 kg standing  balanced  delivered       $485   $43170   $41867   66  
-   7  Rim Relay → Anchor        120 kg standing  balanced  delivered       $242   $43412   $41867   67  
-   8  Anchor → Rim Relay        120 kg standing  balanced  delivered       $260   $43672   $42212   68  
-   9  Rim Relay → Anchor        120 kg standing  balanced  delivered       $745   $44417   $42212   69  3 Ore train ($500 grant)
-  10  Anchor → Rim Relay        120 kg standing  balanced  delivered       $242   $44659   $42212   70  
-  11  Rim Relay → Anchor        120 kg standing  balanced  delivered       $207   $44866   $42212   71  
-  12  Anchor → Rim Relay        120 kg standing  balanced  delivered       $812   $45678   $42212   72  4 In the black ($600 grant · Skybolt Logistics takes notice)
-  13  Rim Relay → Anchor        120 kg standing  balanced  delivered      $-151   $45527   $42400   73  
-  14  Anchor → Rim Relay        120 kg fragile   gentle    delivered       $936   $46463   $42400   74  5 Far side ($750 grant · Cinder opened)
-  15  Rim Relay → Dustfield     120 kg standing  balanced  delivered       $204   $46667   $42849   75  
-  16  Dustfield → Tinstack      120 kg standing  balanced  delivered       $373   $47041   $42920   76  
-  17  Tinstack → Dustfield      120 kg standing  balanced  delivered       $299   $47339   $42920   77  
-  18  Dustfield → Tinstack      120 kg standing  balanced  delivered       $311   $47650   $42920   78  
-  19  Tinstack → Dustfield      120 kg standing  balanced  delivered       $274   $47924   $42920   79  
-  20  Dustfield → Tinstack      120 kg standing  balanced  delivered       $278   $48201   $42920   80  6 Dominant courier (Dominant courier of Tinmoon)
+   2  Rim Relay → Anchor        120 kg standing  balanced  delivered       $-18   $41085   $41280   62  
+   3  Anchor → Rim Relay        120 kg fragile   gentle    delivered        $66   $41152   $41280   63  
+   4  Rim Relay → Dustfield     120 kg contract  balanced  delivered       $293   $41445   $41280   64  
+   5  Dustfield → Anchor        120 kg contract  balanced  delivered       $511   $41956   $41433   65  2 Rock runner ($400 grant)
+   6  Anchor → Rim Relay        120 kg standing  balanced  delivered       $497   $42453   $41908   66  
+   7  Rim Relay → Anchor        120 kg standing  balanced  delivered      $-125   $42328   $41908   67  
+   8  Anchor → Rim Relay        120 kg standing  balanced  delivered      $-104   $42224   $42238   68  
+   9  Rim Relay → Anchor        120 kg standing  balanced  delivered       $368   $42592   $42238   69  3 Ore train ($500 grant)
+  10  Anchor → Rim Relay        120 kg standing  balanced  delivered      $-103   $42489   $42238   70  
+  11  Rim Relay → Anchor        120 kg standing  balanced  delivered      $-154   $42335   $42238   71  
+  12  Anchor → Rim Relay        120 kg standing  balanced  delivered      $-140   $42195   $42341   72  
+  13  Rim Relay → Anchor        120 kg standing  balanced  delivered      $-155   $42040   $42828   73  
+  14  Anchor → Rim Relay        120 kg standing  balanced  delivered      $-101   $41938   $42828   74  
+  15  Rim Relay → Tinstack       90 kg fragile   gentle    delivered      $-146   $41792   $42828   75  
+  16  Tinstack → Dustfield      120 kg standing  balanced  delivered       $511   $42303   $42828   76  
+  17  Dustfield → Tinstack      120 kg standing  balanced  delivered       $295   $42598   $42828   77  
+  18  Tinstack → Dustfield      120 kg standing  balanced  delivered       $281   $42880   $42828   78  
+  19  Dustfield → Anchor        120 kg contract  balanced  delivered       $251   $43131   $42828   79  
+  20  Anchor → Rim Relay        120 kg standing  balanced  delivered       $557   $43688   $42828   80  
+  21  Rim Relay → Anchor        120 kg standing  balanced  delivered      $-770   $42918   $42828   81  
+  22  Anchor → Rim Relay        120 kg standing  balanced  delivered       $-74   $42844   $42828   82  
+  23  Rim Relay → Anchor        120 kg standing  balanced  delivered      $-168   $42676   $42828   83  
+  24  Anchor → Dustfield        120 kg fragile   gentle    delivered       $166   $42843   $42855   84  
+  25  Dustfield → Tinstack      120 kg standing  balanced  delivered       $562   $43405   $42855   85  
+  26  Tinstack → Anchor         120 kg fragile   gentle    delivered       $465   $43870   $42898   86  
+  27  Anchor → Rim Relay        120 kg standing  balanced  delivered       $428   $44299   $43034   87  
+  28  Rim Relay → Anchor        120 kg standing  balanced  delivered      $-158   $44141   $43034   88  
+  29  Anchor → Rim Relay        120 kg standing  balanced  delivered       $-67   $44074   $43429   89  
+  30  Rim Relay → Anchor        120 kg standing  balanced  delivered      $-107   $43967   $43699   90  
+  31  Anchor → Rim Relay        120 kg standing  balanced  delivered      $-117   $43850   $43699   91  
+  32  Rim Relay → Tinstack      120 kg fragile   gentle    delivered      $-111   $43739   $43699   92  
+  33  Tinstack → Dustfield      120 kg standing  balanced  delivered       $506   $44245   $43699   93  
+  34  Dustfield → Tinstack      120 kg standing  balanced  delivered       $330   $44575   $43699   94  
+  35  Tinstack → Dustfield      120 kg standing  balanced  delivered       $226   $44801   $43699   95  
+  36  Dustfield → Tinstack      120 kg standing  balanced  delivered       $907   $45708   $43699   96  4 In the black ($600 grant · Skybolt Logistics takes notice)
+  37  Tinstack → Rim Relay       90 kg fragile   gentle    delivered       $906   $46614   $43699   97  5 Far side ($750 grant · Cinder opened) + 6 Dominant courier (Dominant courier of Tinmoon)
 
-Tinmoon ladder after 20 legs:
+Tinmoon ladder after 37 legs:
   1 First dust           leg 1
   2 Rock runner          leg 5
   3 Ore train            leg 9
-  4 In the black         leg 12
-  5 Far side             leg 14
-  6 Dominant courier     leg 20
-  player $48201 · 20 deliveries · REP 80 | Skybolt Logistics $42920 · 8 deliveries · REP 68 · skill 0.530 · failed 0
-  Anchor       player 6 · rival 0
-  Dustfield    player 4 · rival 3
-  Rim Relay    player 7 · rival 3
-  Tinstack     player 3 · rival 2
+  4 In the black         leg 36
+  5 Far side             leg 37
+  6 Dominant courier     leg 37
+  player $46614 · 37 deliveries · REP 97 | Skybolt Logistics $43699 · 12 deliveries · REP 72 · skill 0.600 · failed 0
+  Anchor       player 12 · rival 1
+  Dustfield    player 6 · rival 4
+  Rim Relay    player 13 · rival 4
+  Tinstack     player 6 · rival 3
 
 === Cinder · reference player · up to 60 legs · market seed 3270102995 · arrives REP 60 · Skybolt Logistics REP 60 skill 0.300 ===
  leg  route                     cargo            profile   result        cash Δ     cash    rival  REP  milestone
    1  Bastion → Slagworks        90 kg standing  balanced  delivered     $24061   $64061   $58031   61  1 First heat ($5,000 grant)
-   2  Slagworks → Forge          90 kg contract  balanced  delivered      $5303   $69364   $58031   62  
-   3  Forge → Bastion            70 kg fragile   gentle    delivered      $2666   $72030   $58031   63  
-   4  Bastion → Anvil            90 kg contract  balanced  delivered     $12243   $84273   $58031   64  2 Forge trade ($8,000 grant)
-   5  Anvil → Slagworks          90 kg standing  balanced  delivered      $3350   $87623   $58031   65  
-   6  Slagworks → Forge          90 kg standing  balanced  delivered      $2831   $90454   $60357   66  
-   7  Forge → Slagworks          90 kg fragile   gentle    delivered      $6525   $96979   $67527   67  
-   8  Slagworks → Bastion        90 kg standing  balanced  delivered      $7901  $104880   $67527   68  
-   9  Bastion → Slagworks        90 kg standing  balanced  delivered      $5175  $110055   $67527   69  
-  10  Slagworks → Bastion        90 kg standing  balanced  delivered      $6470  $116525   $77250   70  
-  11  Bastion → Slagworks        90 kg standing  balanced  delivered      $5831  $122356   $78282   71  
-  12  Slagworks → Anvil          90 kg standing  balanced  delivered      $1652  $124009   $84924   72  
-  13  Anvil → Bastion            90 kg fragile   gentle    delivered     $10658  $134667   $84924   73  3 Careful hands ($10,000 grant)
-  14  Bastion → Forge            90 kg fragile   gentle    delivered     $12324  $146991   $87634   74  
-  15  Forge → Anvil              90 kg standing  balanced  delivered     $18829  $165819   $92697   75  4 Reliable service ($12,000 grant · Skybolt Logistics takes notice)
-  16  Anvil → Forge              90 kg standing  balanced  delivered      $5436  $171256   $99305   76  
-  17  Forge → Slagworks          90 kg contract  balanced  delivered     $17477  $188732  $106282   77  5 Across the fire ($15,000 grant · Gossamer opened) + 6 Dominant courier (Dominant courier of Cinder)
+   2  Slagworks → Forge          90 kg contract  balanced  delivered      $5311   $69372   $58031   62  
+   3  Forge → Bastion            70 kg fragile   gentle    delivered      $6069   $75440   $58031   63  
+   4  Bastion → Anvil            90 kg contract  balanced  delivered     $15462   $90902   $58031   64  2 Forge trade ($8,000 grant)
+   5  Anvil → Slagworks          90 kg standing  balanced  delivered      $6963   $97865   $58031   65  
+   6  Slagworks → Forge          50 kg fragile   gentle    delivered      $3095  $100960   $60357   66  
+   7  Forge → Slagworks          90 kg fragile   gentle    delivered     $19774  $120734   $70919   67  3 Careful hands ($10,000 grant)
+   8  Slagworks → Bastion        90 kg standing  balanced  delivered     $11156  $131890   $70919   68  
+   9  Bastion → Slagworks        90 kg standing  balanced  delivered      $5184  $137074   $70919   69  
+  10  Slagworks → Bastion        90 kg standing  balanced  delivered      $6478  $143552   $80643   70  
+  11  Bastion → Slagworks        90 kg standing  balanced  delivered      $5840  $149393   $85320   71  
+  12  Slagworks → Bastion        90 kg standing  balanced  delivered      $5081  $154473   $92301   72  
+  13  Bastion → Slagworks        90 kg standing  balanced  delivered      $4051  $158524   $92301   73  
+  14  Slagworks → Bastion        90 kg standing  balanced  delivered      $4995  $163520  $101009   74  
+  15  Bastion → Forge            90 kg fragile   gentle    delivered     $22643  $186163  $104918   75  4 Reliable service ($12,000 grant · Skybolt Logistics takes notice)
+  16  Forge → Anvil              90 kg standing  balanced  delivered     $10266  $196429  $104918   76  
+  17  Anvil → Slagworks          90 kg contract  balanced  delivered     $16852  $213281  $109780   77  5 Across the fire ($15,000 grant · Gossamer opened)
+  18  Slagworks → Forge          70 kg fragile   gentle    delivered      $6463  $219745  $114673   78  
+  19  Forge → Anvil              90 kg standing  balanced  delivered      $9728  $229473  $116482   79  6 Dominant courier (Dominant courier of Cinder)
 
-Cinder ladder after 17 legs:
+Cinder ladder after 19 legs:
   1 First heat           leg 1
   2 Forge trade          leg 4
-  3 Careful hands        leg 13
+  3 Careful hands        leg 7
   4 Reliable service     leg 15
   5 Across the fire      leg 17
-  6 Dominant courier     leg 17
-  player $188732 · 17 deliveries · REP 77 | Skybolt Logistics $106282 · 10 deliveries · REP 70 · skill 0.570 · failed 0
-  Bastion      player 4 · rival 1
-  Forge        player 4 · rival 3
-  Slagworks    player 6 · rival 4
-  Anvil        player 3 · rival 2
+  6 Dominant courier     leg 19
+  player $229473 · 19 deliveries · REP 79 | Skybolt Logistics $116482 · 11 deliveries · REP 71 · skill 0.605 · failed 0
+  Bastion      player 5 · rival 2
+  Forge        player 4 · rival 4
+  Slagworks    player 7 · rival 2
+  Anvil        player 3 · rival 3
 
 === Gossamer · reference player · up to 60 legs · market seed 2201895975 · arrives REP 60 · Skybolt Logistics REP 60 skill 0.300 ===
  leg  route                     cargo            profile   result        cash Δ     cash    rival  REP  milestone
    1  Canopy → Halcyon          120 kg standing  balanced  delivered      $5571   $45571   $43715   61  1 First drift ($1,200 grant)
-   2  Halcyon → Canopy          120 kg contract  balanced  delivered      $1186   $46757   $43715   62  
-   3  Canopy → Drift            120 kg contract  balanced  delivered      $1076   $47833   $43715   63  
-   4  Drift → Canopy            120 kg contract  balanced  delivered      $1963   $49796   $43715   64  
-   5  Canopy → Drift            120 kg contract  balanced  delivered      $4183   $53979   $43715   65  2 Sky trade ($1,800 grant)
-   6  Drift → Zephyr            120 kg standing  balanced  delivered      $2792   $56771   $43715   66  
-   7  Zephyr → Drift            120 kg standing  balanced  delivered       $806   $57577   $43715   67  
-   8  Drift → Zephyr            120 kg standing  balanced  delivered      $1159   $58735   $43715   68  
-   9  Zephyr → Canopy           120 kg fragile   gentle    delivered      $1442   $60177   $43715   69  
-  10  Canopy → Halcyon          120 kg standing  balanced  delivered      $4610   $64787   $43715   70  3 Heavy air ($2,200 grant)
-  11  Halcyon → Zephyr          120 kg standing  balanced  delivered       $456   $65243   $43715   71  
-  12  Zephyr → Canopy            90 kg fragile   gentle    delivered       $783   $66026   $43715   72  
-  13  Canopy → Drift             60 kg fragile   gentle    delivered       $854   $66880   $43715   73  
-  14  Drift → Halcyon           120 kg fragile   gentle    delivered      $6382   $73262   $44138   74  4 Feather touch ($2,600 grant · Skybolt Logistics takes notice)
-  15  Halcyon → Zephyr          120 kg standing  balanced  delivered      $1520   $74782   $44138   75  
-  16  Zephyr → Halcyon          120 kg contract  balanced  delivered      $4001   $78783   $44378   76  5 Long haul ($3,200 grant) + 6 Dominant courier (Dominant courier of Gossamer)
+   2  Halcyon → Canopy          120 kg contract  balanced  delivered       $635   $46206   $43715   62  
+   3  Canopy → Drift            120 kg contract  balanced  delivered       $505   $46711   $43715   63  
+   4  Drift → Canopy            120 kg contract  balanced  delivered      $1862   $48573   $43715   64  
+   5  Canopy → Drift            120 kg contract  balanced  delivered      $4072   $52645   $43715   65  2 Sky trade ($1,800 grant)
+   6  Drift → Zephyr            120 kg standing  balanced  delivered      $2695   $55341   $43715   66  
+   7  Zephyr → Drift            120 kg standing  balanced  delivered       $216   $55556   $43715   67  
+   8  Drift → Zephyr            120 kg standing  balanced  delivered       $606   $56162   $43715   68  
+   9  Zephyr → Canopy           120 kg fragile   gentle    delivered       $866   $57028   $43715   69  
+  10  Canopy → Halcyon          120 kg standing  balanced  delivered      $3972   $61000   $43715   70  3 Heavy air ($2,200 grant)
+  11  Halcyon → Canopy          120 kg standing  balanced  delivered       $549   $61550   $43715   71  
+  12  Canopy → Halcyon          120 kg standing  balanced  delivered       $330   $61880   $43715   72  
+  13  Halcyon → Zephyr           90 kg fragile   gentle    delivered       $445   $62325   $43715   73  
+  14  Zephyr → Drift            120 kg standing  balanced  delivered      $1713   $64038   $43715   74  
+  15  Drift → Zephyr            120 kg standing  balanced  delivered       $622   $64660   $43715   75  
+  16  Zephyr → Drift            120 kg standing  balanced  delivered       $241   $64901   $43715   76  
+  17  Drift → Halcyon           120 kg fragile   gentle    delivered      $1274   $66175   $43715   77  
+  18  Halcyon → Zephyr          120 kg standing  balanced  delivered       $945   $67120   $43715   78  
+  19  Zephyr → Canopy            90 kg fragile   gentle    delivered      $3589   $70709   $43715   79  4 Feather touch ($2,600 grant · Skybolt Logistics takes notice)
+  20  Canopy → Halcyon           90 kg contract  balanced  delivered      $3546   $74255   $44423   80  5 Long haul ($3,200 grant) + 6 Dominant courier (Dominant courier of Gossamer)
 
-Gossamer ladder after 16 legs:
+Gossamer ladder after 20 legs:
   1 First drift          leg 1
   2 Sky trade            leg 5
   3 Heavy air            leg 10
-  4 Feather touch        leg 14
-  5 Long haul            leg 16
-  6 Dominant courier     leg 16
-  player $78783 · 16 deliveries · REP 76 | Skybolt Logistics $44378 · 3 deliveries · REP 63 · skill 0.385 · failed 0
-  Canopy       player 4 · rival 0
-  Drift        player 4 · rival 1
-  Halcyon      player 4 · rival 1
-  Zephyr       player 4 · rival 1
+  4 Feather touch        leg 19
+  5 Long haul            leg 20
+  6 Dominant courier     leg 20
+  player $74255 · 20 deliveries · REP 80 | Skybolt Logistics $44423 · 2 deliveries · REP 62 · skill 0.360 · failed 0
+  Canopy       player 5 · rival 0
+  Drift        player 5 · rival 0
+  Halcyon      player 5 · rival 1
+  Zephyr       player 5 · rival 1
 
 === campaign tally ===
-Verdant    6 / 6 milestones in  19 legs · DOMINANT COURIER
-Tinmoon    6 / 6 milestones in  20 legs · DOMINANT COURIER
-Cinder     6 / 6 milestones in  17 legs · DOMINANT COURIER
-Gossamer   6 / 6 milestones in  16 legs · DOMINANT COURIER
-arc complete: dominant courier on every world · carried REP 76
+Verdant    6 / 6 milestones in  32 legs · DOMINANT COURIER
+Tinmoon    6 / 6 milestones in  37 legs · DOMINANT COURIER
+Cinder     6 / 6 milestones in  19 legs · DOMINANT COURIER
+Gossamer   6 / 6 milestones in  20 legs · DOMINANT COURIER
+arc complete: dominant courier on every world · carried REP 80

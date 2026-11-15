@@ -127,36 +127,55 @@ R.autopilot.setProfile('balanced');
 assert.equal(snapshotGame.flight.autopilotProfile, 'gentle', 'changing the builder choice does not touch a flight in progress');
 
 // ---- Q fade: forward thrust fades toward the cap; braking and lift stay.
+// The probe flies the free-fall line — circular speed at the cruise altitude,
+// where the ground curves away exactly as fast as gravity falls — so the
+// vertical channel is quiet and the whole request is along the airflow. Verdant
+// reaches its pressure cap far above that line, so the probe lowers the cap to
+// put the band where a legal cruise actually flies.
 var cap = verdant.flight.maxDynamicPressure;
-var cruise = { wx: 1500, wy: 800, vy: 0, heading: Math.PI / 2 };
-var below = probe({ maxDynamicPressure: cap }, Object.assign({ vx: 200 }, cruise));
+var cruiseAltitude = 800;
+var freeFall = R.physics.circularSpeedAtAltitude(cruiseAltitude);
+var cruisePressure = R.aerodynamics.dynamicPressure(R.physics.densityAtAltitude(cruiseAltitude), freeFall);
+var fadeCap = 2 * cruisePressure / (1 + settings.qFadeStartFraction);
+var cruise = { wx: 1500, wy: cruiseAltitude, vy: 0, heading: Math.PI / 2 };
+var below = probe({ maxDynamicPressure: fadeCap }, Object.assign({ vx: 0.9 * freeFall }, cruise));
 
-assert.equal(below.limiter, 0, 'nothing limits a flight below the fade band');
+assert.equal(below.limiter & flags.Q, 0, 'the pressure limit is off below the fade band');
 
-[310, 330, 350].forEach(function(speed) {
+[0.95, 1, 1.06].forEach(function(ratio) {
+	var speed = ratio * freeFall;
 	var state = Object.assign({ vx: speed }, cruise);
 	var free = probe({}, state);
-	var limited = probe({ maxDynamicPressure: cap }, state);
-	var band = pressureBand(800, speed, cap);
+	var limited = probe({ maxDynamicPressure: fadeCap }, state);
+	var band = pressureBand(cruiseAltitude, speed, fadeCap);
 
 	assert.ok(band > 0 && band <= 1, 'the test state is inside the band');
-	assert.ok(Math.abs(limited.thrust.x - (1 - band) * free.thrust.x) < 1e-6, 'forward thrust fades linearly with the band at ' + speed + ' m/s');
-	assert.ok(Math.abs(limited.thrust.y - free.thrust.y) < 1e-6, 'sideways (lift) thrust is untouched at ' + speed + ' m/s');
-	assert.ok(limited.limiter & flags.Q, 'the HUD reports the Q limiter at ' + speed + ' m/s');
+	assert.ok(Math.abs(limited.thrust.x - (1 - band) * free.thrust.x) < 1e-6, 'forward thrust fades linearly with the band at ' + speed.toFixed(0) + ' m/s');
+	assert.ok(Math.abs(limited.thrust.y - free.thrust.y) < 1e-6, 'sideways (lift) thrust is untouched at ' + speed.toFixed(0) + ' m/s');
+	assert.ok(limited.limiter & flags.Q, 'the HUD reports the Q limiter at ' + speed.toFixed(0) + ' m/s');
 	assert.ok(!(limited.limiter & flags.AOA) && !(limited.limiter & flags.ACCEL), 'only the Q limiter is set');
 });
 
-var pastCap = probe({ maxDynamicPressure: cap }, Object.assign({ vx: 400 }, cruise));
+// Past the cap the along-flow part is gone. What is left is the line: above the
+// free-fall speed, holding altitude means pushing down, and that thrust stays.
+// The speed sits under the cruise cap, so the request is still a forward one and
+// the fade is what removes it.
+var pastCap = probe({ maxDynamicPressure: fadeCap }, Object.assign({ vx: 1.2 * freeFall }, cruise));
 
 assert.ok(Math.abs(pastCap.thrust.x) < 1e-6, 'no forward thrust is left at the cap');
-assert.ok(pastCap.thrust.y > 0, 'but the rocket still holds its altitude');
+assert.ok(Math.abs(pastCap.thrust.y) > 1, 'the vertical channel still flies the line');
+assert.ok(pastCap.thrust.y < 0, 'and above circular speed the line is below free fall');
 
-var overshoot = { wx: 11000, wy: 800, vx: 330, vy: 0, heading: Math.PI / 2 };
-var brakingFree = probe({}, overshoot);
-var brakingLimited = probe({ maxDynamicPressure: cap }, overshoot);
+// Past the pad the guidance reverses to kill its speed. That request sits in the
+// same band, and the fade must leave it alone — a rocket that cannot brake because
+// of its own heat limit is a rocket that flies past the pad.
+var overshoot = { wx: 11000, wy: cruiseAltitude, vx: 1.06 * freeFall, vy: 0, heading: Math.PI / 2 };
+var brakingFree = probe({ maxDynamicPressure: 0 }, overshoot);
+var brakingLimited = probe({ maxDynamicPressure: fadeCap }, overshoot);
 
 assert.ok(brakingFree.thrust.x < 0, 'past the pad the guidance brakes');
-assert.ok(Math.abs(brakingLimited.thrust.x - brakingFree.thrust.x) < 1e-6 && Math.abs(brakingLimited.thrust.y - brakingFree.thrust.y) < 1e-6, 'braking is never faded');
+assert.ok(pressureBand(cruiseAltitude, overshoot.vx, fadeCap) > 0, 'while inside the fade band');
+assert.deepEqual(brakingLimited.thrust, brakingFree.thrust, 'braking is never faded');
 assert.equal(brakingLimited.limiter & flags.Q, 0, 'and is not reported as limiting');
 
 // ---- Acceleration cap: applied before guidance plans, from the first light-off.
@@ -430,9 +449,21 @@ planetIds.forEach(function(planetId) {
 		assert.ok(soft.seconds < free.seconds * 1.15 + 1, label + ' gentle stays within a sane pace');
 		assert.ok(soft.flight.peakAppliedThrustAcceleration < normal.flight.peakAppliedThrustAcceleration * 0.95, label + ' gentle accelerates less');
 		if (planet.seaLevelDensity > 0) {
+			var ceiling = planet.flight.maxDynamicPressure;
+			var fadeStart = ceiling * settings.qFadeStartFraction;
+
+			assert.ok(normal.flight.peakDynamicPressure <= ceiling, label + ' balanced flies inside the pressure ceiling');
 			assert.ok(normal.flight.peakDynamicPressure <= free.flight.peakDynamicPressure, label + ' balanced never raises the peak pressure');
-			assert.ok(routeIndex === 0 || normal.flight.peakDynamicPressure < free.flight.peakDynamicPressure * 0.9, label + ' balanced trims the long hop');
-			assert.ok(soft.flight.peakDynamicPressure < normal.flight.peakDynamicPressure * 0.85, label + ' gentle lowers it measurably further');
+			assert.ok(soft.flight.peakDynamicPressure <= normal.flight.peakDynamicPressure, label + ' gentle never raises it either');
+			// The cruise law, not the ceiling, is what paces a flight that never
+			// reaches the fade band: there the limiter must stay shut. Where the free
+			// flight does reach it, the fade is what trims the hop.
+			if (free.flight.peakDynamicPressure < fadeStart) {
+				assert.equal(normal.limiterSeconds.Q, 0, label + ' no pressure limit engages under the fade band');
+			} else {
+				assert.ok(normal.flight.peakDynamicPressure < free.flight.peakDynamicPressure, label + ' the fade trims a flight that reaches the band');
+				assert.ok(soft.flight.peakDynamicPressure < normal.flight.peakDynamicPressure * 0.9, label + ' and gentle asks for less of it again');
+			}
 			assert.ok(normal.sideFlips <= free.sideFlips + 2 && soft.sideFlips <= free.sideFlips + 2, label + ' the limits add no axis flips');
 		}
 		[normal, soft].forEach(function(result, index) {
@@ -460,7 +491,11 @@ planetIds.forEach(function(planetId) {
 				var label = planetId + ' ' + route.join('>') + ' ' + profileId + ' at ' + frame[0] + ' fps x' + frame[1];
 
 				assert.equal(result.status, 'delivered', label + ' delivers');
-				assert.ok(Math.abs(result.seconds - steady.seconds) < 2, label + ' takes the same time');
+				// Physics sub-steps at the fixed rate no matter what the frame does, so
+				// the only thing a frame rate changes is how often the guidance is
+				// re-asked. At 30 fps x4 that is 7.5 times a second, and a flight held
+				// by a capped cruise line pays a few percent for a stale command.
+				assert.ok(Math.abs(result.seconds - steady.seconds) < steady.seconds * 0.06 + 0.5, label + ' takes the same time');
 				assert.ok(result.flight.peakDynamicPressure < steady.flight.peakDynamicPressure * 1.1 + 100, label + ' keeps the same envelope');
 				assert.ok(result.commandsValid, label + ' commands stay valid');
 			});

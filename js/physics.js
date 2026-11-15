@@ -47,6 +47,17 @@
 		return Math.sqrt(physics.gravitationalParameter() / r);
 	};
 
+	// The speed at which the ground curves away as fast as `downward` can follow
+	// it: at or above it gravity alone cannot hold a flight on the line, and only
+	// a downward push can. With `downward` zero this is circular speed; the extra
+	// term makes the boundary one of thrust rather than of the world, so a flight
+	// with authority in hand can be asked to fly above circular speed and arrive.
+	physics.holdSpeedAtAltitude = function(altitude, downward) {
+		var r = R.world.planet.radius + Math.max(0, altitude);
+
+		return Math.sqrt(Math.max(0, (physics.gravityAtAltitude(altitude) + Math.max(0, downward)) * r));
+	};
+
 	// Where the exponential atmosphere has thinned to the space fraction;
 	// an airless world has no ceiling line at all.
 	physics.atmosphereTop = function() {

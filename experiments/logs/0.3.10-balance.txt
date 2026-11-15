@@ -1,0 +1,126 @@
+# Economy bands for 0.3.10: node experiments/balance.js 20261004 4 2
+# The hold-speed cruise line, priced against the shipped constants: no price or loadout
+# moved, and every band holds. Compare experiments/logs/0.5.2-balance-pressure.txt, which
+# recorded the same bands against the old crawl law.
+
+damage off
+balance Monte Carlo · base seed 20261004 · 4 legs × 2 repetitions per bucket · 72 buckets · starting cash $40000 · overhaulFactor 0.35 · distanceBonus 1.7 · padSpread 0.18
+=== verdant · C 20 km · g 9.81 · prices fuel 4.100 steel 2.500 delivery 18.00 · reference 420/260/200 kg × 80 kg ===
+-- near hop · 5.0 km · Homeport ⇄ Eastport
+stages payload  legs grant  deliv  land  crash      chain stopped by   margin     p10     p90 cash min cash end
+1st     40kg     8     2      6     0      0                     —   +18.0%  +16.2%  +20.5%    40908    41440
+1st     60kg     8     2      6     0      0                     —   +43.1%  +41.8%  +45.0%    41381    43413
+1st     80kg     8     2      6     0      0                     —   +52.2%  +51.7%  +52.6%    41812    44955
+2st     40kg     8     2      6     0      0                     —   −21.5%  −24.0%  −19.8%    40245    40292
+2st     60kg     8     2      6     0      0                     —   +14.0%   +9.1%  +17.8%    41357    42055
+2st     80kg     8     2      6     0      0                     —   +30.3%  +29.0%  +31.8%    41819    43648
+3st     40kg     8     2      6     0      0                     —   −50.2%  −52.5%  −47.0%    39386    39386
+3st     60kg     8     2      6     0      0                     —    −7.0%   −9.5%   −4.6%    41023    41088
+3st     80kg     8     2      6     0      0                     —   +15.5%  +12.9%  +17.7%    41797    42734
+-- far hop · 10.0 km · Homeport ⇄ Farport
+stages payload  legs grant  deliv  land  crash      chain stopped by   margin     p10     p90 cash min cash end
+1st     40kg     8     2      6     0      0                     —   +12.9%  +10.5%  +14.9%    41177    41664
+1st     60kg     8     2      6     0      0                     —   +37.7%  +35.1%  +39.8%    41813    44055
+1st     80kg     8     2      6     0      0                     —   +50.3%  +48.3%  +51.6%    42359    46346
+2st     40kg     8     2      6     0      0                     —   −30.4%  −35.5%  −27.4%    39891    39891
+2st     60kg     8     2      6     0      0                     —    +8.4%   +5.1%  +11.4%    41774    42264
+2st     80kg     8     2      6     0      0                     —   +29.0%  +26.8%  +31.1%    42355    44815
+3st     40kg     8     2      6     0      0                     —  −110.5% −116.7% −107.0%    36701    36890
+3st     60kg     8     2      6     0      0                     —   −44.7%  −49.2%  −40.8%    39029    39226
+3st     80kg     8     2      6     0      0                     —   −14.3%  −17.1%  −12.4%    41169    41169
+=== tinmoon · C 16 km · g 1.62 · prices fuel 2.600 steel 2.000 delivery 4.20 · reference 200/140/100 kg × 80 kg ===
+-- near hop · 2.6 km · Anchor ⇄ Dustfield
+stages payload  legs grant  deliv  land  crash      chain stopped by   margin     p10     p90 cash min cash end
+1st     40kg     8     2      6     0      0                     —   +33.5%  +32.3%  +34.9%    40188    40409
+1st     60kg     8     2      6     0      0                     —   +49.3%  +47.8%  +50.6%    40285    40750
+1st     80kg     8     2      6     0      0                     —   +58.6%  +57.4%  +59.6%    40375    41146
+2st     40kg     8     2      6     0      0                     —    −6.2%  −12.3%   +0.3%    40125    40125
+2st     60kg     8     2      6     0      0                     —   +22.8%  +20.4%  +25.5%    40280    40503
+2st     80kg     8     2      6     0      0                     —   +38.1%  +36.5%  +39.8%    40388    40859
+3st     40kg     8     2      6     0      0                     —   −35.5%  −40.8%  −30.9%    39949    39949
+3st     60kg     8     2      6     0      0                     —    +5.3%   +1.3%   +8.5%    40280    40360
+3st     80kg     8     2      6     0      0                     —   +21.7%  +19.0%  +24.6%    40385    40634
+-- far hop · 8.0 km · Anchor ⇄ Rim Relay
+stages payload  legs grant  deliv  land  crash      chain stopped by   margin     p10     p90 cash min cash end
+1st     40kg     8     2      6     0      0                     —   +17.6%  +13.9%  +20.5%    40275    40457
+1st     60kg     8     2      6     0      0                     —   +37.3%  +35.1%  +39.4%    40411    40924
+1st     80kg     8     2      6     0      0                     —   +49.4%  +48.0%  +51.5%    40563    41459
+2st     40kg     8     2      6     0      0                     —   −30.5%  −35.3%  −25.8%    39970    40029
+2st     60kg     8     2      6     0      0                     —    +7.1%   +5.0%   +9.5%    40415    40489
+2st     80kg     8     2      6     0      0                     —   +22.9%  +21.5%  +24.1%    40544    40977
+3st     40kg     8     2      6     0      0                     —   −72.1%  −74.9%  −69.7%    39599    39616
+3st     60kg     8     2      6     0      0                     —   −20.2%  −25.8%  −15.2%    40122    40186
+3st     80kg     8     2      6     0      0                     —    +5.0%   +2.8%   +7.8%    40553    40619
+=== cinder · C 24 km · g 16.5 · prices fuel 5.500 steel 3.600 delivery 130.00 · reference 1500/900/400 kg × 60 kg ===
+-- near hop · 6.0 km · Bastion ⇄ Forge
+stages payload  legs grant  deliv  land  crash      chain stopped by   margin     p10     p90 cash min cash end
+1st     30kg     8     2      6     0      0                     —   +17.1%  +14.4%  +19.1%    44870    47878
+1st     50kg     8     2      6     0      0                     —   +45.4%  +42.8%  +47.7%    48559    60267
+1st     60kg     8     2      6     0      0                     —   +51.5%  +50.6%  +52.0%    49753    66945
+2st     30kg     8     2      6     0      0                     —   −25.6%  −29.4%  −21.1%    40404    40404
+2st     50kg     8     2      6     0      0                     —   +19.2%  +15.6%  +21.6%    48160    53598
+2st     60kg     8     2      6     0      0                     —   +30.5%  +28.4%  +32.5%    49954    60320
+3st     30kg     8     2      6     0      0                     —   −56.2%  −61.3%  −52.0%    35314    36246
+3st     50kg     8     2      6     0      0                     —    +2.1%   −2.8%   +5.4%    48153    49551
+3st     60kg     8     2      6     0      0                     —   +17.5%  +12.5%  +20.2%    49747    55553
+-- far hop · 12.0 km · Bastion ⇄ Slagworks
+stages payload  legs grant  deliv  land  crash      chain stopped by   margin     p10     p90 cash min cash end
+1st     30kg     8     2      6     0      0                     —   +14.9%  +11.0%  +17.7%    46354    49579
+1st     50kg     8     2      6     0      0                     —   +44.7%  +43.3%  +45.9%    50593    66791
+1st     60kg     8     2      6     0      0                     —   +50.9%  +49.6%  +52.4%    52810    73942
+2st     30kg     8     2      6     0      0                     —   −71.6%  −75.1%  −67.7%    30853    31061
+2st     50kg     8     2      6     0      0                     —    −8.1%  −11.4%   −5.5%    47648    47711
+2st     60kg     8     2      6     0      0                     —    +6.3%   +2.4%  +10.8%    52821    56382
+3st     30kg     8     2      6     0      0                     —   −92.1%  −93.8%  −90.3%    26971    26971
+3st     50kg     8     2      6     0      0                     —   −17.9%  −21.9%  −14.9%    43519    43519
+3st     60kg     8     2      6     0      0                     —    −1.2%   −3.3%   +1.3%    51586    52873
+=== gossamer · C 26 km · g 5.4 · prices fuel 5.000 steel 2.200 delivery 22.50 · reference 380/240/180 kg × 80 kg ===
+-- near hop · 5.2 km · Canopy ⇄ Drift
+stages payload  legs grant  deliv  land  crash      chain stopped by   margin     p10     p90 cash min cash end
+1st     40kg     8     2      6     0      0                     —    +1.3%   −0.7%   +3.0%    41103    41174
+1st     60kg     8     2      6     0      0                     —   +28.4%  +26.3%  +30.0%    41634    43114
+1st     80kg     8     2      6     0      0                     —   +45.5%  +43.2%  +47.4%    42170    45505
+2st     40kg     8     2      6     0      0                     —   −37.2%  −39.0%  −35.6%    39740    39740
+2st     60kg     8     2      6     0      0                     —    +4.5%   +2.2%   +7.1%    41610    41860
+2st     80kg     8     2      6     0      0                     —   +24.8%  +22.4%  +27.3%    42158    43912
+3st     40kg     8     2      6     0      0                     —   −59.3%  −61.4%  −57.5%    38903    38903
+3st     60kg     8     2      6     0      0                     —   −11.7%  −15.6%   −8.2%    40966    40966
+3st     80kg     8     2      6     0      0                     —   +13.1%   +8.5%  +16.6%    42135    43195
+-- far hop · 11.7 km · Canopy ⇄ Halcyon
+stages payload  legs grant  deliv  land  crash      chain stopped by   margin     p10     p90 cash min cash end
+1st     40kg     8     2      6     0      0                     —   −31.2%  −35.9%  −27.4%    39910    39977
+1st     60kg     8     2      0     0      8                     —        —       —       —    32386    32551
+1st     80kg     8     2      0     0      8                     —        —       —       —    32565    32569
+2st     40kg     8     2      6     0      0                     —  −104.5% −109.7%  −98.9%    36338    36571
+2st     60kg     8     2      6     0      0                     —   −41.8%  −45.4%  −38.7%    39140    39140
+2st     80kg     8     2      6     0      0                     —   −12.3%  −14.1%   −9.8%    41715    41732
+3st     40kg     8     2      6     0      0                     —  −142.7% −152.8% −134.4%    34503    34503
+3st     60kg     8     2      6     0      0                     —   −61.9%  −66.4%  −58.4%    37475    37475
+3st     80kg     8     2      6     0      0                     —   −25.2%  −27.6%  −22.1%    40300    40300
+=== bands · verdant near hop · balanced · standing service ===
+reference build (3 stages, 80 kg): margin +15.5% over 6 delivered legs · target +10.0…+20.0% PASS
+for scale, the leaner builds on the same hop: 1 stage +52.2% · 2 stages +30.3% · the overbuild is what a bigger stack than the hop needs costs
+=== bands · standing service in the steady state · reference build, near hop, 24 legs ===
+verdant   margin +12.0% over 23 delivered legs · worst leg −28.3% · target +10.0…+20.0% PASS
+tinmoon   margin +17.3% over 23 delivered legs · worst leg −109.3% · target +10.0…+20.0% PASS
+cinder    margin +14.6% over 23 delivered legs · worst leg −12.0% · target +10.0…+20.0% PASS
+gossamer  margin +10.1% over 23 delivered legs · worst leg −12.4% · target +10.0…+20.0% PASS
+=== bands · overbuilt stack (reference stages ×1.5 fuel, same payload) ===
+verdant near hop: margin −19.1% over 3 delivered legs · target ≤ 0% PASS
+tinmoon near hop: margin −0.2% over 3 delivered legs · target ≤ 0% PASS
+cinder near hop: margin −19.0% over 3 delivered legs · target ≤ 0% PASS
+gossamer near hop: margin −14.8% over 3 delivered legs · target ≤ 0% PASS
+=== bands · the heaviest cargo a pad will take · leanest build on the near hop ===
+verdant   120 kg · margin +63.1% over 11 delivered legs · the bay is not the limit, the pad is
+tinmoon   120 kg · margin +66.1% over 11 delivered legs · the bay is not the limit, the pad is
+cinder    90 kg · margin +64.0% over 11 delivered legs · the bay is not the limit, the pad is
+gossamer  120 kg · margin +56.9% over 11 delivered legs · the bay is not the limit, the pad is
+=== bands · crash · verdant near hop, an undersized stack loaded to its gate (401 kg) ===
+status crashed · revenue $0 · leg cash -249 (the fuel it loaded) · replacement $708 · the attempt costs $957 · target: a large negative, never a mid-band result
+=== bands · contract with urgency or fragile cargo vs a standing service ===
+the reference build on the verdant near hop, 40 legs on one chain
+contract legs: margin +24.1% · p10 −6.3% · p90 +47.5% over 23 delivered legs · 0 lost
+standing legs: margin +9.3% · p10 +7.0% · p90 +15.3% over 16 delivered legs · 0 lost
+target: a contract pays a higher margin, with a wider spread, than a standing service PASS
+=== bands · return leg on leftover fuel vs a refuelled turnaround ===
+leftover fuel: return margin +90.0% · refuelled: +14.4% · target: leftover strictly better PASS

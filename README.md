@@ -142,7 +142,13 @@ the active world is the sole gravitating body, and the fixed star is a visual
 light source. Catalog planets and moons follow circular test-particle orbits
 in that world's gravity. The rocket uses the same central field and spherical
 geometry, so a circular coast at a body's radius keeps pace with it. Delivery
-autopilot stays below circular speed; manual flight can orbit or escape.
+autopilot cruises at a fraction of the speed that holds the line it is flying,
+`sqrt((g + downward) * r)`: above circular speed whenever it is diving, because
+a fast flight has to push down to keep up with the ground. The fraction is what
+leaves thrust in hand — a flight at the hold speed spends its whole budget on the
+vertical and has none left for the pad — and it keeps a delivery below local
+escape speed, so a cut-off coast always comes down. Manual flight can orbit or
+escape the same way.
 Multi-body gravity, encounters and landing on catalog bodies remain future work.
 
 The top bar's **view** selector (key `V`) offers complementary scale and
@@ -258,13 +264,16 @@ climbs on its own; below the air the ground holds the camera, above it the
 probe does, so the ground slides off the bottom exactly as far as the climb.
 
 Measurement scripts share `experiments/harness.js`; their recorded output is in
-`experiments/logs/`. `experiments/logs/0.3.5-touchdowns.txt` is the
-reference-route table for all four worlds in all three autopilot profiles, and
-is byte-identical to the 0.3.4 table below its header.
+`experiments/logs/`. `experiments/logs/0.3.10-cruise.txt` is the current
+reference-route table for all four worlds in all three autopilot profiles, flown
+against the hold speed; `experiments/logs/0.3.5-touchdowns.txt` is the table as
+the older cruise law left it, byte-identical to 0.3.4 below its header.
 `experiments/logs/0.4.4-balance.txt` is the balance run the prices were tuned
 against: a margin histogram per world, bracket, stage count and payload, plus the
 bands the plan targets. The dispatch card's PROFIT row quotes the same margin for
-the leg it is about to fly.
+the leg it is about to fly. `experiments/logs/0.3.10-balance.txt` and
+`0.3.10-balance-damage.txt` are that band table under the hold-speed law, with no
+price moved, and `0.3.10-failures.txt` is the wear the shorter legs book.
 
 `experiments/logs/0.5.1-failures.txt` is the run the damage constants were tuned
 against: how often a hop breaks something on each world at four build strengths,
@@ -277,7 +286,8 @@ steady-service economy with delivered-volume pricing enabled; every established
 margin band still passes. The damage-on repeat is in
 `experiments/logs/0.5.2-balance-pressure-damage.txt` and passes too.
 `experiments/logs/0.6.1-milestones.txt` is a reference player's 40 legs on
-Verdant with the damage model on: milestones on legs 1, 5, 9, 15, 17 and 19.
+Verdant with the damage model on: milestones on legs 1, 5, 9, 15, 32 and 32.
 `experiments/logs/0.6.2-campaign.txt` is the same player through all four
-worlds, each settled within 20 legs. Both are reproduced by
-`campaign-test.js`.
+worlds, each settled within 37 legs; 18 of the 132 legs it flies lose a few
+dollars apiece, which is the volume pricing telling it to stop flooding a pad.
+Both are reproduced by `campaign-test.js`.

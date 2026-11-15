@@ -145,8 +145,14 @@ function runChain(bucket, seed) {
 			break;
 		}
 		harness.fly(game, frameDt);
-		// The log is newest first: the leg that just finished is entries[0].
+		// The log is newest first: the leg that just finished is entries[0]. A
+		// leg the harness stopped before touchdown wrote no entry, and the chain
+		// is over: the rocket is in the sky with no report to price.
 		entry = R.flightLog.entries[0];
+		if (!entry) {
+			legs.push({ status: 'timeout', reason: 'STILL IN THE AIR', cashDelta: 0, revenue: 0, cash: game.cash, granted: false });
+			break;
+		}
 		legs.push({
 			status: entry.status,
 			reason: '',

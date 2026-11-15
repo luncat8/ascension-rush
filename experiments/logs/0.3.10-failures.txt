@@ -1,0 +1,53 @@
+# Damage Monte Carlo for 0.3.10: node experiments/failure.js 120 20261005
+# The wear a leg books under the hold-speed cruise line. A leg is a third shorter, so
+# the stress it leaves on its stages falls with it (Verdant fresh 1.00: 0.020 and $17 in
+# experiments/logs/0.5.1-failures.txt, 0.016 and $14 here) and the fragile rows read
+# better (fresh Verdant 0.50 fails 10.8% where 0.5.1 measured 20.0%, worn Tinmoon 0.50
+# 38.3% against 74.2%). What moved the wrong way is the ordinary worn row: worn Verdant
+# 1.00 fails 10.8% against 6.7%, still inside the 10-15% band the other worlds sit in,
+# so the damage constants are left where 0.5.1 tuned them and this run is the record.
+
+failure Monte Carlo · 120 legs per bucket · seed 20261005 · profile balanced · damage on
+# failureRate 0.1 · exponent 2 · stressRate 0.06 · structureMargin 1.35 · scrap 0.75
+
+--- fresh stack · 120 legs per row · seed 20261005
+world · stage strength     fail%  degr   out  leak   rud crash  stress  repair cargo%
+verdant · strength 1.00      0.0   0.0   0.0   0.0   0.0   0.0   0.016     $14    0.0
+verdant · strength 0.85      0.8   0.0   0.8   0.0   0.0   0.0   0.023     $19    0.0
+verdant · strength 0.75      0.8   0.0   0.0   0.8   0.0   0.0   0.029     $24    0.0
+verdant · strength 0.50     10.8   5.8   0.8   4.2   0.0   2.5   0.160    $128    2.5
+tinmoon · strength 1.00      0.0   0.0   0.0   0.0   0.0   0.0   0.021     $10    0.0
+tinmoon · strength 0.85      0.0   0.0   0.0   0.0   0.0   0.0   0.029     $14    0.0
+tinmoon · strength 0.75      0.0   0.0   0.0   0.0   0.0   0.0   0.037     $18    0.0
+tinmoon · strength 0.50     22.5  13.3   3.3   8.3   0.0   0.0   0.290    $143    0.0
+cinder · strength 1.00       0.0   0.0   0.0   0.0   0.0   0.0   0.015     $39    0.0
+cinder · strength 0.85       0.0   0.0   0.0   0.0   0.0   0.0   0.020     $54    0.0
+cinder · strength 0.75       0.0   0.0   0.0   0.0   0.0   0.0   0.026     $68    0.0
+cinder · strength 0.50      11.7   6.7   2.5   2.5   0.0   1.7   0.111    $286    1.8
+gossamer · strength 1.00     0.0   0.0   0.0   0.0   0.0   0.0   0.023     $16    0.0
+gossamer · strength 0.85     0.0   0.0   0.0   0.0   0.0   0.0   0.032     $22    0.0
+gossamer · strength 0.75     0.8   0.0   0.8   0.0   0.0   0.0   0.041     $28    0.0
+gossamer · strength 0.50     9.2   7.5   0.0   2.5   0.0   0.0   0.144     $97    0.0
+
+--- worn stack: engines at 90 % of their rated burn time · 120 legs per row · seed 20261005
+world · stage strength     fail%  degr   out  leak   rud crash  stress  repair cargo%
+verdant · strength 1.00     10.8   2.5   2.5   6.7   0.0   0.0   0.016     $14    0.0
+verdant · strength 0.85     12.5   8.3   2.5   1.7   0.0   0.0   0.022     $18    0.0
+verdant · strength 0.75     15.8   7.5   3.3   5.0   0.0   0.0   0.029     $24    0.0
+verdant · strength 0.50     25.8  14.2   3.3   9.2   0.0   3.3   0.156    $124    3.3
+tinmoon · strength 1.00     15.0   8.3   0.0   7.5   0.0   0.0   0.020     $10    0.0
+tinmoon · strength 0.85     20.8  11.7   4.2   8.3   0.0   0.0   0.027     $13    0.0
+tinmoon · strength 0.75     26.7  17.5   5.0   7.5   0.0   0.0   0.034     $17    0.0
+tinmoon · strength 0.50     38.3  22.5   5.8  17.5   0.0   0.0   0.276    $135    0.0
+cinder · strength 1.00      15.0   6.7   4.2   4.2   0.0   0.0   0.015     $39    0.0
+cinder · strength 0.85      13.3   7.5   2.5   5.0   0.0   0.0   0.022     $59    0.3
+cinder · strength 0.75      16.7   6.7   2.5   7.5   0.0   0.8   0.027     $70    1.0
+cinder · strength 0.50      25.0  10.8   7.5   8.3   0.0   1.7   0.112    $288    2.0
+gossamer · strength 1.00    15.0  10.8   0.8   5.0   0.0   0.0   0.022     $15    0.0
+gossamer · strength 0.85    18.3   8.3   5.0   6.7   0.0   0.8   0.030     $21    0.8
+gossamer · strength 0.75    19.2  13.3   3.3   5.0   0.0   0.0   0.040     $28    0.0
+gossamer · strength 0.50    25.0  18.3   1.7  10.8   0.0   0.0   0.140     $94    0.0
+
+# fail% is a leg with any failure; degr/out/leak/rud are the modes; stress is the
+# damage the leg left on the stages it came down with; repair is what the next
+# dispatch pays for it; cargo% is the share of the load that did not arrive.

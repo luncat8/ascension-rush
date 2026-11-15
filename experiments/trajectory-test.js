@@ -228,33 +228,43 @@ wrapGame.rocket.wy = 0;
 assert.equal(trajectory.update(wrapGame).valid, false, 'or while on the ground');
 
 // ---- A whole flight keeps publishing a forecast the HUD can show.
-R.world.initialize('cinder');
-var flownGame = harness.launch(
-	R.world.pads[0],
-	R.world.pads[2].id,
-	harness.referenceBuild(R.world.planet, R.world.pads[2].id),
-	'balanced'
-);
-var airborne = 0;
-var forecasts = 0;
+// Every airborne step of a delivery flight has a coast impact to point at. Two
+// things keep that true and neither is the predictor giving up: the cruise line is
+// capped near the speed that would leave the world, and on the deep-atmosphere
+// world the air takes a fast flight's speed back before it is out of range.
+var coastedWorlds = ['cinder', 'verdant', 'gossamer'];
 
-assert.ok(flownGame, 'the cinder reference build launches');
-while (flownGame.phase === 'flying' && flownGame.flight.elapsed < harness.maxSeconds) {
-	R.controls.update(flownGame, step);
-	R.physics.advance(flownGame, step);
-	trajectory.update(flownGame);
-	if (flownGame.rocket.wy > 0) {
-		airborne += 1;
-		forecasts += R.trajectory.impact.valid ? 1 : 0;
-		assert.ok(Number.isFinite(R.trajectory.impact.wx), 'every airborne frame has a finite impact longitude');
+coastedWorlds.forEach(function(planetId) {
+	R.world.initialize(planetId);
+	var flownGame = harness.launch(
+		R.world.pads[0],
+		R.world.pads[2].id,
+		harness.referenceBuild(R.world.planet, R.world.pads[2].id),
+		'balanced'
+	);
+	var airborne = 0;
+	var forecasts = 0;
+	var rocket;
+
+	assert.ok(flownGame, planetId + ' reference build launches');
+	while (flownGame.phase === 'flying' && flownGame.flight.elapsed < harness.maxSeconds) {
+		R.controls.update(flownGame, step);
+		R.physics.advance(flownGame, step);
+		trajectory.update(flownGame);
+		rocket = flownGame.rocket;
+		if (rocket.wy > 0) {
+			airborne += 1;
+			forecasts += R.trajectory.impact.valid ? 1 : 0;
+			assert.ok(Number.isFinite(R.trajectory.impact.wx), planetId + ' every airborne frame has a finite impact longitude');
+		}
 	}
-}
-assert.equal(flownGame.lastReport.status, 'delivered', 'the flight the forecast was sampled from delivers');
-assert.ok(airborne > 1000, 'the flight spent time airborne');
-assert.equal(forecasts, airborne, 'every airborne step of a normal flight has a coast impact');
-assert.ok(Math.abs(flownGame.lastReport.touchdownVerticalSpeed) <= R.world.planet.landingVerticalSpeed,
-	'the debrief quotes the measured touchdown sink rate');
-assert.ok(Math.abs(flownGame.lastReport.targetError) <= R.world.planet.landingRadius,
-	'and a delivered flight reports a pad error inside the landing radius');
+	assert.equal(flownGame.lastReport.status, 'delivered', planetId + ' the flight the forecast was sampled from delivers');
+	assert.ok(airborne > 1000, planetId + ' the flight spent time airborne');
+	assert.equal(forecasts, airborne, planetId + ' every airborne step of a normal flight has a coast impact');
+	assert.ok(Math.abs(flownGame.lastReport.touchdownVerticalSpeed) <= R.world.planet.landingVerticalSpeed,
+		planetId + ' the debrief quotes the measured touchdown sink rate');
+	assert.ok(Math.abs(flownGame.lastReport.targetError) <= R.world.planet.landingRadius,
+		planetId + ' and a delivered flight reports a pad error inside the landing radius');
+});
 
 console.log('Trajectory and coast-impact tests passed.');

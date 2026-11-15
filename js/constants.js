@@ -494,8 +494,14 @@
 		thrustReserve: 0.92,
 		brakeMargin: 1.15,
 		speedCap: 700,
-		// Delivery hops must stay below orbit speed to retain altitude control.
-		circularSpeedFraction: 0.7,
+		// The cruise line is bounded by the speed the vertical channel can still
+		// follow: at the hold speed the ground curves away as fast as the whole
+		// thrust budget pushes down, so a target above it is a flight that climbs
+		// away instead of arriving. The fraction decides how much of that
+		// authority the line spends, and what it leaves in hand is what a leg does
+		// not pay back: at 1 a Cinder hop burns its booster dry and the turnaround
+		// rebuilds it, at 0.7 the same hop still has the stage for the next pad.
+		holdSpeedFraction: 0.7,
 		// Flight-envelope limits; a limit that is null or not positive is off.
 		// A planet's `flight` block sets them per world and a profile scales
 		// them. Pressure in pascals, acceleration in m/s², angle in degrees.

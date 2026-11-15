@@ -428,7 +428,7 @@
 		brakeProfileSpeed = Math.sqrt(2 * brakeAccel * travelDistance) + 1.5;
 		vxDesired = dir * Math.min(
 			tuning.speedCap,
-			tuning.circularSpeedFraction * R.physics.circularSpeedAtAltitude(rocket.wy),
+			tuning.holdSpeedFraction * R.physics.holdSpeedAtAltitude(rocket.wy, budget),
 			brakeProfileSpeed,
 			Math.abs(dx) * tuning.arrivalGain
 		);
@@ -452,17 +452,23 @@
 		// correction. Whatever budget that leaves goes to the horizontal
 		// channel, which is what actually decides whether the rocket reaches
 		// the pad instead of overflying it.
+		// The channel is symmetric: up is a necessity and down is a choice, and
+		// the fast low line is where the choice has to be made. Above the hold
+		// speed the ground curves away faster than gravity falls, so a flight that
+		// only free-falls climbs out of the world instead of arriving — the
+		// downward push is what buys the line, and forbidding it is what lost it.
 		requestY = effectiveGravity + R.util.clamp(
 			tuning.velocityGain * (vyDesired - rocket.vy) + descentFeedForward,
 			-verticalAuthority,
 			verticalAuthority
 		);
-		vectorY = R.util.clamp(requestY, 0, budget);
+		vectorY = R.util.clamp(requestY, -budget, budget);
 		vectorMax = Math.sqrt(Math.max(0, budget * budget - vectorY * vectorY));
 		requestX = tuning.velocityGain * (vxDesired - rocket.vx) - brakeFeedForward +
 			rocket.vx * rocket.vy / (planet.radius + rocket.wy);
 		vectorX = R.util.clamp(requestX, -vectorMax, vectorMax);
-		if (tuning.accelerationCap < tuning.thrustReserve * thrustAccel && (requestY > budget || Math.abs(requestX) > vectorMax)) {
+		if (tuning.accelerationCap < tuning.thrustReserve * thrustAccel &&
+			(Math.abs(requestY) > budget || Math.abs(requestX) > vectorMax)) {
 			autopilot.limiter |= autopilot.limitFlags.ACCEL;
 		}
 		commandThrust(rocket, tuning, thrustAccel, budget, gravity, vectorX, vectorY);
